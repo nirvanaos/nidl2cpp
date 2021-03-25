@@ -18,9 +18,9 @@ protected:
 		return out_;
 	}
 
-	void namespace_enter (const AST::NamedItem& item);
-	void namespace_enter (const char* ns);
-	void namespace_leave ();
+	void namespace_open (const AST::NamedItem& item);
+	void namespace_open (const char* spec_ns);
+	void namespace_close ();
 
 private:
 	typedef std::vector <const AST::NamedItem*> Namespaces;

@@ -9,6 +9,7 @@ typedef sequence <long> SeqLong;
 exception MyException
 {
 	string param;
+	boolean bparam;
 };
 
 interface I1

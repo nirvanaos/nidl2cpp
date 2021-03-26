@@ -35,6 +35,7 @@ private:
 		void init (std::ostream& s)
 		{
 			out_ = s.rdbuf ();
+			s.rdbuf (this);
 		}
 
 		void term (std::ostream& s)

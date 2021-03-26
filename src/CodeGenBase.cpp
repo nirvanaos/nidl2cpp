@@ -2,64 +2,337 @@
 #include "CodeGenBase.h"
 
 using namespace std;
+using namespace std::filesystem;
 using namespace AST;
 
-CodeGenBase::CodeGenBase (const filesystem::path& file) :
-	out_ (file),
-	module_namespace_ (nullptr),
-	spec_namespace_ (nullptr)
-{}
+const char CodeGenBase::internal_namespace_ [] =
+"namespace CORBA {\n"
+"namespace Nirvana {\n";
 
-void CodeGenBase::namespace_open (const NamedItem& item)
+const char* const CodeGenBase::protected_names_ [] = {
+	"FALSE",
+	"TRUE",
+	"alignas",
+	"alignof",
+	"and",
+	"and_eq",
+	"asm",
+	"auto",
+	"bitand",
+	"bitor",
+	"bool",
+	"break",
+	"case",
+	"catch",
+	"char",
+	"char16_t",
+	"char32_t",
+	"class",
+	"compl",
+	"const",
+	"const_cast",
+	"constexpr",
+	"continue",
+	"decltype",
+	"default",
+	"delete",
+	"do",
+	"double",
+	"dynamic_cast",
+	"else",
+	"enum",
+	"explicit",
+	"export",
+	"extern",
+	"float",
+	"for",
+	"friend",
+	"goto",
+	"if",
+	"inline",
+	"int",
+	"int16_t",
+	"int32_t",
+	"int64_t",
+	"long",
+	"mutable",
+	"namespace",
+	"new",
+	"noexcept",
+	"not",
+	"not_eq",
+	"operator",
+	"or",
+	"or_eq",
+	"private",
+	"protected",
+	"public",
+	"register",
+	"reinterpret_cast",
+	"return",
+	"short",
+	"signed",
+	"sizeof",
+	"static",
+	"static_cast",
+	"struct",
+	"switch",
+	"template",
+	"this",
+	"throw",
+	"thread_local",
+	"try",
+	"typedef",
+	"typeid",
+	"typename",
+	"uint16_t",
+	"uint32_t",
+	"uint64_t",
+	"uint8_t",
+	"union",
+	"unsigned",
+	"what",
+	"using",
+	"virtual",
+	"void",
+	"volatile",
+	"wchar_t",
+	"while",
+	"xor",
+	"xor_eq"
+};
+
+inline bool CodeGenBase::is_keyword (const Identifier& id)
 {
-	if (spec_namespace_)
-		namespace_close ();
-	auto p = item.parent ();
-	if ((!p || p->kind () == Item::Kind::MODULE) && p != module_namespace_) {
-		Namespaces cur_namespaces, req_namespaces;
-		get_namespaces (module_namespace_, cur_namespaces);
-		get_namespaces (p, req_namespaces);
-		Namespaces::const_iterator cur = cur_namespaces.begin (), req = req_namespaces.begin ();
-		for (; cur != cur_namespaces.end () && req != req_namespaces.end (); ++cur, ++req) {
-			if (*cur != *req)
-				break;
-		}
-		for (; cur != cur_namespaces.end (); ++cur) {
-			out () << "}\n";
-		}
-		for (; req != req_namespaces.end (); ++req) {
-			out () << "namespace " << (*req)->name () << " {\n";
-		}
+	return binary_search (protected_names_, std::end (protected_names_), id.c_str (), pred);
+}
+
+ostream& operator << (ostream& stm, const Identifier& id)
+{
+	if (CodeGenBase::is_keyword (id))
+		stm << "_cxx_";
+	stm << static_cast <const string&> (id);
+	return stm;
+}
+
+void CodeGenBase::type (ofstream& stm, const Type& t)
+{
+	static const char* const basic_types [(size_t)BasicType::ANY + 1] = {
+		"bool",
+		"uint8_t",
+		"char",
+		"wchar_t",
+		"uint16_t",
+		"uint32_t",
+		"uint64_t",
+		"int16_t",
+		"int32_t",
+		"int64_t",
+		"float",
+		"double",
+		"long double",
+		"::CORBA::Object_var",
+		"::CORBA::ValueBase_var",
+		"::CORBA::Any"
+	};
+
+	switch (t.tkind ()) {
+		case Type::Kind::VOID:
+			stm << "void";
+			break;
+		case Type::Kind::BASIC_TYPE:
+			stm << basic_types [(size_t)t.basic_type ()];
+			break;
+		case Type::Kind::NAMED_TYPE:
+			stm << qualified_name (*t.named_type ());
+			switch (t.named_type ()->kind ()) {
+				case Item::Kind::INTERFACE:
+				case Item::Kind::VALUE_TYPE:
+				case Item::Kind::VALUE_BOX:
+					stm << "_var";
+			}
+			break;
+		case Type::Kind::STRING:
+			stm << "::CORBA::" << "String_var";
+			stm << "::CORBA::" << "WString_var";
+			break;
+		case Type::Kind::WSTRING:
+			break;
+		case Type::Kind::FIXED:
+			stm << "::CORBA::" << "Fixed";
+			if (t.fixed_digits ())
+				stm << " <" << t.fixed_digits () << ", " << t.fixed_scale () << '>';
+			break;
+		case Type::Kind::SEQUENCE: {
+			const Sequence& seq = t.sequence ();
+			stm << "std::vector <";
+			type (stm, seq);
+			stm << '>';
+		} break;
+		case Type::Kind::ARRAY: {
+			const Array& arr = t.array ();
+			for (size_t cnt = arr.dimensions ().size (); cnt; --cnt) {
+				stm << "std::array <";
+			}
+			type (stm, arr);
+			for (auto dim = arr.dimensions ().rbegin (); dim != arr.dimensions ().rend (); ++dim) {
+				stm << ", " << *dim << '>';
+			}
+		} break;
+		default:
+			assert (false);
 	}
 }
 
-void CodeGenBase::namespace_open (const char* spec_ns)
+string CodeGenBase::qualified_name (const NamedItem& item)
 {
-	if (module_namespace_)
-		namespace_close ();
-	out () << spec_ns;
-	spec_namespace_ = spec_ns;
+	return qualified_parent_name (item) + item.name ();
 }
 
-void CodeGenBase::namespace_close ()
+string CodeGenBase::qualified_parent_name (const NamedItem& item)
 {
-	if (module_namespace_) {
-		do {
-			out () << "}\n";
-			module_namespace_ = static_cast <const Module*> (module_namespace_->parent ());
-		} while (module_namespace_);
-	} else if (spec_namespace_) {
-		for (const char* s = spec_namespace_, *open; open = strchr (s, '{'); s = open + 1) {
-			out () << "}\n";
-		}
-		spec_namespace_ = nullptr;
+	const NamedItem* parent = item.parent ();
+	string qn;
+	if (parent) {
+		Item::Kind pk = parent->kind ();
+		if (Item::Kind::INTERFACE == pk || Item::Kind::VALUE_TYPE == pk) {
+			qn = "::CORBA::Nirvana::Definitions < ";
+			qn += parent->qualified_name ();
+			qn += '>';
+			qn += item.name ();
+		} else
+			qn = parent->qualified_name ();
+		qn += "::";
+	}
+	return qn;
+}
+
+void CodeGenBase::bridge_ret (ofstream& stm, const Type& t)
+{
+	if (t.tkind () != Type::Kind::VOID) {
+		stm << "ABI_ret <";
+		type (stm, t);
+		stm << ">";
+	} else {
+		stm << "void";
 	}
 }
 
-void CodeGenBase::get_namespaces (const NamedItem* item, Namespaces& namespaces)
+void CodeGenBase::bridge_param (ofstream& stm, const Parameter& param)
 {
-	if (item) {
-		get_namespaces (item->parent (), namespaces);
-		namespaces.push_back (item);
+	bridge_param (stm, param, param.attribute ());
+	stm << ' ' << param.name ();
+}
+
+void CodeGenBase::bridge_param (ofstream& stm, const Type& t, Parameter::Attribute att)
+{
+	switch (att) {
+		case Parameter::Attribute::IN:
+			stm << "ABI_in <";
+			break;
+		case Parameter::Attribute::OUT:
+			stm << "ABI_out <";
+			break;
+		case Parameter::Attribute::INOUT:
+			stm << "ABI_inout <";
+			break;
+	}
+	type (stm, t);
+	stm << '>';
+}
+
+void CodeGenBase::client_ret (std::ofstream& stm, const AST::Type& t)
+{
+	if (t.tkind () != Type::Kind::VOID) {
+		stm << "Type <";
+		type (stm, t);
+		stm << ">::C_ret";
+	} else {
+		stm << "void";
 	}
 }
+
+void CodeGenBase::client_param (ofstream& stm, const Parameter& param)
+{
+	client_param (stm, param, param.attribute ());
+	stm << ' ' << param.name ();
+}
+
+void CodeGenBase::client_param (ofstream& stm, const Type& t, Parameter::Attribute att)
+{
+	stm << "Type <";
+	type (stm, t);
+	switch (att) {
+		case Parameter::Attribute::IN:
+			stm << ">::C_in";
+			break;
+		case Parameter::Attribute::OUT:
+			stm << ">::C_out";
+			break;
+		case Parameter::Attribute::INOUT:
+			stm << ">::C_inout";
+			break;
+	}
+}
+
+CodeGenBase::Members CodeGenBase::get_members (const Container& cont)
+{
+	Members ret;
+	for (auto it = cont.begin (); it != cont.end (); ++it) {
+		const Item& item = **it;
+		if (item.kind () == Item::Kind::MEMBER)
+			ret.push_back (&static_cast <const Member&> (item));
+	}
+	return ret;
+}
+
+void CodeGenBase::leaf (const UnionDecl&)
+{
+	throw runtime_error ("Not yet implemented");
+}
+
+void CodeGenBase::begin (const Union&)
+{
+	throw runtime_error ("Not yet implemented");
+}
+
+void CodeGenBase::end (const Union&)
+{
+	throw runtime_error ("Not yet implemented");
+}
+
+void CodeGenBase::leaf (const UnionElement&)
+{
+	throw runtime_error ("Not yet implemented");
+}
+
+void CodeGenBase::leaf (const ValueTypeDecl&)
+{
+	throw runtime_error ("Not yet implemented");
+}
+
+void CodeGenBase::begin (const ValueType&)
+{
+	throw runtime_error ("Not yet implemented");
+}
+
+void CodeGenBase::end (const ValueType&)
+{
+	throw runtime_error ("Not yet implemented");
+}
+
+void CodeGenBase::leaf (const StateMember&)
+{
+	throw runtime_error ("Not yet implemented");
+}
+
+void CodeGenBase::leaf (const ValueFactory&)
+{
+	throw runtime_error ("Not yet implemented");
+}
+
+void CodeGenBase::leaf (const ValueBox&)
+{
+	throw runtime_error ("Not yet implemented");
+}
+

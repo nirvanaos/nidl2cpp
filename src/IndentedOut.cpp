@@ -4,15 +4,11 @@
 using namespace std;
 
 IndentedOut::IndentedOut ()
-{
-	exceptions (ofstream::failbit | ofstream::badbit);
-}
+{}
 
-IndentedOut::IndentedOut (const filesystem::path& file) :
-	IndentedOut ()
+IndentedOut::IndentedOut (const filesystem::path& file)
 {
 	open (file);
-	isbuf_.init (*this);
 }
 
 IndentedOut::~IndentedOut ()
@@ -24,6 +20,11 @@ IndentedOut::~IndentedOut ()
 void IndentedOut::open (const std::filesystem::path& file)
 {
 	assert (!is_open ());
+	create_directories (file.parent_path ());
+	ofstream::open (file);
+	if (!is_open ())
+		throw runtime_error (string ("Can not open file: ") + file.string ());
+	isbuf_.init (*this);
 }
 
 int IndentedOut::IndentedStreambuf::overflow (int c)

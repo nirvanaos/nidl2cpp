@@ -5,6 +5,12 @@
 
 class Compiler : public IDL_FrontEnd
 {
+public:
+	Compiler () :
+		servant_suffix_ ("_s"),
+		proxy_suffix_ ("_p")
+	{}
+
 private:
 	// Override print_usage_info for additional usage information.
 	virtual void print_usage_info (const char* exe_name);
@@ -14,6 +20,14 @@ private:
 
 	// Override generate_code to build output from the AST.
 	virtual void generate_code (const AST::Root& tree);
+
+	std::filesystem::path out_file (const AST::Root& tree, const std::string& suffix, const std::filesystem::path& ext) const;
+
+private:
+	std::filesystem::path out_dir_;
+	std::string client_suffix_;
+	std::string servant_suffix_;
+	std::string proxy_suffix_;
 };
 
 #endif

@@ -3,13 +3,27 @@
 
 class CodeGenBase : public AST::CodeGen
 {
-public:
-	static bool is_keyword (const AST::Identifier& id);
-
 protected:
+	virtual void leaf (const AST::Include& item) {}
 	virtual void leaf (const AST::Native&) {}
+	virtual void leaf (const AST::TypeDef& item) {}
 	virtual void begin (const AST::ModuleItems&) {}
 	virtual void end (const AST::ModuleItems&) {}
+	virtual void leaf (const AST::Operation&) {}
+	virtual void leaf (const AST::Attribute&) {}
+	virtual void leaf (const AST::Member& item) {}
+
+	virtual void leaf (const AST::InterfaceDecl& item) {}
+	virtual void end (const AST::Interface& item) {}
+
+	virtual void leaf (const AST::Constant& item) {}
+	virtual void begin (const AST::Exception& item) {}
+	virtual void end (const AST::Exception& item) {}
+	virtual void leaf (const AST::StructDecl& item) {}
+	virtual void begin (const AST::Struct& item) {}
+	virtual void end (const AST::Struct& item) {}
+
+	virtual void leaf (const AST::Enum& item) {}
 
 	virtual void leaf (const AST::UnionDecl&);
 	virtual void begin (const AST::Union&);
@@ -23,15 +37,9 @@ protected:
 	virtual void leaf (const AST::ValueFactory&);
 	virtual void leaf (const AST::ValueBox&);
 
-	static void type (std::ofstream& stm, const AST::Type& t);
-
 	static void bridge_ret (std::ofstream& stm, const AST::Type& t);
 	static void bridge_param (std::ofstream& stm, const AST::Parameter& param);
 	static void bridge_param (std::ofstream& stm, const AST::Type& t, AST::Parameter::Attribute att = AST::Parameter::Attribute::IN);
-
-	static void client_ret (std::ofstream& stm, const AST::Type& t);
-	static void client_param (std::ofstream& stm, const AST::Parameter& param);
-	static void client_param (std::ofstream& stm, const AST::Type& t, AST::Parameter::Attribute att = AST::Parameter::Attribute::IN);
 
 	typedef std::vector <const AST::Member*> Members;
 
@@ -55,7 +63,12 @@ protected:
 	static std::string qualified_name (const AST::NamedItem& item, bool fully = true);
 	static std::string qualified_parent_name (const AST::NamedItem& item, bool fully = true);
 
+	friend std::ostream& operator << (std::ostream& stm, const AST::Identifier& id);
+	friend std::ostream& operator << (std::ostream& stm, const AST::Type& t);
+
 private:
+	static bool is_keyword (const AST::Identifier& id);
+
 	static bool pred (const char* l, const char* r)
 	{
 		return strcmp (l, r) < 0;
@@ -71,5 +84,6 @@ private:
 };
 
 std::ostream& operator << (std::ostream& stm, const AST::Identifier& id);
+std::ostream& operator << (std::ostream& stm, const AST::Type& t);
 
 #endif

@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "Compiler.h"
 #include "Client.h"
+#include "Servant.h"
 #include <iostream>
 
 using namespace std;
@@ -41,6 +42,14 @@ path Compiler::out_file (const AST::Root& tree, const string& suffix, const path
 
 void Compiler::generate_code (const AST::Root& tree)
 {
-	Client client (out_file (tree, client_suffix_, ".h"), out_file (tree, client_suffix_, ".cpp"), tree);
-	tree.visit (client);
+	path client_h = out_file (tree, client_suffix_, ".h");
+	{
+		Client client (client_h, path (client_h).replace_extension (".cpp"), tree);
+		tree.visit (client);
+	}
+	path servant_h = out_file (tree, servant_suffix_, ".h");
+	{
+		Servant servant (servant_h, client_h, tree);
+		tree.visit (servant);
+	}
 }

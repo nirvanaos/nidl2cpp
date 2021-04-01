@@ -115,7 +115,7 @@ ostream& operator << (ostream& stm, const Identifier& id)
 	return stm;
 }
 
-void CodeGenBase::type (ofstream& stm, const Type& t)
+ostream& operator << (ostream& stm, const Type& t)
 {
 	static const char* const basic_types [(size_t)BasicType::ANY + 1] = {
 		"bool",
@@ -144,7 +144,7 @@ void CodeGenBase::type (ofstream& stm, const Type& t)
 			stm << basic_types [(size_t)t.basic_type ()];
 			break;
 		case Type::Kind::NAMED_TYPE:
-			stm << qualified_name (*t.named_type ());
+			stm << CodeGenBase::qualified_name (*t.named_type ());
 			switch (t.named_type ()->kind ()) {
 				case Item::Kind::INTERFACE:
 				case Item::Kind::VALUE_TYPE:
@@ -163,18 +163,15 @@ void CodeGenBase::type (ofstream& stm, const Type& t)
 			if (t.fixed_digits ())
 				stm << " <" << t.fixed_digits () << ", " << t.fixed_scale () << '>';
 			break;
-		case Type::Kind::SEQUENCE: {
-			const Sequence& seq = t.sequence ();
-			stm << "std::vector <";
-			type (stm, seq);
-			stm << '>';
-		} break;
+		case Type::Kind::SEQUENCE:
+			stm << "std::vector <" << static_cast <const Type&> (t.sequence ()) << '>';
+			break;
 		case Type::Kind::ARRAY: {
 			const Array& arr = t.array ();
 			for (size_t cnt = arr.dimensions ().size (); cnt; --cnt) {
 				stm << "std::array <";
 			}
-			type (stm, arr);
+			stm << static_cast <const Type&> (arr);
 			for (auto dim = arr.dimensions ().rbegin (); dim != arr.dimensions ().rend (); ++dim) {
 				stm << ", " << *dim << '>';
 			}
@@ -182,6 +179,8 @@ void CodeGenBase::type (ofstream& stm, const Type& t)
 		default:
 			assert (false);
 	}
+
+	return stm;
 }
 
 string CodeGenBase::qualified_name (const NamedItem& item, bool fully)
@@ -217,9 +216,7 @@ string CodeGenBase::qualified_parent_name (const NamedItem& item, bool fully)
 void CodeGenBase::bridge_ret (ofstream& stm, const Type& t)
 {
 	if (t.tkind () != Type::Kind::VOID) {
-		stm << "ABI_ret <";
-		type (stm, t);
-		stm << ">";
+		stm << "ABI_ret <" << t << ">";
 	} else {
 		stm << "void";
 	}
@@ -244,42 +241,7 @@ void CodeGenBase::bridge_param (ofstream& stm, const Type& t, Parameter::Attribu
 			stm << "ABI_inout <";
 			break;
 	}
-	type (stm, t);
-	stm << '>';
-}
-
-void CodeGenBase::client_ret (std::ofstream& stm, const AST::Type& t)
-{
-	if (t.tkind () != Type::Kind::VOID) {
-		stm << "Type <";
-		type (stm, t);
-		stm << ">::C_ret";
-	} else {
-		stm << "void";
-	}
-}
-
-void CodeGenBase::client_param (ofstream& stm, const Parameter& param)
-{
-	client_param (stm, param, param.attribute ());
-	stm << ' ' << param.name ();
-}
-
-void CodeGenBase::client_param (ofstream& stm, const Type& t, Parameter::Attribute att)
-{
-	stm << "Type <";
-	type (stm, t);
-	switch (att) {
-		case Parameter::Attribute::IN:
-			stm << ">::C_in";
-			break;
-		case Parameter::Attribute::OUT:
-			stm << ">::C_out";
-			break;
-		case Parameter::Attribute::INOUT:
-			stm << ">::C_inout";
-			break;
-	}
+	stm << t << '>';
 }
 
 CodeGenBase::Members CodeGenBase::get_members (const ItemContainer& cont, Item::Kind member_kind)

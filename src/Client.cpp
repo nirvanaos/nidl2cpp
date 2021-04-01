@@ -39,9 +39,7 @@ void Client::leaf (const TypeDef& item)
 {
 	h_.namespace_open (item);
 	h_.empty_line ();
-	h_ << "typedef ";
-	type (h_, item);
-	h_ << ' ' << item.name () << ";\n";
+	h_ << "typedef " << static_cast <const Type&> (item) << ' ' << item.name () << ";\n";
 	type_code_decl (item);
 	type_code_def (item);
 }
@@ -119,14 +117,14 @@ void Client::end (const Interface& itf)
 				const Operation& op = static_cast <const Operation&> (item);
 				bridge_ret (h_, op);
 
-				h_ << " (*" << op.name () << ") (Bridge < " << itf.qualified_name () << ">*";
+				h_ << " (*" << op.name () << ") (Bridge < " << itf.qualified_name () << ">* _b";
 
 				for (auto it = op.begin (); it != op.end (); ++it) {
 					h_ << ", ";
 					bridge_param (h_, **it);
 				}
 
-				h_ << ", Interface*);\n";
+				h_ << ", Interface* _env);\n";
 
 			} break;
 
@@ -136,9 +134,9 @@ void Client::end (const Interface& itf)
 				h_ << " (*_get_" << att.name () << ") (Bridge < " << itf.qualified_name () << ">*, Interface*);\n";
 
 				if (!att.readonly ()) {
-					h_ << "void (*_set_" << att.name () << ") (Bridge < " << itf.qualified_name () << ">*, ";
+					h_ << "void (*_set_" << att.name () << ") (Bridge < " << itf.qualified_name () << ">* _b, ";
 					bridge_param (h_, att);
-					h_ << ", Interface*);\n";
+					h_ << ", Interface* _env);\n";
 				}
 
 			} break;
@@ -167,16 +165,15 @@ void Client::end (const Interface& itf)
 			case Item::Kind::OPERATION: {
 				const Operation& op = static_cast <const Operation&> (item);
 
-				type (h_, op);
-				h_ << ' ' << op.name () << " (";
+				h_ << static_cast <const Type&> (op) << ' ' << op.name () << " (";
 
 				auto it = op.begin ();
 				if (it != op.end ()) {
-					client_param (h_, **it);
+					client_param (**it);
 					++it;
 					for (; it != op.end (); ++it) {
 						h_ << ", ";
-						client_param (h_, **it);
+						client_param (**it);
 					}
 				}
 
@@ -187,12 +184,11 @@ void Client::end (const Interface& itf)
 			case Item::Kind::ATTRIBUTE: {
 				const Attribute& att = static_cast <const Attribute&> (item);
 
-				type (h_, att);
-				h_ << ' ' << att.name () << " () const;\n";
+				h_ << static_cast <const Type&> (att) << ' ' << att.name () << " () const;\n";
 
 				if (!att.readonly ()) {
 					h_ << "void " << att.name () << '(';
-					client_param (h_, att);
+					client_param (att);
 					h_ << ");\n";
 				}
 
@@ -214,16 +210,15 @@ void Client::end (const Interface& itf)
 
 				h_ << "\ntemplate <class T>\n";
 
-				type (h_, op);
-				h_ << " Client <T, " << itf.qualified_name () << ">::" << op.name () << " (";
+				h_ << static_cast <const Type&> (op) << " Client <T, " << itf.qualified_name () << ">::" << op.name () << " (";
 
 				auto it = op.begin ();
 				if (it != op.end ()) {
-					client_param (h_, **it);
+					client_param (**it);
 					++it;
 					for (; it != op.end (); ++it) {
 						h_ << ", ";
-						client_param (h_, **it);
+						client_param (**it);
 					}
 				}
 
@@ -234,7 +229,11 @@ void Client::end (const Interface& itf)
 				environment (op.raises ());
 				h_ << "Bridge < " << itf.scoped_name () << ">& _b (T::_get_bridge (_env));\n";
 
-				client_ret (h_, op);
+				if (op.tkind () != Type::Kind::VOID)
+					h_ << "Type <" << static_cast <const Type&> (op) << ">::C_ret";
+				else
+					h_ << "void";
+
 				h_ << " _ret = (_b._epv ().epv." << op.name () << ") (&_b";
 				for (it = op.begin (); it != op.end (); ++it) {
 					h_ << ", &" << (*it)->name ();
@@ -253,17 +252,14 @@ void Client::end (const Interface& itf)
 
 				h_ << "\ntemplate <class T>\n";
 
-				type (h_, att);
-				h_ << " Client <T, " << itf.qualified_name () << ">::" << att.name () << " () const\n"
+				h_ << static_cast <const Type&> (att) << " Client <T, " << itf.qualified_name () << ">::" << att.name () << " () const\n"
 					"{\n";
 
 				h_.indent ();
 
 				environment (att.getraises ());
-				h_ << "Bridge < " << itf.scoped_name () << ">& _b (T::_get_bridge (_env));\n";
-
-				client_ret (h_, att);
-				h_ << " _ret = (_b._epv ().epv._get_" << att.name () << ") (&_b, &_env);\n"
+				h_ << "Bridge < " << itf.scoped_name () << ">& _b (T::_get_bridge (_env));\n"
+					"Type <" << static_cast <const Type&> (att) << ">::C_ret" << " _ret = (_b._epv ().epv._get_" << att.name () << ") (&_b, &_env);\n"
 					"_env.check ();\n"
 					"return _ret;\n";
 
@@ -274,7 +270,7 @@ void Client::end (const Interface& itf)
 					h_ << "\ntemplate <class T>\n";
 
 					h_ << "void Client <T, " << itf.qualified_name () << ">::" << att.name () << '(';
-					client_param (h_, att);
+					client_param (att);
 					h_ << " val)\n"
 						"{\n";
 
@@ -332,6 +328,28 @@ void Client::end (const Interface& itf)
 	h_ << "};\n";
 }
 
+void Client::client_param (const Parameter& param)
+{
+	client_param (param, param.attribute ());
+	h_ << ' ' << param.name ();
+}
+
+void Client::client_param (const Type& t, Parameter::Attribute att)
+{
+	h_ << "Type < " << t;
+	switch (att) {
+		case Parameter::Attribute::IN:
+			h_ << ">::C_in";
+			break;
+		case Parameter::Attribute::OUT:
+			h_ << ">::C_out";
+			break;
+		case Parameter::Attribute::INOUT:
+			h_ << ">::C_inout";
+			break;
+	}
+}
+
 void Client::environment (const AST::Raises& raises)
 {
 	if (raises.empty ())
@@ -347,24 +365,13 @@ void Client::environment (const AST::Raises& raises)
 	}
 }
 
-void Client::leaf (const Operation&)
-{
-	// Processed in begin (const Interface&);
-}
-
-void Client::leaf (const Attribute&)
-{
-	// Processed in begin (const Interface&);
-}
-
 void Client::leaf (const Constant& item)
 {
-	h_.namespace_open (item);
 	bool outline = constant (h_, item);
 	h_ << ' ' << item.name ();
 	if (outline) {
 		constant (cpp_, item);
-		cpp_ << ' ' << qualified_name (item) << " = ";
+		cpp_ << ' ' << qualified_name (item, false) << " = ";
 		value (cpp_, item);
 		cpp_ << ";\n";
 	} else {
@@ -374,8 +381,10 @@ void Client::leaf (const Constant& item)
 	h_ << ";\n";
 }
 
-bool Client::constant (ofstream& stm, const Constant& item)
+bool Client::constant (Code& stm, const Constant& item)
 {
+	stm.namespace_open (item);
+	stm.empty_line ();
 	stm << "const ";
 	bool outline = false;
 	switch (item.dereference_type ().tkind ()) {
@@ -389,7 +398,7 @@ bool Client::constant (ofstream& stm, const Constant& item)
 			stm << "WChar* const";
 			break;
 		default:
-			type (stm, item);
+			stm << static_cast <const Type&> (item);
 	}
 	return outline;
 }
@@ -431,17 +440,13 @@ void Client::end (const Exception& item)
 	if (!members.empty ()) {
 		for (const Member* m : members) {
 			h_.empty_line ();
-			h_ << "::CORBA::Nirvana::Type <";
-			type (h_, *m);
-			h_ << ">::Member_ret " << m->name () << " () const\n"
+			h_ << "::CORBA::Nirvana::Type <" << static_cast <const Type&> (*m) << ">::Member_ret " << m->name () << " () const\n"
 				"{\n";
 			h_.indent ();
 			h_ << "return _data." << m->name () << ";\n";
 			h_.unindent ();
-			h_ << "}\n";
-			h_ << "void " << m->name () << " (::CORBA::Nirvana::Type <";
-			type (h_, *m);
-			h_ << ">::C_in val)\n"
+			h_ << "}\n"
+				"void " << m->name () << " (::CORBA::Nirvana::Type <" << static_cast <const Type&> (*m) << ">::C_in val)\n"
 				"{\n";
 			h_.indent ();
 			h_ << "_data." << m->name () << " = val;\n";
@@ -454,9 +459,7 @@ void Client::end (const Exception& item)
 		h_.indent ();
 
 		for (const Member* m : members) {
-			h_ << "::CORBA::Nirvana::Type <";
-			type (h_, *m);
-			h_ << ">::Member_type " << m->name () << ";\n";
+			h_ << "::CORBA::Nirvana::Type < " << static_cast <const Type&> (*m) << ">::Member_type " << m->name () << ";\n";
 		}
 
 		h_.unindent ();
@@ -506,9 +509,7 @@ void Client::define_type (const std::string& fqname, const Members& members)
 		"{\n";
 	h_.indent ();
 	for (auto member : members) {
-		h_ << "Type <Type < ";
-		type (h_, *member);
-		h_ << ">::Member_type>::ABI_type " << member->name () << ";\n";
+		h_ << "Type <Type < " << static_cast <const Type&> (*member) << ">::Member_type>::ABI_type " << member->name () << ";\n";
 	}
 	h_.unindent ();
 	h_ << "};\n\n";
@@ -525,15 +526,11 @@ void Client::define_type (const std::string& fqname, const Members& members)
 		h_ << "TypeVarLen < " << fqname << ", \n";
 		h_.indent ();
 
-		h_ << "Type <Type <";
-		type (h_, **vl_member);
-		h_ << ">::Member_type>::has_check";
+		h_ << "Type <Type <" << static_cast <const Type&> (**vl_member) << ">::Member_type>::has_check";
 
 		while (++vl_member != members.end ()) {
 			if (is_var_len (**vl_member)) {
-				h_ << "\n| Type <Type <";
-				type (h_, **vl_member);
-				h_ << ">::Member_type>::has_check";
+				h_ << "\n| Type <Type <" << static_cast <const Type&> (**vl_member) << ">::Member_type>::has_check";
 			}
 		}
 
@@ -545,9 +542,7 @@ void Client::define_type (const std::string& fqname, const Members& members)
 			"{\n";
 		h_.indent ();
 		for (auto member : members) {
-			h_ << "Type <Type <";
-			type (h_, *member);
-			h_ << ">::Member_type>::check (val." << member->name () << ");\n";
+			h_ << "Type <Type <" << static_cast <const Type&> (*member) << ">::Member_type>::check (val." << member->name () << ");\n";
 		}
 		h_.unindent ();
 		h_ << "}\n";
@@ -566,12 +561,14 @@ void Client::leaf (const StructDecl& item)
 }
 
 void Client::begin (const Struct& item)
-{}
-void Client::end (const Struct& item)
-{}
+{
+	// TODO:
+}
 
-void Client::leaf (const Member& item)
-{}
+void Client::end (const Struct& item)
+{
+	// TODO:
+}
 
 void Client::leaf (const Enum& item)
 {

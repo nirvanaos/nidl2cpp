@@ -12,7 +12,7 @@ public:
 		h_ (file_h, root),
 		cpp_ (file_cpp, root)
 	{
-		h_ << "\n#include <CORBA/CORBA.h>\n\n";
+		h_ << "#include <CORBA/CORBA.h>\n\n";
 
 		cpp_ << "\n#include " << file_h.filename () << "\n"
 			"#include <Nirvana/OLF.h>\n\n";
@@ -27,8 +27,6 @@ protected:
 	virtual void leaf (const AST::InterfaceDecl& item);
 	virtual void begin (const AST::Interface& item);
 	virtual void end (const AST::Interface& item);
-	virtual void leaf (const AST::Operation&);
-	virtual void leaf (const AST::Attribute&);
 
 	virtual void leaf (const AST::Constant& item);
 
@@ -39,18 +37,18 @@ protected:
 	virtual void begin (const AST::Struct& item);
 	virtual void end (const AST::Struct& item);
 
-	virtual void leaf (const AST::Member& item);
-
 	virtual void leaf (const AST::Enum& item);
 
 private:
 	void interface_forward (const AST::NamedItem& item, AST::InterfaceKind ik);
-	bool constant (std::ofstream& stm, const AST::Constant& item);
+	bool constant (Code& stm, const AST::Constant& item);
 	void environment (const AST::Raises& raises);
 	void type_code_decl (const AST::NamedItem& item);
 	void type_code_def (const AST::RepositoryId& type);
 	static void value (std::ofstream& stm, const AST::Variant& var);
 	void define_type (const std::string& fqname, const Members& members);
+	void client_param (const AST::Parameter& param);	
+	void client_param (const AST::Type& t, AST::Parameter::Attribute att = AST::Parameter::Attribute::IN);
 
 private:
 	Header h_; // .h file

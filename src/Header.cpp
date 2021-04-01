@@ -36,6 +36,7 @@ Header::Header (const path& file, const AST::Root& root) :
 void Header::close ()
 {
 	namespace_close ();
-	*this << "\n#endif\n";
+	empty_line ();
+	*this << "#endif\n";
 	Code::close ();
 }

@@ -469,6 +469,8 @@ void Client::end (const Exception& item)
 	h_.unindent ();
 	h_ << "}\n";
 	type_code_decl (item);
+	define_type (qualified_name (item) + "::_Data", members);
+
 	type_code_def (item);
 	cpp_ << "const char " << qualified_name (item) << "::repository_id_ [] = \"" << item.repository_id () << "\";\n"
 		"const " << qualified_name (item) << "* " << qualified_name (item) << "::_downcast (const ::CORBA::Exception* ep) NIRVANA_NOEXCEPT {\n";
@@ -477,6 +479,67 @@ void Client::end (const Exception& item)
 		<< qualified_name (item) << "&> (*ep) : nullptr;\n";
 	cpp_.unindent ();
 	cpp_ << "}\n";
+}
+
+void Client::define_type (const std::string& fqname, const Members& members)
+{
+	h_.namespace_open (internal_namespace_);
+
+	// ABI
+	h_ << "template <>\n"
+		"struct ABI <" << fqname << ">\n"
+		"{\n";
+	h_.indent ();
+	for (auto member : members) {
+		h_ << "Type <Type <";
+		type (h_, *member);
+		h_ << ">::Member_type>::ABI_type " << member->name () << ";\n";
+	}
+	h_.unindent ();
+	h_ << "};\n\n";
+
+	auto vl_member = members.begin ();
+	for (; vl_member != members.end (); ++vl_member) {
+		if (is_var_len (**vl_member))
+			break;
+	}
+	// Type
+	h_ << "template <>\n"
+		"struct Type <" << fqname << "> : ";
+	if (vl_member != members.end ()) {
+		h_ << "TypeVarLen <" << fqname << ", \n";
+		h_.indent ();
+
+		h_ << "Type <Type <";
+		type (h_, **vl_member);
+		h_ << ">::Member_type>::has_check";
+
+		while (++vl_member != members.end ()) {
+			if (is_var_len (**vl_member)) {
+				h_ << "\n| Type <Type <";
+				type (h_, **vl_member);
+				h_ << ">::Member_type>::has_check";
+			}
+		}
+
+		h_ << ">\n"
+			"{\n";
+		h_.indent ();
+		h_ << "static void check (const ABI_type& val)\n"
+			"{\n";
+		h_.indent ();
+		for (auto member : members) {
+			h_ << "Type <Type <";
+			type (h_, *member);
+			h_ << ">::Member_type>::check (val." << member->name () << ");\n";
+		}
+		h_.unindent ();
+		h_ << "}\n";
+		h_.unindent ();
+		h_ << "};\n";
+	} else {
+		h_ << "TypeFixLen <" << fqname << "> {};\n";
+	}
 }
 
 void Client::leaf (const StructDecl& item)

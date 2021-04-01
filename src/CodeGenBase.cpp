@@ -153,10 +153,10 @@ void CodeGenBase::type (ofstream& stm, const Type& t)
 			}
 			break;
 		case Type::Kind::STRING:
-			stm << "::CORBA::" << "String_var";
-			stm << "::CORBA::" << "WString_var";
+			stm << "std::string";
 			break;
 		case Type::Kind::WSTRING:
+			stm << "std::wstring";
 			break;
 		case Type::Kind::FIXED:
 			stm << "::CORBA::" << "Fixed";
@@ -184,25 +184,28 @@ void CodeGenBase::type (ofstream& stm, const Type& t)
 	}
 }
 
-string CodeGenBase::qualified_name (const NamedItem& item)
+string CodeGenBase::qualified_name (const NamedItem& item, bool fully)
 {
 	return qualified_parent_name (item) + item.name ();
 }
 
-string CodeGenBase::qualified_parent_name (const NamedItem& item)
+string CodeGenBase::qualified_parent_name (const NamedItem& item, bool fully)
 {
 	const NamedItem* parent = item.parent ();
 	string qn;
 	if (parent) {
 		Item::Kind pk = parent->kind ();
-		if (Item::Kind::INTERFACE == pk || Item::Kind::VALUE_TYPE == pk) {
-			qn = "::CORBA::Nirvana::Definitions < ";
-			qn += parent->qualified_name ();
-			qn += '>';
-			qn += item.name ();
-		} else
-			qn = parent->qualified_name ();
-		qn += "::";
+		if (fully || pk != Item::Kind::MODULE) {
+			if (Item::Kind::INTERFACE == pk || Item::Kind::VALUE_TYPE == pk) {
+				qn = "::CORBA::Nirvana::Definitions < ";
+				qn += qualified_parent_name (*parent, fully);
+				qn += parent->name ();
+				qn += '>';
+				qn += item.name ();
+			} else
+				qn = qualified_parent_name (*parent, fully);
+			qn += "::";
+		}
 	}
 	return qn;
 }
@@ -275,15 +278,65 @@ void CodeGenBase::client_param (ofstream& stm, const Type& t, Parameter::Attribu
 	}
 }
 
-CodeGenBase::Members CodeGenBase::get_members (const Container& cont)
+CodeGenBase::Members CodeGenBase::get_members (const ItemContainer& cont, Item::Kind member_kind)
 {
 	Members ret;
 	for (auto it = cont.begin (); it != cont.end (); ++it) {
 		const Item& item = **it;
-		if (item.kind () == Item::Kind::MEMBER)
+		if (item.kind () == member_kind)
 			ret.push_back (&static_cast <const Member&> (item));
 	}
 	return ret;
+}
+
+bool CodeGenBase::is_var_len (const Type& type)
+{
+	const Type& t = type.dereference_type ();
+	switch (t.tkind ()) {
+		case Type::Kind::BASIC_TYPE:
+			switch (t.basic_type ()) {
+				case BasicType::ANY:
+				case BasicType::OBJECT:
+				case BasicType::VALUE_BASE:
+					return true;
+				default:
+					return false;
+			}
+
+		case Type::Kind::STRING:
+		case Type::Kind::WSTRING:
+		case Type::Kind::SEQUENCE:
+			return true;
+
+		case Type::Kind::ARRAY:
+			return is_var_len (t.array ());
+
+		case Type::Kind::NAMED_TYPE: {
+			const NamedItem& item = *t.named_type ();
+			Members members;
+			switch (item.kind ()) {
+				case Item::Kind::INTERFACE:
+				case Item::Kind::INTERFACE_DECL:
+				case Item::Kind::VALUE_TYPE:
+				case Item::Kind::VALUE_TYPE_DECL:
+				case Item::Kind::VALUE_BOX:
+					return true;
+				case Item::Kind::STRUCT:
+					members = get_members (static_cast <const Struct&> (item));
+					break;
+				case Item::Kind::UNION:
+					members = get_members (static_cast <const Union&> (item));
+					break;
+				default:
+					return false;
+			}
+			for (auto member : members) {
+				if (is_var_len (*member))
+					return true;
+			}
+		}
+	}
+	return false;
 }
 
 void CodeGenBase::leaf (const UnionDecl&)

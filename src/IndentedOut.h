@@ -1,6 +1,7 @@
 #ifndef NIDL2CPP_INDENTEDOUT_H_
 #define NIDL2CPP_INDENTEDOUT_H_
 
+// TODO: Move to idlfe library as an utility class.
 class IndentedOut : public std::ofstream
 {
 public:
@@ -22,6 +23,16 @@ public:
 		isbuf_.unindent ();
 	}
 
+	void empty_line ()
+	{
+		isbuf_.empty_line ();
+	}
+
+	unsigned indentation () const
+	{
+		return isbuf_.indentation ();
+	}
+
 private:
 	class IndentedStreambuf : public std::streambuf
 	{
@@ -29,7 +40,8 @@ private:
 		IndentedStreambuf () :
 			out_ (nullptr),
 			indentation_ (0),
-			bol_ (true)
+			bol_ (true),
+			empty_line_ (false)
 		{}
 
 		void init (std::ostream& s)
@@ -60,6 +72,8 @@ private:
 			return indentation_;
 		}
 
+		void empty_line ();
+
 	protected:
 		virtual int overflow (int c);
 
@@ -67,6 +81,7 @@ private:
 		std::streambuf* out_;
 		unsigned indentation_;
 		bool bol_;
+		bool empty_line_;
 	};
 
 	IndentedStreambuf isbuf_;

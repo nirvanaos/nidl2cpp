@@ -32,11 +32,27 @@ int IndentedOut::IndentedStreambuf::overflow (int c)
 	if (c != '\n') {
 		if (bol_ && indentation_) {
 			for (unsigned cnt = indentation_; cnt; --cnt) {
-				out_->sputc ('\t');
+				int ret = out_->sputc ('\t');
+				if (ret != '\t')
+					return ret;
 			}
-			bol_ = false;
 		}
-	} else
+		empty_line_ = bol_ = false;
+	} else if (bol_)
+		empty_line_ = true;
+	else
 		bol_ = true;
 	return out_->sputc (c);
+}
+
+void IndentedOut::IndentedStreambuf::empty_line ()
+{
+	if (!bol_) {
+		out_->sputc ('\t');
+		bol_ = true;
+	}
+	if (!empty_line_) {
+		out_->sputc ('\t');
+		empty_line_ = true;
+	}
 }

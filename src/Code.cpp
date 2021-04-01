@@ -20,7 +20,7 @@ Code::Code (const path& file, const Root& root) :
 void Code::open (const std::filesystem::path& file, const Root& root)
 {
 	IndentedOut::open (file);
-	*this << "// This file is generated from " << root.file () << endl;
+	*this << "// This file was generated from " << root.file () << endl;
 	*this << "// Nirvana IDL compiler version 1.0\n";
 }
 

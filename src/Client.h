@@ -50,6 +50,7 @@ private:
 	void type_code_decl (const AST::NamedItem& item);
 	void type_code_def (const AST::RepositoryId& type);
 	static void value (std::ofstream& stm, const AST::Variant& var);
+	void define_type (const std::string& fqname, const Members& members);
 
 private:
 	Header h_; // .h file

@@ -48,11 +48,11 @@ int IndentedOut::IndentedStreambuf::overflow (int c)
 void IndentedOut::IndentedStreambuf::empty_line ()
 {
 	if (!bol_) {
-		out_->sputc ('\t');
+		out_->sputc ('\n');
 		bol_ = true;
 	}
 	if (!empty_line_) {
-		out_->sputc ('\t');
+		out_->sputc ('\n');
 		empty_line_ = true;
 	}
 }

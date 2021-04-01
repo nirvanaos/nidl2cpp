@@ -197,13 +197,17 @@ string CodeGenBase::qualified_parent_name (const NamedItem& item, bool fully)
 		Item::Kind pk = parent->kind ();
 		if (fully || pk != Item::Kind::MODULE) {
 			if (Item::Kind::INTERFACE == pk || Item::Kind::VALUE_TYPE == pk) {
-				qn = "::CORBA::Nirvana::Definitions < ";
-				qn += qualified_parent_name (*parent, fully);
-				qn += parent->name ();
+				qn = "::CORBA::Nirvana::Definitions <";
+				if (fully)
+					qn += " ::";
+				qn += qualified_name (*parent, fully);
 				qn += '>';
 				qn += item.name ();
-			} else
-				qn = qualified_parent_name (*parent, fully);
+			} else {
+				if (fully)
+					qn = "::";
+				qn += qualified_name (*parent, fully);
+			}
 			qn += "::";
 		}
 	}

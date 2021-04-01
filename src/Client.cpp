@@ -22,18 +22,23 @@ void Client::leaf (const Include& item)
 
 void Client::type_code_decl (const NamedItem& item)
 {
-	h_ << "extern const ::Nirvana::ImportInterfaceT <::CORBA::TypeCode> _tc_" << item.name () << ";\n";
+	h_ << "extern const ::Nirvana::ImportInterfaceT < ::CORBA::TypeCode> _tc_" << item.name () << ";\n";
 }
 
 void Client::type_code_def (const RepositoryId& type)
 {
-	cpp_ << "NIRVANA_OLF_SECTION extern const ::Nirvana::ImportInterfaceT <::CORBA::TypeCode>\n";
-	cpp_ << qualified_parent_name (type.item ()) << "_tc_" << type.item ().name () << " = { ::Nirvana::OLF_IMPORT_INTERFACE, \"" << type.repository_id () << "\", ::CORBA::TypeCode::repository_id_ };\n";
+	cpp_.namespace_open (type.item ());
+	cpp_.empty_line ();
+	cpp_ << "NIRVANA_OLF_SECTION extern const ::Nirvana::ImportInterfaceT < ::CORBA::TypeCode>\n";
+	cpp_ << qualified_parent_name (type.item (), false) << "_tc_" << type.item ().name ()
+		<< " = { ::Nirvana::OLF_IMPORT_INTERFACE, \"" << type.repository_id ()
+		<< "\", ::CORBA::TypeCode::repository_id_ };\n\n";
 }
 
 void Client::leaf (const TypeDef& item)
 {
 	h_.namespace_open (item);
+	h_.empty_line ();
 	h_ << "typedef ";
 	type (h_, item);
 	h_ << ' ' << item.name () << ";\n";
@@ -411,6 +416,8 @@ void Client::value (ofstream& stm, const Variant& var)
 
 void Client::begin (const Exception& item)
 {
+	h_.namespace_open (item);
+	h_.empty_line ();
 	h_ << "class " << item.name () << " : public ::CORBA::UserException\n"
 		"{\n"
 		"public:\n";
@@ -423,7 +430,8 @@ void Client::end (const Exception& item)
 	Members members = get_members (item);
 	if (!members.empty ()) {
 		for (const Member* m : members) {
-			h_ << "\n::CORBA::Nirvana::Type <";
+			h_.empty_line ();
+			h_ << "::CORBA::Nirvana::Type <";
 			type (h_, *m);
 			h_ << ">::Member_ret " << m->name () << " () const\n"
 				"{\n";
@@ -441,7 +449,7 @@ void Client::end (const Exception& item)
 			h_ << "}\n";
 		}
 
-		h_ << "struct _Data\n"
+		h_ << "\nstruct _Data\n"
 			"{\n";
 		h_.indent ();
 
@@ -467,18 +475,25 @@ void Client::end (const Exception& item)
 		h_ << "_Data _data;\n";
 	}
 	h_.unindent ();
-	h_ << "}\n";
+	h_ << "};\n";
+
 	type_code_decl (item);
+	
 	define_type (qualified_name (item) + "::_Data", members);
 
 	type_code_def (item);
-	cpp_ << "const char " << qualified_name (item) << "::repository_id_ [] = \"" << item.repository_id () << "\";\n"
-		"const " << qualified_name (item) << "* " << qualified_name (item) << "::_downcast (const ::CORBA::Exception* ep) NIRVANA_NOEXCEPT {\n";
+	cpp_.namespace_open (item);
+	cpp_.empty_line ();
+	cpp_ << "const char " << qualified_name (item, false) << "::repository_id_ [] = \""
+		<< item.repository_id () << "\";\n"
+		"const " << qualified_name (item, false) << "* " << qualified_name (item)
+		<< "::_downcast (const ::CORBA::Exception* ep) NIRVANA_NOEXCEPT {\n";
 	cpp_.indent ();
-	cpp_ << "return (ep && ::CORBA::Nirvana::RepositoryId::compatible (ep->_rep_id (), " << qualified_name (item) << "::repository_id_)) ? &static_cast <const "
-		<< qualified_name (item) << "&> (*ep) : nullptr;\n";
+	cpp_ << "return (ep && ::CORBA::Nirvana::RepositoryId::compatible (ep->_rep_id (), "
+		<< qualified_name (item, false) << "::repository_id_)) ? &static_cast <const "
+		<< qualified_name (item, false) << "&> (*ep) : nullptr;\n";
 	cpp_.unindent ();
-	cpp_ << "}\n";
+	cpp_ << "}\n\n";
 }
 
 void Client::define_type (const std::string& fqname, const Members& members)
@@ -487,11 +502,11 @@ void Client::define_type (const std::string& fqname, const Members& members)
 
 	// ABI
 	h_ << "template <>\n"
-		"struct ABI <" << fqname << ">\n"
+		"struct ABI < " << fqname << ">\n"
 		"{\n";
 	h_.indent ();
 	for (auto member : members) {
-		h_ << "Type <Type <";
+		h_ << "Type <Type < ";
 		type (h_, *member);
 		h_ << ">::Member_type>::ABI_type " << member->name () << ";\n";
 	}
@@ -505,9 +520,9 @@ void Client::define_type (const std::string& fqname, const Members& members)
 	}
 	// Type
 	h_ << "template <>\n"
-		"struct Type <" << fqname << "> : ";
+		"struct Type < " << fqname << "> : ";
 	if (vl_member != members.end ()) {
-		h_ << "TypeVarLen <" << fqname << ", \n";
+		h_ << "TypeVarLen < " << fqname << ", \n";
 		h_.indent ();
 
 		h_ << "Type <Type <";
@@ -522,8 +537,9 @@ void Client::define_type (const std::string& fqname, const Members& members)
 			}
 		}
 
-		h_ << ">\n"
-			"{\n";
+		h_ << ">\n";
+		h_.unindent ();
+		h_ << "{\n";
 		h_.indent ();
 		h_ << "static void check (const ABI_type& val)\n"
 			"{\n";
@@ -538,7 +554,7 @@ void Client::define_type (const std::string& fqname, const Members& members)
 		h_.unindent ();
 		h_ << "};\n";
 	} else {
-		h_ << "TypeFixLen <" << fqname << "> {};\n";
+		h_ << "TypeFixLen < " << fqname << "> {};\n";
 	}
 }
 

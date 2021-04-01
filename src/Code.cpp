@@ -47,13 +47,16 @@ void Code::namespace_open (const NamedItem& item)
 			if (*cur != *req)
 				break;
 		}
+		empty_line ();
 		for (; cur != cur_namespaces.end (); ++cur) {
 			*this << "}\n";
 		}
+		empty_line ();
 		for (; req != req_namespaces.end (); ++req) {
 			*this << "namespace " << (*req)->name () << " {\n";
 		}
 		module_namespace_ = p;
+		*this << endl;
 	}
 }
 
@@ -69,21 +72,28 @@ void Code::namespace_open (const char* spec_ns)
 {
 	if (module_namespace_)
 		namespace_close ();
-	*this << spec_ns;
-	spec_namespace_ = spec_ns;
+	if (spec_ns != spec_namespace_) {
+		empty_line ();
+		*this << spec_ns << endl;
+		spec_namespace_ = spec_ns;
+	}
 }
 
 void Code::namespace_close ()
 {
 	if (module_namespace_) {
 		do {
+			empty_line ();
 			*this << "}\n";
 			module_namespace_ = static_cast <const Module*> (module_namespace_->parent ());
 		} while (module_namespace_);
+		*this << endl;
 	} else if (spec_namespace_) {
+		empty_line ();
 		for (const char* s = spec_namespace_, *open; open = strchr (s, '{'); s = open + 1) {
 			*this << "}\n";
 		}
 		spec_namespace_ = nullptr;
+		*this << endl;
 	}
 }

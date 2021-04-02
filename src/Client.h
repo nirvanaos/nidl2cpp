@@ -49,6 +49,8 @@ private:
 	void define_type (const std::string& fqname, const Members& members);
 	void client_param (const AST::Parameter& param);	
 	void client_param (const AST::Type& t, AST::Parameter::Attribute att = AST::Parameter::Attribute::IN);
+	std::ostream& type_prefix (const AST::Type& t);
+	std::ostream& member_type_prefix (const AST::Type& t);
 
 private:
 	Header h_; // .h file

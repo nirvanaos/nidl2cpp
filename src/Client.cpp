@@ -431,7 +431,13 @@ void Client::begin (const Exception& item)
 		"{\n"
 		"public:\n";
 	h_.indent ();
-	h_ << "DECLARE_EXCEPTION (" << item.name () << ");\n";
+	h_ << "DECLARE_EXCEPTION (" << item.name () << ");\n\n";
+}
+
+ostream& Client::type_prefix (const Type& t)
+{
+	h_ << "::CORBA::Nirvana::Type <" << t << ">::";
+	return h_;
 }
 
 void Client::end (const Exception& item)
@@ -440,13 +446,14 @@ void Client::end (const Exception& item)
 	if (!members.empty ()) {
 		for (const Member* m : members) {
 			h_.empty_line ();
-			h_ << "::CORBA::Nirvana::Type <" << static_cast <const Type&> (*m) << ">::Member_ret " << m->name () << " () const\n"
+			type_prefix (*m) << "Member_ret " << m->name () << " () const\n"
 				"{\n";
 			h_.indent ();
 			h_ << "return _data." << m->name () << ";\n";
 			h_.unindent ();
 			h_ << "}\n"
-				"void " << m->name () << " (::CORBA::Nirvana::Type <" << static_cast <const Type&> (*m) << ">::C_in val)\n"
+				"void " << m->name () << " (";
+			type_prefix (*m) << "C_in val)\n"
 				"{\n";
 			h_.indent ();
 			h_ << "_data." << m->name () << " = val;\n";
@@ -459,7 +466,7 @@ void Client::end (const Exception& item)
 		h_.indent ();
 
 		for (const Member* m : members) {
-			h_ << "::CORBA::Nirvana::Type < " << static_cast <const Type&> (*m) << ">::Member_type " << m->name () << ";\n";
+			type_prefix (*m) << "Member_type " << m->name () << ";\n";
 		}
 
 		h_.unindent ();
@@ -480,11 +487,12 @@ void Client::end (const Exception& item)
 	h_.unindent ();
 	h_ << "};\n";
 
+	// Type code
 	type_code_decl (item);
-	
 	define_type (qualified_name (item) + "::_Data", members);
-
 	type_code_def (item);
+
+	// Define exception
 	cpp_.namespace_open (item);
 	cpp_.empty_line ();
 	cpp_ << "const char " << qualified_name (item, false) << "::repository_id_ [] = \""
@@ -499,6 +507,12 @@ void Client::end (const Exception& item)
 	cpp_ << "}\n\n";
 }
 
+std::ostream& Client::member_type_prefix (const AST::Type& t)
+{
+	h_ << "Type <Type < " << t << ">::Member_type>::";
+	return h_;
+}
+
 void Client::define_type (const std::string& fqname, const Members& members)
 {
 	h_.namespace_open (internal_namespace_);
@@ -509,7 +523,7 @@ void Client::define_type (const std::string& fqname, const Members& members)
 		"{\n";
 	h_.indent ();
 	for (auto member : members) {
-		h_ << "Type <Type < " << static_cast <const Type&> (*member) << ">::Member_type>::ABI_type " << member->name () << ";\n";
+		member_type_prefix (*member) << "ABI_type " << member->name () << ";\n";
 	}
 	h_.unindent ();
 	h_ << "};\n\n";
@@ -526,11 +540,12 @@ void Client::define_type (const std::string& fqname, const Members& members)
 		h_ << "TypeVarLen < " << fqname << ", \n";
 		h_.indent ();
 
-		h_ << "Type <Type <" << static_cast <const Type&> (**vl_member) << ">::Member_type>::has_check";
+		member_type_prefix (**vl_member) << "has_check";
 
 		while (++vl_member != members.end ()) {
 			if (is_var_len (**vl_member)) {
-				h_ << "\n| Type <Type <" << static_cast <const Type&> (**vl_member) << ">::Member_type>::has_check";
+				h_ << "\n| ";
+				member_type_prefix (**vl_member) << "has_check";
 			}
 		}
 
@@ -542,7 +557,7 @@ void Client::define_type (const std::string& fqname, const Members& members)
 			"{\n";
 		h_.indent ();
 		for (auto member : members) {
-			h_ << "Type <Type <" << static_cast <const Type&> (*member) << ">::Member_type>::check (val." << member->name () << ");\n";
+			member_type_prefix (*member) << "check (val." << member->name () << ");\n";
 		}
 		h_.unindent ();
 		h_ << "}\n";
@@ -562,12 +577,46 @@ void Client::leaf (const StructDecl& item)
 
 void Client::begin (const Struct& item)
 {
-	// TODO:
+	h_.namespace_open (item);
+	h_.empty_line ();
+	h_ << "class " << item.name () << "\n"
+		"{\n"
+		"public:\n";
+	h_.indent ();
 }
 
 void Client::end (const Struct& item)
 {
-	// TODO:
+	Members members = get_members (item);
+	for (const Member* m : members) {
+		h_.empty_line ();
+		type_prefix (*m) << "Member_ret " << m->name () << " () const\n"
+			"{\n";
+		h_.indent ();
+		h_ << "return _" << m->name () << ";\n";
+		h_.unindent ();
+		h_ << "}\n"
+		"void " << m->name () << " (";
+		type_prefix (*m) << "C_in val)\n"
+		"{\n";
+		h_.indent ();
+		h_ << '_' << m->name () << " = val;\n";
+		h_.unindent ();
+		h_ << "}\n";
+	}
+	h_.unindent ();
+	h_ << "private:\n";
+	h_.indent ();
+	for (const Member* m : members) {
+		type_prefix (*m) << "Member_type _" << m->name () << ";\n";
+	}
+	h_.unindent ();
+	h_ << "};\n";
+
+	// Type code
+	type_code_decl (item);
+	define_type (qualified_name (item), members);
+	type_code_def (item);
 }
 
 void Client::leaf (const Enum& item)

@@ -12,6 +12,12 @@ exception MyException
 	boolean bparam;
 };
 
+struct MyStruct
+{
+	wstring ws_member;
+	long l_member;
+};
+
 interface I1
 {
 	long op1 (in long p1);

@@ -95,17 +95,20 @@ void Client::end (const Interface& itf)
 			break;
 	}
 
-	for (auto b = itf.bases ().begin (); b != itf.bases ().end (); ++b) {
-		ScopedName sn = (*b)->scoped_name ();
+	Interfaces bases = itf.get_all_bases ();
+	for (auto b : bases) {
 		string proc_name;
-		for (ScopedName::const_iterator it = sn.begin (); it != sn.end (); ++it) {
-			proc_name += '_';
-			proc_name += *it;
+		{
+			ScopedName sn = b->scoped_name ();
+			for (ScopedName::const_iterator it = sn.begin (); it != sn.end (); ++it) {
+				proc_name += '_';
+				proc_name += *it;
+			}
 		}
-		h_ << "BASE_STRUCT_ENTRY (" << sn.stringize () << ", " << proc_name << ")\n";
+		h_ << "BASE_STRUCT_ENTRY (" << qualified_name (*b) << ", " << proc_name << ")\n";
 	}
 
-	if (itf.interface_kind () != InterfaceKind::PSEUDO)
+	if (itf.interface_kind () != InterfaceKind::PSEUDO || !bases.empty ())
 		h_ << "BRIDGE_EPV\n";
 
 	for (auto it = itf.begin (); it != itf.end (); ++it) {
@@ -293,7 +296,7 @@ void Client::end (const Interface& itf)
 	// Interface definition
 	h_.namespace_open (itf);
 	h_ << "class " << itf.name () << " : public CORBA::Nirvana::ClientInterface <" << itf.name ();
-	for (auto b : itf.bases ()) {
+	for (auto b : bases) {
 		h_ << ", " << qualified_name (*b);
 	}
 	switch (itf.interface_kind ()) {

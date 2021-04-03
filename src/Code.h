@@ -1,11 +1,12 @@
 #ifndef NIDL2CPP_CODE_H_
 #define NIDL2CPP_CODE_H_
 
-#include "IndentedOut.h"
+#include <BE/IndentedOut.h>
 
 // C++ code file output.
-class Code : public IndentedOut
+class Code : public BE::IndentedOut
 {
+	typedef BE::IndentedOut Base;
 public:
 	Code ();
 	Code (const std::filesystem::path& file, const AST::Root& root);

@@ -19,7 +19,7 @@ Code::Code (const path& file, const Root& root) :
 
 void Code::open (const std::filesystem::path& file, const Root& root)
 {
-	IndentedOut::open (file);
+	Base::open (file);
 	*this << "// This file was generated from " << root.file ().filename () << endl;
 	*this << "// Nirvana IDL compiler version 1.0\n";
 }
@@ -27,7 +27,7 @@ void Code::open (const std::filesystem::path& file, const Root& root)
 void Code::close ()
 {
 	namespace_close ();
-	IndentedOut::close ();
+	Base::close ();
 }
 
 void Code::namespace_open (const NamedItem& item)

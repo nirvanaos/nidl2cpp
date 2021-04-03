@@ -17,8 +17,10 @@ public:
 
 protected:
 	virtual void end (const AST::Root&);
-
-	virtual void begin (const AST::Interface& item);
+	virtual void begin (const AST::Interface& itf);
+	virtual void leaf (const AST::Operation& op);
+	virtual void leaf (const AST::Attribute& att);
+	virtual void end (const AST::Interface& itf);
 
 private:
 	void servant_param (const AST::Parameter& param)
@@ -30,8 +32,12 @@ private:
 
 	void catch_block ();
 
+	void implementation_suffix (const AST::InterfaceKind ik);
+	void implementation_parameters (const AST::Interface& primary, const AST::Interfaces& bases);
+
 private:
 	Header h_;
+	std::vector<std::string> epv_;
 };
 
 #endif

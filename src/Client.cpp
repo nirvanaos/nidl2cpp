@@ -70,7 +70,7 @@ void Client::begin (const Interface& itf)
 
 	h_.namespace_open (internal_namespace_);
 	h_ << "template <>\n"
-		"struct Definitions < " << itf.qualified_name () << ">\n"
+		"struct Definitions < " << qualified_name (itf) << ">\n"
 		"{\n";
 	h_.indent ();
 }
@@ -83,7 +83,7 @@ void Client::end (const Interface& itf)
 
 	// Bridge
 	h_.namespace_open (internal_namespace_);
-	h_ << "BRIDGE_BEGIN (" << itf.qualified_name () << ", \"" << itf.repository_id () << "\")\n";
+	h_ << "BRIDGE_BEGIN (" << qualified_name (itf) << ", \"" << itf.repository_id () << "\")\n";
 
 	switch (itf.interface_kind ()) {
 		case InterfaceKind::UNCONSTRAINED:
@@ -97,9 +97,8 @@ void Client::end (const Interface& itf)
 
 	for (auto b = itf.bases ().begin (); b != itf.bases ().end (); ++b) {
 		ScopedName sn = (*b)->scoped_name ();
-		ScopedName::const_iterator it = sn.begin ();
-		string proc_name = *(it++);
-		for (; it != sn.end (); ++it) {
+		string proc_name;
+		for (ScopedName::const_iterator it = sn.begin (); it != sn.end (); ++it) {
 			proc_name += '_';
 			proc_name += *it;
 		}
@@ -117,7 +116,7 @@ void Client::end (const Interface& itf)
 				const Operation& op = static_cast <const Operation&> (item);
 				bridge_ret (h_, op);
 
-				h_ << " (*" << op.name () << ") (Bridge < " << itf.qualified_name () << ">* _b";
+				h_ << " (*" << op.name () << ") (Bridge < " << qualified_name (itf) << ">* _b";
 
 				for (auto it = op.begin (); it != op.end (); ++it) {
 					h_ << ", ";
@@ -131,10 +130,10 @@ void Client::end (const Interface& itf)
 			case Item::Kind::ATTRIBUTE: {
 				const Attribute& att = static_cast <const Attribute&> (item);
 				bridge_ret (h_, att);
-				h_ << " (*_get_" << att.name () << ") (Bridge < " << itf.qualified_name () << ">*, Interface*);\n";
+				h_ << " (*_get_" << att.name () << ") (Bridge < " << qualified_name (itf) << ">*, Interface*);\n";
 
 				if (!att.readonly ()) {
-					h_ << "void (*_set_" << att.name () << ") (Bridge < " << itf.qualified_name () << ">* _b, ";
+					h_ << "void (*_set_" << att.name () << ") (Bridge < " << qualified_name (itf) << ">* _b, ";
 					bridge_param (h_, att);
 					h_ << ", Interface* _env);\n";
 				}
@@ -149,10 +148,10 @@ void Client::end (const Interface& itf)
 
 	h_ <<
 		"template <class T>\n"
-		"class Client <T, " << itf.qualified_name () << "> :\n";
+		"class Client <T, " << qualified_name (itf) << "> :\n";
 	h_.indent ();
 	h_ << "public T,\n"
-		"public Definitions <" << itf.qualified_name () << ">\n";
+		"public Definitions <" << qualified_name (itf) << ">\n";
 	h_.unindent ();
 	h_ << "{\n"
 		"public:\n";
@@ -210,7 +209,7 @@ void Client::end (const Interface& itf)
 
 				h_ << "\ntemplate <class T>\n";
 
-				h_ << static_cast <const Type&> (op) << " Client <T, " << itf.qualified_name () << ">::" << op.name () << " (";
+				h_ << static_cast <const Type&> (op) << " Client <T, " << qualified_name (itf) << ">::" << op.name () << " (";
 
 				auto it = op.begin ();
 				if (it != op.end ()) {
@@ -227,7 +226,7 @@ void Client::end (const Interface& itf)
 				h_.indent ();
 
 				environment (op.raises ());
-				h_ << "Bridge < " << itf.scoped_name () << ">& _b (T::_get_bridge (_env));\n";
+				h_ << "Bridge < " << qualified_name (itf) << ">& _b (T::_get_bridge (_env));\n";
 
 				if (op.tkind () != Type::Kind::VOID)
 					h_ << "Type <" << static_cast <const Type&> (op) << ">::C_ret";
@@ -252,13 +251,13 @@ void Client::end (const Interface& itf)
 
 				h_ << "\ntemplate <class T>\n";
 
-				h_ << static_cast <const Type&> (att) << " Client <T, " << itf.qualified_name () << ">::" << att.name () << " () const\n"
+				h_ << static_cast <const Type&> (att) << " Client <T, " << qualified_name (itf) << ">::" << att.name () << " () const\n"
 					"{\n";
 
 				h_.indent ();
 
 				environment (att.getraises ());
-				h_ << "Bridge < " << itf.scoped_name () << ">& _b (T::_get_bridge (_env));\n"
+				h_ << "Bridge < " << qualified_name (itf) << ">& _b (T::_get_bridge (_env));\n"
 					"Type <" << static_cast <const Type&> (att) << ">::C_ret" << " _ret = (_b._epv ().epv._get_" << att.name () << ") (&_b, &_env);\n"
 					"_env.check ();\n"
 					"return _ret;\n";
@@ -269,7 +268,7 @@ void Client::end (const Interface& itf)
 				if (!att.readonly ()) {
 					h_ << "\ntemplate <class T>\n";
 
-					h_ << "void Client <T, " << itf.qualified_name () << ">::" << att.name () << '(';
+					h_ << "void Client <T, " << qualified_name (itf) << ">::" << att.name () << '(';
 					client_param (att);
 					h_ << " val)\n"
 						"{\n";
@@ -277,7 +276,7 @@ void Client::end (const Interface& itf)
 					h_.indent ();
 
 					environment (att.setraises ());
-					h_ << "Bridge < " << itf.scoped_name () << ">& _b (T::_get_bridge (_env));\n";
+					h_ << "Bridge < " << qualified_name (itf) << ">& _b (T::_get_bridge (_env));\n";
 
 					h_ << "(_b._epv ().epv._set_" << att.name () << ") (&_b, &val, &_env);\n"
 						"_env.check ();\n"
@@ -294,8 +293,8 @@ void Client::end (const Interface& itf)
 	// Interface definition
 	h_.namespace_open (itf);
 	h_ << "class " << itf.name () << " : public CORBA::Nirvana::ClientInterface <" << itf.name ();
-	for (auto b = itf.bases ().begin (); b != itf.bases ().end (); ++b) {
-		h_ << ", " << (*b)->qualified_name ();
+	for (auto b : itf.bases ()) {
+		h_ << ", " << qualified_name (*b);
 	}
 	switch (itf.interface_kind ()) {
 		case InterfaceKind::UNCONSTRAINED:
@@ -357,9 +356,9 @@ void Client::environment (const AST::Raises& raises)
 	else {
 		h_ << "EnvironmentEx < ";
 		auto it = raises.begin ();
-		h_ << (*it)->qualified_name ();
+		h_ << qualified_name (**it);
 		for (++it; it != raises.end (); ++it) {
-			h_ << ", " << (*it)->qualified_name ();
+			h_ << ", " << qualified_name (**it);
 		}
 		h_ << "> _env;\n";
 	}
@@ -463,7 +462,10 @@ void Client::end (const Exception& item)
 
 		h_ << "\nstruct _Data\n"
 			"{\n";
+
 		h_.indent ();
+
+		struct_stuff (static_cast <const Identifier&> (string ("_Data")), members);
 
 		for (const Member* m : members) {
 			type_prefix (*m) << "Member_type " << m->name () << ";\n";
@@ -505,6 +507,48 @@ void Client::end (const Exception& item)
 		<< qualified_name (item, false) << "&> (*ep) : nullptr;\n";
 	cpp_.unindent ();
 	cpp_ << "}\n\n";
+}
+
+void Client::struct_stuff (const Identifier& name, const Members& members)
+{
+	// Default constructor
+	h_ << name << " ()";
+	const char* def_val = nullptr;
+	auto it = members.begin ();
+	for (; it != members.end (); ++it) {
+		if (def_val = default_value (**it))
+			break;
+	}
+	if (def_val) {
+		h_ << " :\n";
+		h_.indent ();
+		h_ << (*it)->name () << " (" << def_val << ')';
+		for (++it; it != members.end (); ++it) {
+			if (def_val = default_value (**it)) {
+				h_ << ",\n"
+					<< (*it)->name () << " (" << def_val << ')';
+			}
+		}
+		h_.unindent ();
+	}
+	h_ << "\n {}\n";
+
+	h_ << name << "(const " << name << "&) = default;\n"
+		<< name << "(" << name << "&&) = default;\n"
+		<< name << "& operator = (const " << name << "&) = default;\n"
+		<< name << "& operator = (" << name << "&&) = default;\n";
+}
+
+const char* Client::default_value (const Type& t)
+{
+	const Type& td = t.dereference_type ();
+	if (td.tkind () == Type::Kind::BASIC_TYPE) {
+		if (td.basic_type () == BasicType::BOOLEAN)
+			return "false";
+		else if (td.basic_type () < BasicType::OBJECT)
+			return "0";
+	}
+	return nullptr;
 }
 
 std::ostream& Client::member_type_prefix (const AST::Type& t)
@@ -588,6 +632,9 @@ void Client::begin (const Struct& item)
 void Client::end (const Struct& item)
 {
 	Members members = get_members (item);
+
+	struct_stuff (item.name (), members);
+
 	for (const Member* m : members) {
 		h_.empty_line ();
 		type_prefix (*m) << "Member_ret " << m->name () << " () const\n"

@@ -15,11 +15,11 @@ void Servant::begin (const Interface& itf)
 	h_.empty_line ();
 
 	h_ << "template <class S>\n"
-		"class Skeleton <S, " << itf.qualified_name () << ">\n"
+		"class Skeleton <S, " << qualified_name (itf) << ">\n"
 		"{\n"
 		"public:\n";
 	h_.indent ();
-	h_ << "static const typename Bridge < " << itf.qualified_name () << ">::EPV epv_;\n\n";
+	h_ << "static const typename Bridge < " << qualified_name (itf) << ">::EPV epv_;\n\n";
 	h_.unindent ();
 	h_ << "protected:\n";
 	h_.indent ();
@@ -37,7 +37,7 @@ void Servant::begin (const Interface& itf)
 				{
 					string name = "_";
 					name += op.name ();
-					h_ << ' ' << name << " (Bridge < " << itf.qualified_name () << ">* _b";
+					h_ << ' ' << name << " (Bridge < " << qualified_name (itf) << ">* _b";
 					ops.push_back (move (name));
 				}
 
@@ -84,7 +84,7 @@ void Servant::begin (const Interface& itf)
 				{
 					string name = "__get_";
 					name += att.name ();
-					h_ << ' ' << name << " (Bridge < " << itf.qualified_name () << ">* _b, Interface* _env)\n"
+					h_ << ' ' << name << " (Bridge < " << qualified_name (itf) << ">* _b, Interface* _env)\n"
 						"{\n";
 					ops.push_back (move (name));
 				}
@@ -103,7 +103,7 @@ void Servant::begin (const Interface& itf)
 					{
 						string name = "__get_";
 						name += att.name ();
-						h_ << "static void " << name << " (Bridge < " << itf.qualified_name () << ">* _b, ";
+						h_ << "static void " << name << " (Bridge < " << qualified_name (itf) << ">* _b, ";
 						ops.push_back (move (name));
 					}
 					bridge_param (h_, att);
@@ -127,13 +127,13 @@ void Servant::begin (const Interface& itf)
 	h_.unindent ();
 	h_ << "};\n"
 		"\ntemplate <class S>\n"
-		"const Bridge < " << itf.qualified_name () << ">::EPV Skeleton <S, " << itf.qualified_name () << ">::epv_ = {\n";
+		"const Bridge < " << qualified_name (itf) << ">::EPV Skeleton <S, " << qualified_name (itf) << ">::epv_ = {\n";
 	h_.indent ();
 	h_ << "{ // header\n";
 	h_.indent ();
-	h_ << "Bridge < " << itf.qualified_name () << ">::repository_id_,\n"
-		"S::template __duplicate < " << itf.qualified_name () << "1>,\n"
-		"S::template __release < " << itf.qualified_name () << ">\n";
+	h_ << "Bridge < " << qualified_name (itf) << ">::repository_id_,\n"
+		"S::template __duplicate < " << qualified_name (itf) << "1>,\n"
+		"S::template __release < " << qualified_name (itf) << ">\n";
 	h_.unindent ();
 	h_ << "}";
 	
@@ -147,11 +147,11 @@ void Servant::begin (const Interface& itf)
 			h_ << "S::template _wide <AbstractBase, ";
 		else
 			h_ << "S::template _wide_object < ";
-		h_ << itf.qualified_name () << ">\n";
+		h_ << qualified_name (itf) << ">\n";
 
 		for (auto b : itf.bases ()) {
 			h_ << ",\n"
-				"S::template _wide < " << b->qualified_name () << ", " << itf.qualified_name () << ">\n";
+				"S::template _wide < " << qualified_name (*b) << ", " << qualified_name (itf) << ">\n";
 		}
 
 		h_.unindent ();

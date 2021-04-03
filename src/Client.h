@@ -51,6 +51,8 @@ private:
 	void client_param (const AST::Type& t, AST::Parameter::Attribute att = AST::Parameter::Attribute::IN);
 	std::ostream& type_prefix (const AST::Type& t);
 	std::ostream& member_type_prefix (const AST::Type& t);
+	void struct_stuff (const AST::Identifier& name, const Members& members);
+	static const char* default_value (const AST::Type& t);
 
 private:
 	Header h_; // .h file

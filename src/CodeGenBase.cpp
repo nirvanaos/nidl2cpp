@@ -102,6 +102,8 @@ const char* const CodeGenBase::protected_names_ [] = {
 	"xor_eq"
 };
 
+#define PROTECTED_PREFIX "_cxx_"
+
 inline bool CodeGenBase::is_keyword (const Identifier& id)
 {
 	return binary_search (protected_names_, std::end (protected_names_), id.c_str (), pred);
@@ -110,7 +112,7 @@ inline bool CodeGenBase::is_keyword (const Identifier& id)
 ostream& operator << (ostream& stm, const Identifier& id)
 {
 	if (CodeGenBase::is_keyword (id))
-		stm << "_cxx_";
+		stm << PROTECTED_PREFIX;
 	stm << static_cast <const string&> (id);
 	return stm;
 }
@@ -185,7 +187,10 @@ ostream& operator << (ostream& stm, const Type& t)
 
 string CodeGenBase::qualified_name (const NamedItem& item, bool fully)
 {
-	return qualified_parent_name (item) + item.name ();
+	if (is_keyword (item.name ()))
+		return qualified_parent_name (item) + PROTECTED_PREFIX + item.name ();
+	else
+		return qualified_parent_name (item) + item.name ();
 }
 
 string CodeGenBase::qualified_parent_name (const NamedItem& item, bool fully)
@@ -201,6 +206,8 @@ string CodeGenBase::qualified_parent_name (const NamedItem& item, bool fully)
 					qn += " ::";
 				qn += qualified_name (*parent, fully);
 				qn += '>';
+				if (is_keyword (item.name ()))
+					qn += PROTECTED_PREFIX;
 				qn += item.name ();
 			} else {
 				if (fully)

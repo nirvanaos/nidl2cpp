@@ -448,32 +448,26 @@ void Client::end (const Exception& item)
 			type_prefix (*m) << "Member_ret " << m->name () << " () const\n"
 				"{\n";
 			h_.indent ();
-			h_ << "return _data." << m->name () << ";\n";
+			h_ << "return _data." << m->name () << " ();\n";
 			h_.unindent ();
 			h_ << "}\n"
 				"void " << m->name () << " (";
 			type_prefix (*m) << "C_in val)\n"
 				"{\n";
 			h_.indent ();
-			h_ << "_data." << m->name () << " = val;\n";
+			h_ << "_data." << m->name () << "(val);\n";
 			h_.unindent ();
 			h_ << "}\n";
 		}
 
-		h_ << "\nstruct _Data\n"
-			"{\n";
+		h_ << "\nclass _Data\n"
+			"{\n"
+			"public:\n";
 
 		h_.indent ();
-
-		struct_stuff (static_cast <const Identifier&> (string ("_Data")), members);
-
-		for (const Member* m : members) {
-			type_prefix (*m) << "Member_type " << m->name () << ";\n";
-		}
-
+		struct_end (static_cast <const Identifier&> (string ("_Data")), members);
 		h_.unindent ();
-		h_ << "};\n\n";
-		h_.unindent ();
+
 		h_ << "private:\n";
 		h_.indent ();
 
@@ -507,48 +501,6 @@ void Client::end (const Exception& item)
 		<< qualified_name (item, false) << "&> (*ep) : nullptr;\n";
 	cpp_.unindent ();
 	cpp_ << "}\n\n";
-}
-
-void Client::struct_stuff (const Identifier& name, const Members& members)
-{
-	// Default constructor
-	h_ << name << " ()";
-	const char* def_val = nullptr;
-	auto it = members.begin ();
-	for (; it != members.end (); ++it) {
-		if (def_val = default_value (**it))
-			break;
-	}
-	if (def_val) {
-		h_ << " :\n";
-		h_.indent ();
-		h_ << (*it)->name () << " (" << def_val << ')';
-		for (++it; it != members.end (); ++it) {
-			if (def_val = default_value (**it)) {
-				h_ << ",\n"
-					<< (*it)->name () << " (" << def_val << ')';
-			}
-		}
-		h_.unindent ();
-	}
-	h_ << "\n {}\n";
-
-	h_ << name << "(const " << name << "&) = default;\n"
-		<< name << "(" << name << "&&) = default;\n"
-		<< name << "& operator = (const " << name << "&) = default;\n"
-		<< name << "& operator = (" << name << "&&) = default;\n";
-}
-
-const char* Client::default_value (const Type& t)
-{
-	const Type& td = t.dereference_type ();
-	if (td.tkind () == Type::Kind::BASIC_TYPE) {
-		if (td.basic_type () == BasicType::BOOLEAN)
-			return "false";
-		else if (td.basic_type () < BasicType::OBJECT)
-			return "0";
-	}
-	return nullptr;
 }
 
 std::ostream& Client::member_type_prefix (const AST::Type& t)
@@ -633,8 +585,45 @@ void Client::end (const Struct& item)
 {
 	Members members = get_members (item);
 
-	struct_stuff (item.name (), members);
+	struct_end (item.name (), members);
 
+	// Type code
+	type_code_decl (item);
+	define_type (qualified_name (item), members);
+	type_code_def (item);
+}
+
+void Client::struct_end (const Identifier& name, const Members& members)
+{
+	// Default constructor
+	h_ << name << " ()";
+	const char* def_val = nullptr;
+	auto it = members.begin ();
+	for (; it != members.end (); ++it) {
+		if (def_val = default_value (**it))
+			break;
+	}
+	if (def_val) {
+		h_ << " :\n";
+		h_.indent ();
+		h_ << '_' << (*it)->name () << " (" << def_val << ')';
+		for (++it; it != members.end (); ++it) {
+			if (def_val = default_value (**it)) {
+				h_ << ",\n"
+					<< '_' << (*it)->name () << " (" << def_val << ')';
+			}
+		}
+		h_.unindent ();
+	}
+	h_ << "\n {}\n";
+
+	// Constructors and assignments
+	h_ << name << "(const " << name << "&) = default;\n"
+		<< name << "(" << name << "&&) = default;\n"
+		<< name << "& operator = (const " << name << "&) = default;\n"
+		<< name << "& operator = (" << name << "&&) = default;\n";
+
+	// Accessors
 	for (const Member* m : members) {
 		h_.empty_line ();
 		type_prefix (*m) << "Member_ret " << m->name () << " () const\n"
@@ -643,14 +632,16 @@ void Client::end (const Struct& item)
 		h_ << "return _" << m->name () << ";\n";
 		h_.unindent ();
 		h_ << "}\n"
-		"void " << m->name () << " (";
+			"void " << m->name () << " (";
 		type_prefix (*m) << "C_in val)\n"
-		"{\n";
+			"{\n";
 		h_.indent ();
 		h_ << '_' << m->name () << " = val;\n";
 		h_.unindent ();
-		h_ << "}\n";
+		h_ << "}\n\n";
 	}
+
+	// Member variables
 	h_.unindent ();
 	h_ << "private:\n";
 	h_.indent ();
@@ -659,12 +650,20 @@ void Client::end (const Struct& item)
 	}
 	h_.unindent ();
 	h_ << "};\n";
-
-	// Type code
-	type_code_decl (item);
-	define_type (qualified_name (item), members);
-	type_code_def (item);
 }
+
+const char* Client::default_value (const Type& t)
+{
+	const Type& td = t.dereference_type ();
+	if (td.tkind () == Type::Kind::BASIC_TYPE) {
+		if (td.basic_type () == BasicType::BOOLEAN)
+			return "false";
+		else if (td.basic_type () < BasicType::OBJECT)
+			return "0";
+	}
+	return nullptr;
+}
+
 
 void Client::leaf (const Enum& item)
 {

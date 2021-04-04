@@ -26,6 +26,7 @@ interface I1
 	string string_op (in string in_s, out string out_s, inout string inout_s);
 	SeqLong seq_op (in SeqLong in_s, out SeqLong out_s, inout SeqLong inout_s);
 	any any_op (in any in_any, out any out_any, inout any inout_any);
+	attribute long addendum;
 };
 
 };

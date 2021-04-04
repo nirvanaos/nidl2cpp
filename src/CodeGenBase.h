@@ -59,6 +59,7 @@ protected:
 	}
 
 	static bool is_var_len (const AST::Type& type);
+	static bool is_var_len (const Members& members);
 
 	static std::string qualified_name (const AST::NamedItem& item, bool fully = true);
 	static std::string qualified_parent_name (const AST::NamedItem& item, bool fully = true);

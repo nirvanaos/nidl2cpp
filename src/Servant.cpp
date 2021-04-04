@@ -221,7 +221,7 @@ void Servant::leaf (const Attribute& att)
 	h_.indent ();
 	h_ << "try {\n";
 	h_.indent ();
-	h_ << "return Type < " << static_cast <const Type&> (att) << ">::ret (S::_implementation (_b)." << att.name () << " ();\n";
+	h_ << "return Type < " << static_cast <const Type&> (att) << ">::ret (S::_implementation (_b)." << att.name () << " ());\n";
 	catch_block ();
 	h_ << "return ";
 	bridge_ret (h_, att);

@@ -186,10 +186,10 @@ void Client::end (const Interface& itf)
 			case Item::Kind::ATTRIBUTE: {
 				const Attribute& att = static_cast <const Attribute&> (item);
 
-				h_ << static_cast <const Type&> (att) << ' ' << att.name () << " () const;\n";
+				h_ << static_cast <const Type&> (att) << ' ' << att.name () << " ();\n";
 
 				if (!att.readonly ()) {
-					h_ << "void " << att.name () << '(';
+					h_ << "void " << att.name () << " (";
 					client_param (att);
 					h_ << ");\n";
 				}
@@ -254,7 +254,7 @@ void Client::end (const Interface& itf)
 
 				h_ << "\ntemplate <class T>\n";
 
-				h_ << static_cast <const Type&> (att) << " Client <T, " << qualified_name (itf) << ">::" << att.name () << " () const\n"
+				h_ << static_cast <const Type&> (att) << " Client <T, " << qualified_name (itf) << ">::" << att.name () << " ()\n"
 					"{\n";
 
 				h_.indent ();
@@ -271,7 +271,7 @@ void Client::end (const Interface& itf)
 				if (!att.readonly ()) {
 					h_ << "\ntemplate <class T>\n";
 
-					h_ << "void Client <T, " << qualified_name (itf) << ">::" << att.name () << '(';
+					h_ << "void Client <T, " << qualified_name (itf) << ">::" << att.name () << " (";
 					client_param (att);
 					h_ << " val)\n"
 						"{\n";
@@ -282,8 +282,7 @@ void Client::end (const Interface& itf)
 					h_ << "Bridge < " << qualified_name (itf) << ">& _b (T::_get_bridge (_env));\n";
 
 					h_ << "(_b._epv ().epv._set_" << att.name () << ") (&_b, &val, &_env);\n"
-						"_env.check ();\n"
-						"return _ret;\n";
+						"_env.check ();\n";
 
 					h_.unindent ();
 					h_ << "}\n";
@@ -471,7 +470,7 @@ void Client::end (const Exception& item)
 		struct_end (static_cast <const Identifier&> (string ("_Data")), members);
 		h_.unindent ();
 
-		h_ << "private:\n";
+		h_ << "\nprivate:\n";
 		h_.indent ();
 
 		h_ << "virtual void* __data () NIRVANA_NOEXCEPT\n"
@@ -648,6 +647,7 @@ void Client::struct_end (const Identifier& name, const Members& members)
 	h_.unindent ();
 	h_ << "private:\n";
 	h_.indent ();
+	h_ << "friend struct ::CORBA::Nirvana::MarshalTraits <" << name << ">;\n";
 	for (const Member* m : members) {
 		type_prefix (*m) << "Member_type _" << m->name () << ";\n";
 	}

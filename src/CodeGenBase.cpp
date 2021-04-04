@@ -286,7 +286,6 @@ bool CodeGenBase::is_var_len (const Type& type)
 
 		case Type::Kind::NAMED_TYPE: {
 			const NamedItem& item = *t.named_type ();
-			Members members;
 			switch (item.kind ()) {
 				case Item::Kind::INTERFACE:
 				case Item::Kind::INTERFACE_DECL:
@@ -295,19 +294,24 @@ bool CodeGenBase::is_var_len (const Type& type)
 				case Item::Kind::VALUE_BOX:
 					return true;
 				case Item::Kind::STRUCT:
-					members = get_members (static_cast <const Struct&> (item));
+					return is_var_len (get_members (static_cast <const Struct&> (item)));
 					break;
 				case Item::Kind::UNION:
-					members = get_members (static_cast <const Union&> (item));
+					return is_var_len (get_members (static_cast <const Union&> (item)));
 					break;
 				default:
 					return false;
 			}
-			for (auto member : members) {
-				if (is_var_len (*member))
-					return true;
-			}
 		}
+	}
+	return false;
+}
+
+bool CodeGenBase::is_var_len (const Members& members)
+{
+	for (auto member : members) {
+		if (is_var_len (*member))
+			return true;
 	}
 	return false;
 }

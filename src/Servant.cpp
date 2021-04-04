@@ -88,14 +88,15 @@ void Servant::end (const Interface& itf)
 		h_ << "template <class S>\n"
 			"class Servant <S, " << qualified_name (itf) << "> : public Implementation";
 		implementation_suffix (itf);
+		h_ << " <S, ";
 		implementation_parameters (itf, bases);
 
 		// POA implementation
 		h_.empty_line ();
-		h_ << "template <class S>\n"
-			"class ServantPOA <S, " << qualified_name (itf) << "> : public Implementation";
+		h_ << "template <>\n"
+			"class ServantPOA < " << qualified_name (itf) << "> : public Implementation";
 		implementation_suffix (itf);
-		h_ << "POA";
+		h_ << "POA < ";
 		implementation_parameters (itf, bases);
 
 		// Static implementation
@@ -103,7 +104,7 @@ void Servant::end (const Interface& itf)
 		h_ << "template <class S>\n"
 			"class ServantStatic <S, " << qualified_name (itf) << "> : public Implementation";
 		implementation_suffix (itf);
-		h_ << "Static";
+		h_ << "Static <S, ";
 		implementation_parameters (itf, bases);
 
 		h_.namespace_close ();
@@ -147,11 +148,11 @@ void Servant::implementation_suffix (const InterfaceKind ik)
 
 void Servant::implementation_parameters (const Interface& primary, const Interfaces& bases)
 {
-	h_ << " <S, " << qualified_name (primary);
+	h_ << qualified_name (primary);
 	for (auto b : bases) {
 		h_ << ", " << qualified_name (*b);
 	}
-	h_ << "> {}\n";
+	h_ << "> {};\n";
 }
 
 void Servant::leaf (const Operation& op)

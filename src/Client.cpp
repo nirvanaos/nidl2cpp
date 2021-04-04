@@ -232,17 +232,17 @@ void Client::end (const Interface& itf)
 				h_ << "Bridge < " << qualified_name (itf) << ">& _b (T::_get_bridge (_env));\n";
 
 				if (op.tkind () != Type::Kind::VOID)
-					h_ << "Type <" << static_cast <const Type&> (op) << ">::C_ret";
-				else
-					h_ << "void";
+					h_ << "Type <" << static_cast <const Type&> (op) << ">::C_ret _ret = ";
 
-				h_ << " _ret = (_b._epv ().epv." << op.name () << ") (&_b";
+				h_ << "(_b._epv ().epv." << op.name () << ") (&_b";
 				for (it = op.begin (); it != op.end (); ++it) {
 					h_ << ", &" << (*it)->name ();
 				}
 				h_ << ", &_env);\n"
-					"_env.check ();\n"
-					"return _ret;\n";
+					"_env.check ();\n";
+
+				if (op.tkind () != Type::Kind::VOID)
+					h_ << "return _ret;\n";
 
 				h_.unindent ();
 				h_ << "}\n";

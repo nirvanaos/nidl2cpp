@@ -2,6 +2,7 @@
 #include "Compiler.h"
 #include "Client.h"
 #include "Servant.h"
+#include "Proxy.h"
 #include <iostream>
 
 using namespace std;
@@ -52,4 +53,7 @@ void Compiler::generate_code (const AST::Root& tree)
 		Servant servant (servant_h, client_h, tree);
 		tree.visit (servant);
 	}
+
+	Proxy proxy (out_file (tree, proxy_suffix_, ".cpp"), servant_h, tree);
+	tree.visit (proxy);
 }

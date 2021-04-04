@@ -35,7 +35,7 @@ void Servant::end (const Interface& itf)
 	h_ << "{ // header\n";
 	h_.indent ();
 	h_ << "Bridge < " << qualified_name (itf) << ">::repository_id_,\n"
-		"S::template __duplicate < " << qualified_name (itf) << "1>,\n"
+		"S::template __duplicate < " << qualified_name (itf) << ">,\n"
 		"S::template __release < " << qualified_name (itf) << ">\n";
 	h_.unindent ();
 	h_ << "}";
@@ -180,7 +180,7 @@ void Servant::leaf (const Operation& op)
 	h_ << "try {\n";
 	h_.indent ();
 	if (op.tkind () != Type::Kind::VOID)
-		h_ << "return Type < " << static_cast <const Type&> (op) << "::ret (";
+		h_ << "return Type < " << static_cast <const Type&> (op) << ">::ret (";
 	h_ << "S::_implementation (_b)." << op.name () << " (";
 	if (!op.empty ()) {
 		auto par = op.begin ();
@@ -221,7 +221,7 @@ void Servant::leaf (const Attribute& att)
 	h_.indent ();
 	h_ << "try {\n";
 	h_.indent ();
-	h_ << "return Type < " << static_cast <const Type&> (att) << "::ret (S::_implementation (_b)." << att.name () << " ();\n";
+	h_ << "return Type < " << static_cast <const Type&> (att) << ">::ret (S::_implementation (_b)." << att.name () << " ();\n";
 	catch_block ();
 	h_ << "return ";
 	bridge_ret (h_, att);

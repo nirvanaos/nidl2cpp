@@ -23,6 +23,10 @@ protected:
 	virtual void end (const AST::Interface& itf);
 
 private:
+	void abi_members (const std::vector <const AST::Parameter*>& params);
+	std::ostream& abi_member (const AST::Type& t);
+
+private:
 	Code cpp_;
 };
 

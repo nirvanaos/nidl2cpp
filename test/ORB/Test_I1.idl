@@ -18,6 +18,11 @@ struct MyStruct
 	long l_member;
 };
 
+enum MyEnum
+{
+	a, b, c
+};
+
 interface I1
 {
 	long op1 (in long p1);

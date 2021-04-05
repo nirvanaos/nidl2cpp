@@ -53,6 +53,13 @@ private:
 	std::ostream& member_type_prefix (const AST::Type& t);
 	void struct_end (const AST::Identifier& name, const Members& members);
 	static const char* default_value (const AST::Type& t);
+	static bool nested (const AST::NamedItem& item);
+	void h_namespace_open (const AST::NamedItem& item);
+
+	void implement (const AST::Exception& item);
+	void implement (const AST::Struct& item);
+	void implement (const AST::Union& item);
+	void implement (const AST::Enum& item);
 
 private:
 	Header h_; // .h file

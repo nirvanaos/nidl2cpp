@@ -146,8 +146,8 @@ ostream& operator << (ostream& stm, const Type& t)
 			stm << basic_types [(size_t)t.basic_type ()];
 			break;
 		case Type::Kind::NAMED_TYPE:
-			stm << CodeGenBase::qualified_name (*t.named_type ());
-			switch (t.named_type ()->kind ()) {
+			stm << CodeGenBase::qualified_name (t.named_type ());
+			switch (t.named_type ().kind ()) {
 				case Item::Kind::INTERFACE:
 				case Item::Kind::VALUE_TYPE:
 				case Item::Kind::VALUE_BOX:
@@ -188,9 +188,9 @@ ostream& operator << (ostream& stm, const Type& t)
 string CodeGenBase::qualified_name (const NamedItem& item, bool fully)
 {
 	if (is_keyword (item.name ()))
-		return qualified_parent_name (item) + PROTECTED_PREFIX + item.name ();
+		return qualified_parent_name (item, fully) + PROTECTED_PREFIX + item.name ();
 	else
-		return qualified_parent_name (item) + item.name ();
+		return qualified_parent_name (item, fully) + item.name ();
 }
 
 string CodeGenBase::qualified_parent_name (const NamedItem& item, bool fully)
@@ -201,22 +201,16 @@ string CodeGenBase::qualified_parent_name (const NamedItem& item, bool fully)
 		Item::Kind pk = parent->kind ();
 		if (fully || pk != Item::Kind::MODULE) {
 			if (Item::Kind::INTERFACE == pk || Item::Kind::VALUE_TYPE == pk) {
-				qn = "::CORBA::Nirvana::Definitions <";
-				if (fully)
-					qn += " ::";
+				qn += "::CORBA::Nirvana::Definitions < ";
 				qn += qualified_name (*parent, fully);
 				qn += '>';
-				if (is_keyword (item.name ()))
-					qn += PROTECTED_PREFIX;
-				qn += item.name ();
 			} else {
-				if (fully)
-					qn = "::";
 				qn += qualified_name (*parent, fully);
 			}
 			qn += "::";
 		}
-	}
+	} else if (fully)
+		qn = "::";
 	return qn;
 }
 
@@ -285,7 +279,7 @@ bool CodeGenBase::is_var_len (const Type& type)
 			return is_var_len (t.array ());
 
 		case Type::Kind::NAMED_TYPE: {
-			const NamedItem& item = *t.named_type ();
+			const NamedItem& item = t.named_type ();
 			switch (item.kind ()) {
 				case Item::Kind::INTERFACE:
 				case Item::Kind::INTERFACE_DECL:

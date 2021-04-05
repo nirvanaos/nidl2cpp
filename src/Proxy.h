@@ -20,9 +20,7 @@ protected:
 
 	virtual void leaf (const AST::TypeDef& item);
 	
-	virtual void begin (const AST::Interface& itf);
-	virtual void leaf (const AST::Operation& op);
-	virtual void leaf (const AST::Attribute& att);
+	virtual void begin (const AST::Interface& itf) {}
 	virtual void end (const AST::Interface& itf);
 
 	virtual void end (const AST::Exception& item);
@@ -30,25 +28,37 @@ protected:
 	virtual void leaf (const AST::Enum& item);
 
 private:
-	void abi_members (const std::vector <const AST::Parameter*>& params);
+	void abi_members (const Members& members);
 	std::ostream& abi_member (const AST::Type& t);
 	void proxy_param (const AST::Parameter& param);
 
-	typedef std::vector <const AST::Parameter*> Parameters;
-	static void get_parameters (const AST::Operation& op, Parameters& params_in, Parameters& params_out);
-	static bool need_marshal (const Parameters& params);
+	static void get_parameters (const AST::Operation& op, Members& params_in, Members& params_out);
 
 	static std::string export_name (const AST::NamedItem& item);
 
-	void implement (const AST::TypeDef& item);
-	void implement (const AST::Exception& item);
-	void implement (const AST::Struct& item);
-	void implement (const AST::Enum& item);
+	void implement (const AST::Operation& op);
+	void implement (const AST::Attribute& att);
 
 	void marshal_traits (const std::string& name, const Members& members);
 
-	void parameter (const AST::Member& m);
+	void md_members (const Members& members);
+	void md_member (const AST::Member& m);
+	void md_member (const AST::Type& t, const std::string& name);
 	void tc_name (const AST::Type& t);
+
+	struct OpMetadata
+	{
+		std::string name;
+		const AST::Type* type;
+		Members params_in;
+		Members params_out;
+	};
+
+	typedef std::list <OpMetadata> Metadata;
+
+	void md_operation (const AST::Interface& itf, const OpMetadata& op);
+
+	void rep_id_of (const AST::RepositoryId& rid);
 
 private:
 	Code cpp_;

@@ -7,6 +7,7 @@ class Compiler : public IDL_FrontEnd
 {
 public:
 	Compiler () :
+		IDL_FrontEnd (FLAG_DEPRECATE_ANONYMOUS_TYPES),
 		servant_suffix_ ("_s"),
 		proxy_suffix_ ("_p")
 	{}

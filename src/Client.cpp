@@ -22,7 +22,7 @@ void Client::leaf (const Include& item)
 
 void Client::type_code_decl (const NamedItem& item)
 {
-	h_ << "extern const ::Nirvana::ImportInterfaceT < ::CORBA::TypeCode> _tc_" << item.name () << ";\n";
+	h_ << "const ::Nirvana::ImportInterfaceT < ::CORBA::TypeCode> _tc_" << item.name () << ";\n";
 }
 
 void Client::type_code_def (const RepositoryId& type)
@@ -35,9 +35,20 @@ void Client::type_code_def (const RepositoryId& type)
 		<< "\", ::CORBA::TypeCode::repository_id_ };\n\n";
 }
 
+bool Client::nested (const AST::NamedItem& item)
+{
+	return item.parent () && item.parent ()->kind () != Item::Kind::MODULE;
+}
+
+void Client::h_namespace_open (const NamedItem& item)
+{
+	if (!nested (item))
+		h_.namespace_open (item);
+}
+
 void Client::leaf (const TypeDef& item)
 {
-	h_.namespace_open (item);
+	h_namespace_open (item);
 	h_.empty_line ();
 	h_ << "typedef " << static_cast <const Type&> (item) << ' ' << item.name () << ";\n";
 	type_code_decl (item);
@@ -47,6 +58,7 @@ void Client::leaf (const TypeDef& item)
 void Client::interface_forward (const NamedItem& item, InterfaceKind ik)
 {
 	h_.namespace_open (item);
+	h_.empty_line ();
 	h_ << "class " << item.name () << ";\n";
 	h_ << "typedef CORBA::Nirvana::I_ptr <" << item.name () << "> " << item.name () << "_ptr;\n";
 	h_ << "typedef CORBA::Nirvana::I_var <" << item.name () << "> " << item.name () << "_var;\n";
@@ -81,8 +93,28 @@ void Client::end (const Interface& itf)
 	h_.unindent ();
 	h_ << "};\n";
 
+	// Implement nested items
+	for (auto it = itf.begin (); it != itf.end (); ++it) {
+		const Item& item = **it;
+		switch (item.kind ()) {
+			case Item::Kind::EXCEPTION:
+				implement (static_cast <const Exception&> (item));
+				break;
+			case Item::Kind::STRUCT:
+				implement (static_cast <const Struct&> (item));
+				break;
+			case Item::Kind::UNION:
+				implement (static_cast <const Union&> (item));
+				break;
+			case Item::Kind::ENUM:
+				implement (static_cast <const Enum&> (item));
+				break;
+		}
+	}
+
 	// Bridge
 	h_.namespace_open (internal_namespace_);
+	h_.empty_line ();
 	h_ << "BRIDGE_BEGIN (" << qualified_name (itf) << ", \"" << itf.repository_id () << "\")\n";
 
 	switch (itf.interface_kind ()) {
@@ -145,11 +177,8 @@ void Client::end (const Interface& itf)
 		}
 	}
 
-	h_ << "BRIDGE_END ()\n";
-
-	// Client interface
-
-	h_ <<
+	h_ << "BRIDGE_END ()\n"
+		"\n" // Client interface
 		"template <class T>\n"
 		"class Client <T, " << qualified_name (itf) << "> :\n";
 	h_.indent ();
@@ -368,9 +397,11 @@ void Client::environment (const AST::Raises& raises)
 
 void Client::leaf (const Constant& item)
 {
+	h_namespace_open (item);
 	bool outline = constant (h_, item);
 	h_ << ' ' << item.name ();
 	if (outline) {
+		cpp_.namespace_open (item);
 		constant (cpp_, item);
 		cpp_ << ' ' << qualified_name (item, false) << " = ";
 		value (cpp_, item);
@@ -384,7 +415,6 @@ void Client::leaf (const Constant& item)
 
 bool Client::constant (Code& stm, const Constant& item)
 {
-	stm.namespace_open (item);
 	stm.empty_line ();
 	stm << "const ";
 	bool outline = false;
@@ -426,7 +456,7 @@ void Client::value (ofstream& stm, const Variant& var)
 
 void Client::begin (const Exception& item)
 {
-	h_.namespace_open (item);
+	h_namespace_open (item);
 	h_.empty_line ();
 	h_ << "class " << item.name () << " : public ::CORBA::UserException\n"
 		"{\n"
@@ -487,6 +517,14 @@ void Client::end (const Exception& item)
 
 	// Type code
 	type_code_decl (item);
+
+	if (!nested (item))
+		implement (item);
+}
+
+void Client::implement (const AST::Exception& item)
+{
+	Members members = get_members (item);
 	define_type (qualified_name (item) + "::_Data", members);
 	type_code_def (item);
 
@@ -514,6 +552,7 @@ std::ostream& Client::member_type_prefix (const AST::Type& t)
 void Client::define_type (const std::string& fqname, const Members& members)
 {
 	h_.namespace_open (internal_namespace_);
+	h_.empty_line ();
 
 	// ABI
 	h_ << "template <>\n"
@@ -568,14 +607,14 @@ void Client::define_type (const std::string& fqname, const Members& members)
 
 void Client::leaf (const StructDecl& item)
 {
-	h_.namespace_open (item);
+	h_namespace_open (item);
 	h_ << "class " << item.name () << ";\n";
 	type_code_decl (item);
 }
 
 void Client::begin (const Struct& item)
 {
-	h_.namespace_open (item);
+	h_namespace_open (item);
 	h_.empty_line ();
 	h_ << "class " << item.name () << "\n"
 		"{\n"
@@ -591,6 +630,14 @@ void Client::end (const Struct& item)
 
 	// Type code
 	type_code_decl (item);
+
+	if (!nested (item))
+		implement (item);
+}
+
+void Client::implement (const Struct& item)
+{
+	Members members = get_members (item);
 	define_type (qualified_name (item), members);
 	type_code_def (item);
 }
@@ -667,11 +714,15 @@ const char* Client::default_value (const Type& t)
 	return nullptr;
 }
 
+void Client::implement (const Union& item)
+{
+	// TODO:: Implement
+}
 
 void Client::leaf (const Enum& item)
 {
-	h_.namespace_open (item);
-	h_ << "enum class " << item.name () << " : uint32_t\n"
+	h_namespace_open (item);
+	h_ << "enum class " << item.name () << " : ::CORBA::Nirvana::ABI_enum\n"
 		"{\n";
 	h_.indent ();
 	auto it = item.begin ();
@@ -680,5 +731,20 @@ void Client::leaf (const Enum& item)
 		h_ << ",\n" << (*it)->name ();
 	}
 	h_.unindent ();
-	h_ << "};\n";
+	h_ << "\n};\n";
+
+	type_code_decl (item);
+
+	if (!nested (item))
+		implement (item);
+}
+
+void Client::implement (const Enum& item)
+{
+	h_.namespace_open (internal_namespace_);
+	h_.empty_line ();
+	h_ << "template <>\n"
+		"struct Type < " << qualified_name (item) << "> : public TypeEnum < " << qualified_name (item)
+		<< ", " << qualified_name (item) << "::" << item.back ()->name () << ">\n"
+		"{};\n";
 }

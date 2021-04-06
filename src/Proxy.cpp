@@ -534,49 +534,10 @@ void Proxy::tc_name (const Type& t)
 	}
 }
 
-void Proxy::marshal_traits (const std::string& name, const Members& members)
-{
-	if (!members.empty ()) {
-		cpp_.empty_line ();
-		cpp_ << "template <> struct MarshalTraits < " << name << ">\n"
-			"{\n";
-		cpp_.indent ();
-
-		cpp_ << "static const bool has_marshal = " << (is_var_len (members) ? "true" : "false") << ";\n\n"
-			"static void marshal_in (const " << name << "& src, Marshal_ptr marshaler, Type < " << name << ">::ABI_type& dst)\n"
-			"{\n";
-		cpp_.indent ();
-		for (auto m : members) {
-			cpp_ << "_marshal_in (src._" << m->name () << ", marshaler, dst." << m->name () << ");\n";
-		}
-		cpp_.unindent ();
-		cpp_ << "}\n\n"
-			"static void marshal_out (" << name << "& src, Marshal_ptr marshaler, Type < " << name << ">::ABI_type& dst)\n"
-			"{\n";
-		cpp_.indent ();
-		for (auto m : members) {
-			cpp_ << "_marshal_out (src._" << m->name () << ", marshaler, dst." << m->name () << ");\n";
-		}
-		cpp_.unindent ();
-		cpp_ << "}\n\n"
-			"static void unmarshal (const Type < " << name << ">::ABI_type& src, Unmarshal_ptr unmarshaler, " << name << "& dst)\n"
-			"{\n";
-		cpp_.indent ();
-		for (auto m : members) {
-			cpp_ << "_unmarshal (src." << m->name () << ", unmarshaler, dst._" << m->name () << ");\n";
-		}
-		cpp_.unindent ();
-		cpp_ << "}\n";
-		cpp_.unindent ();
-		cpp_ << "};\n";
-	}
-}
-
 void Proxy::end (const Exception& item)
 {
 	cpp_.namespace_open (internal_namespace_);
 	Members members = get_members (item);
-	marshal_traits (qualified_name (item) + "::_Data", members);
 
 	cpp_ << "template <>\n"
 		"class TypeCodeException < " << qualified_name (item) << "> : public TypeCodeExceptionImpl < " << qualified_name (item)
@@ -601,7 +562,6 @@ void Proxy::end (const Struct& item)
 {
 	cpp_.namespace_open (internal_namespace_);
 	Members members = get_members (item);
-	marshal_traits (qualified_name (item), members);
 	rep_id_of (item);
 
 	// TODO: Implement type code

@@ -47,7 +47,8 @@ private:
 	void type_code_def (const AST::RepositoryId& type);
 	static void value (std::ofstream& stm, const AST::Variant& var);
 	void define_type (const std::string& fqname, const Members& members);
-	void client_param (const AST::Parameter& param);	
+	void marshal_traits (const std::string& name, const Members& members);
+	void client_param (const AST::Parameter& param);
 	void client_param (const AST::Type& t, AST::Parameter::Attribute att = AST::Parameter::Attribute::IN);
 	std::ostream& type_prefix (const AST::Type& t);
 	std::ostream& member_type_prefix (const AST::Type& t);

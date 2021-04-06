@@ -39,8 +39,6 @@ private:
 	void implement (const AST::Operation& op);
 	void implement (const AST::Attribute& att);
 
-	void marshal_traits (const std::string& name, const Members& members);
-
 	void md_members (const Members& members);
 	void md_member (const AST::Member& m);
 	void md_member (const AST::Type& t, const std::string& name);

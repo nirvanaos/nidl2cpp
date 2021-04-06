@@ -549,6 +549,45 @@ std::ostream& Client::member_type_prefix (const AST::Type& t)
 	return h_;
 }
 
+inline
+void Client::marshal_traits (const string& name, const Members& members)
+{
+	if (!members.empty ()) {
+		h_.empty_line ();
+		h_ << "template <> struct MarshalTraits < " << name << ">\n"
+			"{\n";
+		h_.indent ();
+
+		h_ << "static const bool has_marshal = " << (is_var_len (members) ? "true" : "false") << ";\n\n"
+			"static void marshal_in (const " << name << "& src, Marshal_ptr marshaler, Type < " << name << ">::ABI_type& dst)\n"
+			"{\n";
+		h_.indent ();
+		for (auto m : members) {
+			h_ << "_marshal_in (src._" << m->name () << ", marshaler, dst." << m->name () << ");\n";
+		}
+		h_.unindent ();
+		h_ << "}\n\n"
+			"static void marshal_out (" << name << "& src, Marshal_ptr marshaler, Type < " << name << ">::ABI_type& dst)\n"
+			"{\n";
+		h_.indent ();
+		for (auto m : members) {
+			h_ << "_marshal_out (src._" << m->name () << ", marshaler, dst." << m->name () << ");\n";
+		}
+		h_.unindent ();
+		h_ << "}\n\n"
+			"static void unmarshal (const Type < " << name << ">::ABI_type& src, Unmarshal_ptr unmarshaler, " << name << "& dst)\n"
+			"{\n";
+		h_.indent ();
+		for (auto m : members) {
+			h_ << "_unmarshal (src." << m->name () << ", unmarshaler, dst._" << m->name () << ");\n";
+		}
+		h_.unindent ();
+		h_ << "}\n";
+		h_.unindent ();
+		h_ << "};\n";
+	}
+}
+
 void Client::define_type (const std::string& fqname, const Members& members)
 {
 	h_.namespace_open (internal_namespace_);
@@ -603,6 +642,8 @@ void Client::define_type (const std::string& fqname, const Members& members)
 	} else {
 		h_ << "TypeFixLen < " << fqname << "> {};\n";
 	}
+
+	marshal_traits (fqname, members);
 }
 
 void Client::leaf (const StructDecl& item)

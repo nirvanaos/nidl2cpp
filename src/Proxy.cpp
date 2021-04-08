@@ -534,37 +534,52 @@ void Proxy::tc_name (const Type& t)
 	}
 }
 
+void Proxy::type_code_members (const NamedItem& item, const Members& members)
+{
+	assert (!members.empty ());
+	cpp_ << "template <>\n"
+		"const Parameter TypeCodeMembers < " << qualified_name (item) << ">::members_ [] = {\n";
+
+	md_members (members);
+
+	cpp_ << "};\n\n";
+}
+
 void Proxy::end (const Exception& item)
 {
 	cpp_.namespace_open (internal_namespace_);
 	Members members = get_members (item);
 
-	cpp_ << "template <>\n"
-		"class TypeCodeException < " << qualified_name (item) << "> : public TypeCodeExceptionImpl < " << qualified_name (item)
-		<< ", " << members.size () << ">\n"
-		"{};\n\n";
-
-	if (!members.empty ()) {
-		cpp_ << "template <>\n"
-			"const Parameter TypeCodeMembers <TypeCodeException < " << qualified_name (item) << "> >::members_ [] = {\n";
-
-		md_members (members);
-
-		cpp_ << "};\n\n";
-	}
+	if (!members.empty ())
+		type_code_members (item, members);
 
 	cpp_.namespace_close ();
-	cpp_ << "NIRVANA_EXPORT (" << export_name (item) << "_TC, " << qualified_name (item)
-		<< "::repository_id_, CORBA::TypeCode, CORBA::Nirvana::TypeCodeException < " << qualified_name (item) << ">)\n";
+	cpp_ << "NIRVANA_EXPORT (" << export_name (item) << "_TC, "
+		<< qualified_name (item) << "::repository_id_, CORBA::TypeCode, CORBA::Nirvana::TypeCodeException < " << qualified_name (item)
+		<< ", " << (members.empty () ? "false" : "true") << ">)\n";
+}
+
+void Proxy::type_code_name (const NamedItem& item)
+{
+	cpp_ << "template <>\n"
+		"const char TypeCodeName < " << qualified_name (item) << ">::name_ [] = \"" << static_cast <const string&> (item.name ()) << "\";\n";
+}
+
+void Proxy::rep_id_of (const RepositoryId& rid)
+{
+	cpp_ << "template <>\n"
+		"const char RepIdOf < " << qualified_name (rid.item ()) << ">::repository_id_ [] = \"" << rid.repository_id () << "\";\n";
 }
 
 void Proxy::end (const Struct& item)
 {
 	cpp_.namespace_open (internal_namespace_);
-	Members members = get_members (item);
 	rep_id_of (item);
-
-	// TODO: Implement type code
+	type_code_name (item);
+	type_code_members (item, get_members (item));
+	cpp_.namespace_close ();
+	cpp_ << "NIRVANA_EXPORT (" << export_name (item) << "_TC, "
+		"CORBA::Nirvana::RepIdOf < " << qualified_name (item) << "::repository_id_, CORBA::TypeCode, CORBA::Nirvana::TypeCodeStruct < " << qualified_name (item) << ">)\n";
 }
 
 void Proxy::leaf (const Enum& item)
@@ -591,10 +606,4 @@ void Proxy::leaf (const Enum& item)
 	cpp_.namespace_close ();
 	cpp_ << "NIRVANA_EXPORT (" << export_name (item) << "_TC, \"" << item.repository_id ()
 		<< "\", CORBA::TypeCode, CORBA::Nirvana::TypeCodeEnum < " << qualified_name (item) << ">)\n";
-}
-
-void Proxy::rep_id_of (const RepositoryId& rid)
-{
-	cpp_ << "template <>\n"
-		"const char RepIdOf < " << qualified_name (rid.item ()) << ">::repository_id_ [] = \"" << rid.repository_id () << "\";\n";
 }

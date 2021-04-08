@@ -22,6 +22,8 @@ void Client::leaf (const Include& item)
 
 void Client::type_code_decl (const NamedItem& item)
 {
+	if (!nested (item))
+		h_ << "extern ";
 	h_ << "const ::Nirvana::ImportInterfaceT < ::CORBA::TypeCode> _tc_" << item.name () << ";\n";
 }
 
@@ -398,6 +400,9 @@ void Client::environment (const AST::Raises& raises)
 void Client::leaf (const Constant& item)
 {
 	h_namespace_open (item);
+
+	if (!nested (item))
+		h_ << "extern ";
 	bool outline = constant (h_, item);
 	h_ << ' ' << item.name ();
 	if (outline) {
@@ -413,20 +418,19 @@ void Client::leaf (const Constant& item)
 	h_ << ";\n";
 }
 
-bool Client::constant (Code& stm, const Constant& item)
+bool Client::constant (ofstream& stm, const Constant& item)
 {
-	stm.empty_line ();
 	stm << "const ";
 	bool outline = false;
 	switch (item.dereference_type ().tkind ()) {
 		case Type::Kind::STRING:
 		case Type::Kind::FIXED:
 			outline = true;
-			stm << "Char* const";
+			stm << "char* const";
 			break;
 		case Type::Kind::WSTRING:
 			outline = true;
-			stm << "WChar* const";
+			stm << "whar_t* const";
 			break;
 		default:
 			stm << static_cast <const Type&> (item);

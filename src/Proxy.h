@@ -57,6 +57,8 @@ private:
 	void md_operation (const AST::Interface& itf, const OpMetadata& op);
 
 	void rep_id_of (const AST::RepositoryId& rid);
+	void type_code_members (const AST::NamedItem& item, const Members& members);
+	void type_code_name (const AST::NamedItem& item);
 
 private:
 	Code cpp_;

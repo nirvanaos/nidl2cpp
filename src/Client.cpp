@@ -79,10 +79,38 @@ void Client::begin (const Interface& itf)
 	// Forward declarations
 	interface_forward (itf, itf);
 
-	if (itf.interface_kind () != InterfaceKind::PSEUDO)
+	if (itf.interface_kind () != InterfaceKind::PSEUDO) {
 		type_code_def (itf);
 
+		h_.namespace_open (internal_namespace_);
+		h_.empty_line ();
+		h_ << "template <>\n"
+			"Type <I_var < " << qualified_name (itf) << "> > : ";
+		switch (itf.interface_kind ()) {
+			case InterfaceKind::LOCAL:
+				h_ << "TypeLocalObject";
+				break;
+			case InterfaceKind::ABSTRACT:
+				h_ << "TypeAbstractInterface";
+				break;
+			default:
+				h_ << "TypeObject";
+				break;
+		}
+		h_ << " < " << qualified_name (itf) << ">\n"
+			"{\n";
+		h_.indent ();
+		h_ << "static TypeCode_ptr type_code ()\n"
+			"{\n";
+		h_.indent ();
+		h_ << "return " << qualified_parent_name (itf) << "_tc_" << static_cast <const string&> (itf.name ()) << ";\n";
+		h_.unindent ();
+		h_ << "}\n";
+		h_.unindent ();
+		h_ << "};\n";
+	}
 	h_.namespace_open (internal_namespace_);
+	h_.empty_line ();
 	h_ << "template <>\n"
 		"struct Definitions < " << qualified_name (itf) << ">\n"
 		"{\n";

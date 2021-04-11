@@ -120,22 +120,22 @@ ostream& operator << (ostream& stm, const Identifier& id)
 ostream& operator << (ostream& stm, const Type& t)
 {
 	static const char* const basic_types [(size_t)BasicType::ANY + 1] = {
-		"bool",
-		"uint8_t",
-		"char",
-		"wchar_t",
-		"uint16_t",
-		"uint32_t",
-		"uint64_t",
-		"int16_t",
-		"int32_t",
-		"int64_t",
-		"float",
-		"double",
-		"long double",
-		"::CORBA::Object_var",
-		"::CORBA::ValueBase_var",
-		"::CORBA::Any"
+		"Boolean",
+		"Octet",
+		"Char",
+		"Wchar",
+		"UShort",
+		"ULong",
+		"ULongLong",
+		"Short",
+		"Long",
+		"LongLong",
+		"Float",
+		"Double",
+		"LongDouble",
+		"Object_var",
+		"ValueBase_var",
+		"Any"
 	};
 
 	switch (t.tkind ()) {
@@ -143,7 +143,7 @@ ostream& operator << (ostream& stm, const Type& t)
 			stm << "void";
 			break;
 		case Type::Kind::BASIC_TYPE:
-			stm << basic_types [(size_t)t.basic_type ()];
+			stm << "::CORBA::" << basic_types [(size_t)t.basic_type ()];
 			break;
 		case Type::Kind::NAMED_TYPE:
 			stm << CodeGenBase::qualified_name (t.named_type ());
@@ -155,19 +155,29 @@ ostream& operator << (ostream& stm, const Type& t)
 			}
 			break;
 		case Type::Kind::STRING:
-			stm << "std::string";
+			stm << "::CORBA::Nirvana::";
+			if (t.string_bound ())
+				stm << "BoundedString <" << t.string_bound () << '>';
+			else
+				stm << "String";
 			break;
 		case Type::Kind::WSTRING:
-			stm << "std::wstring";
+			stm << "::CORBA::Nirvana::";
+			if (t.string_bound ())
+				stm << "BoundedWString <" << t.string_bound () << '>';
+			else
+				stm << "WString";
 			break;
 		case Type::Kind::FIXED:
-			stm << "::CORBA::" << "Fixed";
-			if (t.fixed_digits ())
-				stm << " <" << t.fixed_digits () << ", " << t.fixed_scale () << '>';
+			stm << "::CORBA::Nirvana::" << "Fixed <" << t.fixed_digits () << ", " << t.fixed_scale () << '>';
 			break;
-		case Type::Kind::SEQUENCE:
-			stm << "std::vector <" << static_cast <const Type&> (t.sequence ()) << '>';
-			break;
+		case Type::Kind::SEQUENCE: {
+			const Sequence& seq = t.sequence ();
+			stm << "::CORBA::Nirvana::" << "Sequence <" << static_cast <const Type&> (t.sequence ());
+			if (seq.bound ())
+				stm << ", " << seq.bound ();
+			stm << '>';
+		} break;
 		case Type::Kind::ARRAY: {
 			const Array& arr = t.array ();
 			for (size_t cnt = arr.dimensions ().size (); cnt; --cnt) {

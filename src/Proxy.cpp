@@ -208,8 +208,15 @@ void Proxy::end (const Interface& itf)
 
 	cpp_.namespace_open (internal_namespace_);
 	cpp_.empty_line ();
-	cpp_ << "template <> const char ProxyFactoryImpl < " << qualified_name (itf) << ">::name_ [] = \"" << static_cast <const string&> (itf.name ()) << "\";\n"
-		"\ntemplate <>\n"
+	cpp_ << "IMPLEMENT_PROXY_FACTORY(";
+	{
+		auto parent = itf.parent ();
+		if (parent)
+			cpp_ << qualified_name (*parent);
+	}
+	cpp_ << ", " << itf.name () << ");\n"
+		"\n"
+		"template <>\n"
 		"struct ProxyTraits < " << qualified_name (itf) << ">\n"
 		"{\n";
 	cpp_.indent ();

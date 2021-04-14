@@ -252,10 +252,10 @@ void Servant::leaf (const Attribute& att)
 		{
 			string name = "__set_";
 			name += att.name ();
-			h_ << "static void " << name << " (Bridge < " << QName (itf) << ">* _b, " << TypeC_param (att) << " val, Interface* _env)\n";
+			h_ << "static void " << name << " (Bridge < " << QName (itf) << ">* _b, " << TypeC_param (att) << " val, Interface* _env)\n"
+				"{\n";
 			epv_.push_back (move (name));
 		}
-		"{\n";
 		h_.indent ();
 		h_ << "try {\n";
 		h_.indent ();

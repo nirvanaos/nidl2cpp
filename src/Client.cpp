@@ -52,7 +52,7 @@ void Client::type_code_decl (const NamedItem& item)
 	h_ << "const ::Nirvana::ImportInterfaceT < ::CORBA::TypeCode> _tc_" << item.name () << ";\n";
 }
 
-void Client::type_code_def (const NamedItem& item)
+void Client::type_code_def (const NamedItem& item, const char* prefix)
 {
 	assert (cpp_.no_namespace ());
 	cpp_.empty_line ();
@@ -64,8 +64,14 @@ void Client::type_code_def (const NamedItem& item)
 		<< " = { ::Nirvana::OLF_IMPORT_INTERFACE, ";
 	if (item.kind () == Item::Kind::INTERFACE || item.kind () == Item::Kind::VALUE_TYPE)
 		cpp_ << QName (item);
-	else
-		cpp_ << "CORBA::Nirvana::RepIdOf <" << QName (item) << '>';
+	else {
+		cpp_ << "CORBA::Nirvana::RepIdOf <";
+		if (prefix)
+			cpp_ << ParentName (item) << prefix << static_cast <const string&> (item.name ());
+		else
+			cpp_ << QName (item);
+		cpp_ << '>';
+	}
 	cpp_ << "::repository_id_, CORBA::TypeCode::repository_id_ };\n\n";
 }
 
@@ -85,8 +91,11 @@ void Client::leaf (const TypeDef& item)
 	h_namespace_open (item);
 	h_.empty_line ();
 	h_ << "typedef " << static_cast <const Type&> (item) << ' ' << item.name () << ";\n";
-	type_code_decl (item);
-	type_code_def (item);
+	if (!is_pseudo (item)) {
+		h_ << "class " << typedef_prefix_ << static_cast <const string&> (item.name ()) << ";\n";
+		type_code_decl (item);
+		type_code_def (item, typedef_prefix_);
+	}
 }
 
 void Client::interface_forward (const NamedItem& item, InterfaceKind ik)
@@ -496,7 +505,10 @@ void Client::end (const Exception& item)
 			"public:\n";
 
 		h_.indent ();
-		struct_end (static_cast <const Identifier&> (string ("_Data")), members);
+		{
+			string name ("_Data");
+			struct_end (static_cast <const Identifier&> (name), members);
+		}
 		h_.unindent ();
 
 		h_ << "\nprivate:\n";
@@ -664,7 +676,7 @@ void Client::struct_end (const Identifier& name, const Members& members)
 	const char* def_val = nullptr;
 	auto it = members.begin ();
 	for (; it != members.end (); ++it) {
-		if (def_val = default_value (**it))
+		if ((def_val = default_value (**it)))
 			break;
 	}
 	if (def_val) {
@@ -672,7 +684,7 @@ void Client::struct_end (const Identifier& name, const Members& members)
 		h_.indent ();
 		h_ << '_' << (*it)->name () << " (" << def_val << ')';
 		for (++it; it != members.end (); ++it) {
-			if (def_val = default_value (**it)) {
+			if ((def_val = default_value (**it))) {
 				h_ << ",\n"
 					<< '_' << (*it)->name () << " (" << def_val << ')';
 			}

@@ -67,7 +67,7 @@ private:
 	void interface_forward (const AST::NamedItem& item, AST::InterfaceKind ik);
 	void environment (const AST::Raises& raises);
 	void type_code_decl (const AST::NamedItem& item);
-	void type_code_def (const AST::NamedItem& item);
+	void type_code_def (const AST::NamedItem& item, const char* prefix = nullptr);
 	static bool constant (Code& stm, const AST::Constant& item);
 	void define_type (const AST::NamedItem& item, const Members& members, const char* suffix = "");
 	std::ostream& member_type_prefix (const AST::Type& t);

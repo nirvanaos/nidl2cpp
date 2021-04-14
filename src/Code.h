@@ -94,6 +94,18 @@ public:
 		return *this;
 	}
 
+	Code& operator << (unsigned long long val)
+	{
+		Base::operator << (val);
+		return *this;
+	}
+
+	Code& operator << (long long val)
+	{
+		Base::operator << (val);
+		return *this;
+	}
+
 	Code& operator << (std::ios_base& (*func)(std::ios_base&))
 	{
 		Base::operator << (func);

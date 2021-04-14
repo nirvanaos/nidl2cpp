@@ -69,32 +69,32 @@ bool Compiler::parse_command_line (CmdLine& args)
 		return true;
 
 	const char* arg = nullptr;
-	if (arg = option (args.arg (), "out_h"))
+	if ((arg = option (args.arg (), "out_h")))
 		out_h_ = args.parameter (arg);
-	else if (arg = option (args.arg (), "out_cpp"))
+	else if ((arg = option (args.arg (), "out_cpp")))
 		out_cpp_ = args.parameter (arg);
-	else if (arg = option (args.arg (), "out"))
+	else if ((arg = option (args.arg (), "out")))
 		out_h_ = out_cpp_ = args.parameter (arg);
-	else if (arg = option (args.arg (), "no_client"))
+	else if ((arg = option (args.arg (), "no_client")))
 		client_ = false;
-	else if (arg = option (args.arg (), "no_server"))
+	else if ((arg = option (args.arg (), "no_server")))
 		server_ = false;
-	else if (arg = option (args.arg (), "no_proxy"))
+	else if ((arg = option (args.arg (), "no_proxy")))
 		proxy_ = false;
-	else if (arg = option (args.arg (), "client")) {
+	else if ((arg = option (args.arg (), "client"))) {
 		server_ = false;
 		proxy_ = false;
-	} else if (arg = option (args.arg (), "server")) {
+	} else if ((arg = option (args.arg (), "server"))) {
 		client_ = false;
 		proxy_ = false;
-	} else if (arg = option (args.arg (), "proxy")) {
+	} else if ((arg = option (args.arg (), "proxy"))) {
 		client_ = false;
 		server_ = false;
-	} else if (arg = option (args.arg (), "client_suffix"))
+	} else if ((arg = option (args.arg (), "client_suffix")))
 		client_suffix_ = args.parameter (arg);
-	else if (arg = option (args.arg (), "server_suffix"))
+	else if ((arg = option (args.arg (), "server_suffix")))
 		servant_suffix_ = args.parameter (arg);
-	else if (arg = option (args.arg (), "proxy_suffix"))
+	else if ((arg = option (args.arg (), "proxy_suffix")))
 		proxy_suffix_ = args.parameter (arg);
 
 	if (arg) {

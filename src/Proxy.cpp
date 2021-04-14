@@ -606,6 +606,9 @@ void Proxy::rep_id_of (const RepositoryId& rid)
 
 void Proxy::end (const Struct& item)
 {
+	if (is_pseudo (item))
+		return;
+
 	cpp_.namespace_open (internal_namespace_);
 	rep_id_of (item);
 	type_code_name (item);
@@ -617,6 +620,9 @@ void Proxy::end (const Struct& item)
 
 void Proxy::leaf (const Enum& item)
 {
+	if (is_pseudo (item))
+		return;
+
 	cpp_.namespace_open (internal_namespace_);
 	cpp_.empty_line ();
 	rep_id_of (item);

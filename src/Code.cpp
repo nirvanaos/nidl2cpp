@@ -196,7 +196,7 @@ Code& operator << (Code& stm, const Type& t)
 			const Sequence& seq = t.sequence ();
 			if (stm.spec_namespace () != CodeGenBase::internal_namespace_)
 				stm << "::CORBA::Nirvana::";
-			stm << "Sequence <" << static_cast <const Type&> (t.sequence ());
+			stm << "Sequence < " << static_cast <const Type&> (t.sequence ());
 			if (seq.bound ())
 				stm << ", " << seq.bound ();
 			stm << '>';
@@ -204,7 +204,7 @@ Code& operator << (Code& stm, const Type& t)
 		case Type::Kind::ARRAY: {
 			const Array& arr = t.array ();
 			for (size_t cnt = arr.dimensions ().size (); cnt; --cnt) {
-				stm << "std::array <";
+				stm << "std::array < ";
 			}
 			stm << static_cast <const Type&> (arr);
 			for (auto dim = arr.dimensions ().rbegin (); dim != arr.dimensions ().rend (); ++dim) {

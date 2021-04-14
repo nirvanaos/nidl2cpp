@@ -278,6 +278,25 @@ bool CodeGenBase::is_var_len (const Members& members)
 	return false;
 }
 
+bool CodeGenBase::is_pseudo (const NamedItem& item)
+{
+	const NamedItem* p = &item;
+	do {
+		switch (p->kind ()) {
+			case Item::Kind::INTERFACE: {
+				const Interface& itf = static_cast <const Interface&> (*p);
+				if (itf.interface_kind () == InterfaceKind::PSEUDO)
+					return true;
+			} break;
+
+			case Item::Kind::MODULE:
+				return false;
+		}
+		p = p->parent ();
+	} while (p);
+	return false;
+}
+
 void CodeGenBase::leaf (const UnionDecl&)
 {
 	throw runtime_error ("Not yet implemented");

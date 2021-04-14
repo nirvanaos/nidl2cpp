@@ -144,8 +144,10 @@ Code& operator << (Code& stm, const CodeGenBase::ParentName& qn)
 	if (parent) {
 		Item::Kind pk = parent->kind ();
 		if (pk == Item::Kind::MODULE) {
-			if (stm.module_namespace () != parent)
-				stm << CodeGenBase::ParentName (*parent);
+			if (stm.module_namespace () != parent) {
+				stm << CodeGenBase::QName (*parent);
+				stm << "::";
+			}
 		} else {
 			if (Item::Kind::INTERFACE == pk || Item::Kind::VALUE_TYPE == pk) {
 				if (stm.spec_namespace () != CodeGenBase::internal_namespace_) {
@@ -176,7 +178,10 @@ Code& operator << (Code& stm, const CodeGenBase::TypePrefix& t)
 
 Code& operator << (Code& stm, const CodeGenBase::TypeABI_ret& t)
 {
-	return stm << CodeGenBase::TypePrefix (t.type) << "ABI_ret";
+	if (t.type.tkind () != Type::Kind::VOID)
+		return stm << CodeGenBase::TypePrefix (t.type) << "ABI_ret";
+	else
+		return stm << "void";
 }
 
 Code& operator << (Code& stm, const CodeGenBase::TypeABI_param& t)
@@ -285,6 +290,12 @@ bool CodeGenBase::is_pseudo (const NamedItem& item)
 		switch (p->kind ()) {
 			case Item::Kind::INTERFACE: {
 				const Interface& itf = static_cast <const Interface&> (*p);
+				if (itf.interface_kind () == InterfaceKind::PSEUDO)
+					return true;
+			} break;
+
+			case Item::Kind::INTERFACE_DECL: {
+				const InterfaceDecl& itf = static_cast <const InterfaceDecl&> (*p);
 				if (itf.interface_kind () == InterfaceKind::PSEUDO)
 					return true;
 			} break;

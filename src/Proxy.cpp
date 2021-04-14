@@ -36,7 +36,8 @@ void Proxy::end (const Root&)
 
 void Proxy::leaf (const TypeDef& item)
 {
-	// TODO: Implement
+	cpp_ << "NIRVANA_EXPORT (" << export_name (item) << "_TC, \"" << item.repository_id ()
+		<< "\", CORBA::TypeCode, CORBA::Nirvana::TypeCodeEnum < " << QName (item) << ">)\n";
 }
 
 void Proxy::get_parameters (const AST::Operation& op, Members& params_in, Members& params_out)

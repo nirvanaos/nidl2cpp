@@ -102,157 +102,90 @@ const char* const CodeGenBase::protected_names_ [] = {
 	"xor_eq"
 };
 
-#define PROTECTED_PREFIX "_cxx_"
-
-inline bool CodeGenBase::is_keyword (const Identifier& id)
+bool CodeGenBase::is_keyword (const Identifier& id)
 {
 	return binary_search (protected_names_, std::end (protected_names_), id.c_str (), pred);
 }
 
-ostream& operator << (ostream& stm, const Identifier& id)
+Code& operator << (Code& stm, const CodeGenBase::QName& qn)
 {
-	if (CodeGenBase::is_keyword (id))
-		stm << PROTECTED_PREFIX;
-	stm << static_cast <const string&> (id);
+	stm << CodeGenBase::ParentName (qn.item) << qn.item.name ();
 	return stm;
 }
 
-ostream& operator << (ostream& stm, const Type& t)
+Code& operator << (Code& stm, const CodeGenBase::ParentName& qn)
 {
-	static const char* const basic_types [(size_t)BasicType::ANY + 1] = {
-		"Boolean",
-		"Octet",
-		"Char",
-		"Wchar",
-		"UShort",
-		"ULong",
-		"ULongLong",
-		"Short",
-		"Long",
-		"LongLong",
-		"Float",
-		"Double",
-		"LongDouble",
-		"Object_var",
-		"ValueBase_var",
-		"Any"
-	};
-
-	switch (t.tkind ()) {
-		case Type::Kind::VOID:
-			stm << "void";
-			break;
-		case Type::Kind::BASIC_TYPE:
-			stm << "::CORBA::" << basic_types [(size_t)t.basic_type ()];
-			break;
-		case Type::Kind::NAMED_TYPE:
-			stm << CodeGenBase::qualified_name (t.named_type ());
-			switch (t.named_type ().kind ()) {
-				case Item::Kind::INTERFACE:
-				case Item::Kind::VALUE_TYPE:
-				case Item::Kind::VALUE_BOX:
-					stm << "_var";
-			}
-			break;
-		case Type::Kind::STRING:
-			stm << "::CORBA::Nirvana::";
-			if (t.string_bound ())
-				stm << "BoundedString <" << t.string_bound () << '>';
-			else
-				stm << "String";
-			break;
-		case Type::Kind::WSTRING:
-			stm << "::CORBA::Nirvana::";
-			if (t.string_bound ())
-				stm << "BoundedWString <" << t.string_bound () << '>';
-			else
-				stm << "WString";
-			break;
-		case Type::Kind::FIXED:
-			stm << "::CORBA::Nirvana::" << "Fixed <" << t.fixed_digits () << ", " << t.fixed_scale () << '>';
-			break;
-		case Type::Kind::SEQUENCE: {
-			const Sequence& seq = t.sequence ();
-			stm << "::CORBA::Nirvana::" << "Sequence <" << static_cast <const Type&> (t.sequence ());
-			if (seq.bound ())
-				stm << ", " << seq.bound ();
-			stm << '>';
-		} break;
-		case Type::Kind::ARRAY: {
-			const Array& arr = t.array ();
-			for (size_t cnt = arr.dimensions ().size (); cnt; --cnt) {
-				stm << "std::array <";
-			}
-			stm << static_cast <const Type&> (arr);
-			for (auto dim = arr.dimensions ().rbegin (); dim != arr.dimensions ().rend (); ++dim) {
-				stm << ", " << *dim << '>';
-			}
-		} break;
-		default:
-			assert (false);
-	}
-
-	return stm;
-}
-
-string CodeGenBase::qualified_name (const NamedItem& item, bool fully)
-{
-	if (is_keyword (item.name ()))
-		return qualified_parent_name (item, fully) + PROTECTED_PREFIX + item.name ();
-	else
-		return qualified_parent_name (item, fully) + item.name ();
-}
-
-string CodeGenBase::qualified_parent_name (const NamedItem& item, bool fully)
-{
-	const NamedItem* parent = item.parent ();
-	string qn;
+	const NamedItem* parent = qn.item.parent ();
 	if (parent) {
 		Item::Kind pk = parent->kind ();
-		if (fully || pk != Item::Kind::MODULE) {
+		if (pk == Item::Kind::MODULE) {
+			if (stm.module_namespace () != parent)
+				stm << CodeGenBase::ParentName (*parent);
+		} else {
 			if (Item::Kind::INTERFACE == pk || Item::Kind::VALUE_TYPE == pk) {
-				qn += "::CORBA::Nirvana::Definitions < ";
-				qn += qualified_name (*parent, fully);
-				qn += '>';
+				if (stm.spec_namespace () != CodeGenBase::internal_namespace_) {
+					if (!stm.no_namespace ())
+						stm << "::";
+					stm << "CORBA::Nirvana::";
+				}
+				stm << "Definitions < " << CodeGenBase::QName (*parent) << '>';
 			} else {
-				qn += qualified_name (*parent, fully);
+				stm << CodeGenBase::QName (*parent);
 			}
-			qn += "::";
+			stm << "::";
 		}
-	} else if (fully)
-		qn = "::";
-	return qn;
+	} else if (!stm.no_namespace ())
+		stm << "::";
+	return stm;
 }
 
-void CodeGenBase::bridge_ret (ofstream& stm, const Type& t)
+Code& operator << (Code& stm, const CodeGenBase::TypePrefix& t)
 {
-	if (t.tkind () != Type::Kind::VOID) {
-		stm << "ABI_ret <" << t << ">";
-	} else {
-		stm << "void";
+	if (stm.spec_namespace () != CodeGenBase::internal_namespace_) {
+		if (stm.module_namespace ())
+			stm << "::";
+		stm << "CORBA::Nirvana::";
 	}
+	return stm << "Type < " << t.type << ">::";
 }
 
-void CodeGenBase::bridge_param (ofstream& stm, const Parameter& param)
+Code& operator << (Code& stm, const CodeGenBase::TypeABI_ret& t)
 {
-	bridge_param (stm, param, param.attribute ());
-	stm << ' ' << param.name ();
+	return stm << CodeGenBase::TypePrefix (t.type) << "ABI_ret";
 }
 
-void CodeGenBase::bridge_param (ofstream& stm, const Type& t, Parameter::Attribute att)
+Code& operator << (Code& stm, const CodeGenBase::TypeABI_param& t)
 {
-	switch (att) {
+	stm << CodeGenBase::TypePrefix (t.type);
+	switch (t.att) {
 		case Parameter::Attribute::IN:
-			stm << "ABI_in <";
+			stm << "ABI_in";
 			break;
 		case Parameter::Attribute::OUT:
-			stm << "ABI_out <";
+			stm << "ABI_out";
 			break;
 		case Parameter::Attribute::INOUT:
-			stm << "ABI_inout <";
+			stm << "ABI_inout";
 			break;
 	}
-	stm << t << '>';
+	return stm;
+}
+
+Code& operator << (Code& stm, const CodeGenBase::TypeC_param& t)
+{
+	stm << CodeGenBase::TypePrefix (t.type);
+	switch (t.att) {
+		case Parameter::Attribute::IN:
+			stm << "C_in";
+			break;
+		case Parameter::Attribute::OUT:
+			stm << "C_out";
+			break;
+		case Parameter::Attribute::INOUT:
+			stm << "C_inout";
+			break;
+	}
+	return stm;
 }
 
 CodeGenBase::Members CodeGenBase::get_members (const ItemContainer& cont, Item::Kind member_kind)

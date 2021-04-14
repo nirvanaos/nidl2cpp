@@ -11,8 +11,7 @@ public:
 	Servant (const std::filesystem::path& file, const std::filesystem::path& client, const AST::Root& root) :
 		h_ (file, root)
 	{
-		h_ << "#include <CORBA/Server.h>\n"
-			"#include " << client.filename () << std::endl << std::endl;
+		h_ << "#include " << client.filename () << std::endl << std::endl;
 	}
 
 protected:

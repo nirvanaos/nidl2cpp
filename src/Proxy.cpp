@@ -70,7 +70,7 @@ void Proxy::implement (const Operation& op)
 	}
 
 	cpp_.empty_line ();
-	cpp_ << "static void " << static_cast <const string&> (op.name ()) << "_request (I_ptr < " << qualified_name (itf) << "> _servant, "
+	cpp_ << "static void " << static_cast <const string&> (op.name ()) << "_request (I_ptr < " << QName (itf) << "> _servant, "
 		" IORequest_ptr _call, ::Nirvana::ConstPointer _in_ptr, Unmarshal_var& _u, ::Nirvana::Pointer _out_ptr)\n"
 		"{\n";
 	cpp_.indent ();
@@ -120,16 +120,16 @@ void Proxy::implement (const Operation& op)
 
 	if (!type_out.empty ()) {
 		// Marshal output
-		cpp_ << "Marshal_ptr _m";
-		if (is_var_len (params_out))
-			cpp_ << " = _call->marshaler ()";
-		cpp_ << ";\n"
+		bool marshal = is_var_len (params_out);
+		const char* m_param = marshal ? "_m" : "Marshal::_nil ()";
+		if (marshal)
+			cpp_ << "Marshal_var _m = _call->marshaler ();\n"
 			<< type_out << "& _out = *(" << type_out << "*)_out_ptr;\n";
 		for (auto p : params_out) {
-			cpp_ << "_marshal_out (" << p->name () << ", _m, _out." << p->name () << ");\n";
+			cpp_ << "_marshal_out (" << p->name () << ", " << m_param << " , _out." << p->name () << ");\n";
 		}
 		if (op.tkind () != Type::Kind::VOID)
-			cpp_ << "_marshal_out (_ret, _m, _out._ret);\n";
+			cpp_ << "_marshal_out (_ret, " << m_param << " , _out._ret);\n";
 	}
 
 	cpp_.unindent ();
@@ -159,7 +159,7 @@ void Proxy::implement (const Attribute& att)
 	abi_member (att) << att_abi << ";\n";
 
 	cpp_.empty_line ();
-	cpp_ << "static void _get_" << static_cast <const string&> (att.name ()) << "_request (I_ptr < " << qualified_name (itf) << "> _servant, "
+	cpp_ << "static void _get_" << static_cast <const string&> (att.name ()) << "_request (I_ptr < " << QName (itf) << "> _servant, "
 		" IORequest_ptr _call, ::Nirvana::ConstPointer _in_ptr, Unmarshal_var& _u, ::Nirvana::Pointer _out_ptr)\n"
 		"{\n";
 	cpp_.indent ();
@@ -168,12 +168,13 @@ void Proxy::implement (const Attribute& att)
 	cpp_ << static_cast <const Type&> (att) << " _ret;\n";
 
 	// Call
-	cpp_ << "_ret = _servant->" << att.name () << " ();\n"
-		"Marshal_ptr _m";
-	if (is_var_len (att))
-		cpp_ << " = _call->marshaler ()";
+	cpp_ << "_ret = _servant->" << att.name () << " ();\n";
+
+	bool marshal = is_var_len (att);
+	if (marshal)
+		cpp_ << "Marshal_var _m = _call->marshaler ()";
 	cpp_ << ";\n";
-	cpp_ << "_marshal_out (_ret, _m, *(" << att_abi << "*)_out_ptr);\n";
+	cpp_ << "_marshal_out (_ret, " << (marshal ? "_m" : "Marshal::_nil ()") << " , *(" << att_abi << "*)_out_ptr);\n";
 
 	cpp_.unindent ();
 	cpp_ << "}\n";
@@ -182,7 +183,7 @@ void Proxy::implement (const Attribute& att)
 		cpp_.empty_line ();
 		cpp_ << "static const Parameter _set_" << static_cast <const string&> (att.name ()) << "_in_params_ [1];\n\n";
 
-		cpp_ << "static void _set_" << static_cast <const string&> (att.name ()) << "_request (I_ptr < " << qualified_name (itf) << "> _servant, "
+		cpp_ << "static void _set_" << static_cast <const string&> (att.name ()) << "_request (I_ptr < " << QName (itf) << "> _servant, "
 			" IORequest_ptr _call, ::Nirvana::ConstPointer _in_ptr, Unmarshal_var& _u, ::Nirvana::Pointer _out_ptr)\n"
 			"{\n";
 		cpp_.indent ();
@@ -212,12 +213,12 @@ void Proxy::end (const Interface& itf)
 	{
 		auto parent = itf.parent ();
 		if (parent)
-			cpp_ << qualified_name (*parent);
+			cpp_ << QName (*parent);
 	}
 	cpp_ << ", " << itf.name () << ");\n"
 		"\n"
 		"template <>\n"
-		"struct ProxyTraits < " << qualified_name (itf) << ">\n"
+		"struct ProxyTraits < " << QName (itf) << ">\n"
 		"{\n";
 	cpp_.indent ();
 	cpp_ << "static const Operation operations_ [];\n"
@@ -238,11 +239,11 @@ void Proxy::end (const Interface& itf)
 	cpp_.unindent ();
 	cpp_ << "};\n\n"
 		"template <>\n"
-		"class Proxy < " << qualified_name (itf) << "> : public ProxyBase < " << qualified_name (itf) << ">\n"
+		"class Proxy < " << QName (itf) << "> : public ProxyBase < " << QName (itf) << ">\n"
 		"{\n";
 	cpp_.indent ();
-	cpp_ << "typedef ProxyBase < " << qualified_name (itf) << "> Base;\n"
-		"typedef ProxyTraits < " << qualified_name (itf) << "> Traits;\n";
+	cpp_ << "typedef ProxyBase < " << QName (itf) << "> Base;\n"
+		"typedef ProxyTraits < " << QName (itf) << "> Traits;\n";
 	cpp_.unindent ();
 	cpp_ << "public:\n";
 	cpp_.indent ();
@@ -393,7 +394,7 @@ void Proxy::end (const Interface& itf)
 
 		for (const auto& op : metadata) {
 			if (!op.params_in.empty ()) {
-				cpp_ << "const Parameter ProxyTraits < " << qualified_name (itf) << ">::" << op.name << "_in_params_ [" << op.params_in.size () << "] = {\n";
+				cpp_ << "const Parameter ProxyTraits < " << QName (itf) << ">::" << op.name << "_in_params_ [" << op.params_in.size () << "] = {\n";
 				if (op.type) {
 					md_members (op.params_in);
 				} else {
@@ -407,13 +408,13 @@ void Proxy::end (const Interface& itf)
 				cpp_ << "};\n";
 			}
 			if (!op.params_out.empty ()) {
-				cpp_ << "const Parameter ProxyTraits < " << qualified_name (itf) << ">::" << op.name << "_out_params_ [" << op.params_out.size () << "] = {\n";
+				cpp_ << "const Parameter ProxyTraits < " << QName (itf) << ">::" << op.name << "_out_params_ [" << op.params_out.size () << "] = {\n";
 				md_members (op.params_out);
 				cpp_ << "};\n";
 			}
 		}
 
-		cpp_ << "const Operation ProxyTraits < " << qualified_name (itf) << ">::operations_ [" << metadata.size () << "] = {\n";
+		cpp_ << "const Operation ProxyTraits < " << QName (itf) << ">::operations_ [" << metadata.size () << "] = {\n";
 		cpp_.indent ();
 
 		auto it = metadata.cbegin ();
@@ -428,8 +429,8 @@ void Proxy::end (const Interface& itf)
 	}
 
 	cpp_.namespace_close ();
-	cpp_ << "NIRVANA_EXPORT (" << export_name (itf) << "_ProxyFactory, " << qualified_name (itf)
-		<< "::repository_id_, CORBA::AbstractBase, CORBA::Nirvana::ProxyFactoryImpl <" << qualified_name (itf) << ">)\n";
+	cpp_ << "NIRVANA_EXPORT (" << export_name (itf) << "_ProxyFactory, " << QName (itf)
+		<< "::repository_id_, CORBA::AbstractBase, CORBA::Nirvana::ProxyFactoryImpl <" << QName (itf) << ">)\n";
 }
 
 void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
@@ -448,7 +449,7 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
 		cpp_ << "0, 0";
 	cpp_ << " }, ";
 	tc_name (op.type ? *op.type : Type ());
-	cpp_ << ", RqProcWrapper < " << qualified_name (itf) << ", " << op.name << "_request> }";
+	cpp_ << ", RqProcWrapper < " << QName (itf) << ", " << op.name << "_request> }";
 }
 
 void Proxy::proxy_param (const Parameter& param)
@@ -526,7 +527,7 @@ void Proxy::tc_name (const Type& t)
 			break;
 		case Type::Kind::NAMED_TYPE: {
 			const NamedItem& item = t.named_type ();
-			cpp_ << qualified_parent_name (item) << "_tc_" << item.name ();
+			cpp_ << ParentName (item) << "_tc_" << item.name ();
 		} break;
 		case Type::Kind::STRING:
 			assert (!t.string_bound ()); // Anonymous types are not allowed.
@@ -545,7 +546,7 @@ void Proxy::type_code_members (const NamedItem& item, const Members& members)
 {
 	assert (!members.empty ());
 	cpp_ << "template <>\n"
-		"const Parameter TypeCodeMembers < " << qualified_name (item) << ">::members_ [] = {\n";
+		"const Parameter TypeCodeMembers < " << QName (item) << ">::members_ [] = {\n";
 
 	md_members (members);
 
@@ -562,20 +563,20 @@ void Proxy::end (const Exception& item)
 
 	cpp_.namespace_close ();
 	cpp_ << "NIRVANA_EXPORT (" << export_name (item) << "_TC, "
-		<< qualified_name (item) << "::repository_id_, CORBA::TypeCode, CORBA::Nirvana::TypeCodeException < " << qualified_name (item)
+		<< QName (item) << "::repository_id_, CORBA::TypeCode, CORBA::Nirvana::TypeCodeException < " << QName (item)
 		<< ", " << (members.empty () ? "false" : "true") << ">)\n";
 }
 
 void Proxy::type_code_name (const NamedItem& item)
 {
 	cpp_ << "template <>\n"
-		"const char TypeCodeName < " << qualified_name (item) << ">::name_ [] = \"" << static_cast <const string&> (item.name ()) << "\";\n";
+		"const char TypeCodeName < " << QName (item) << ">::name_ [] = \"" << static_cast <const string&> (item.name ()) << "\";\n";
 }
 
 void Proxy::rep_id_of (const RepositoryId& rid)
 {
 	cpp_ << "template <>\n"
-		"const char RepIdOf < " << qualified_name (rid.item ()) << ">::repository_id_ [] = \"" << rid.repository_id () << "\";\n";
+		"const char RepIdOf < " << QName (rid.item ()) << ">::repository_id_ [] = \"" << rid.repository_id () << "\";\n";
 }
 
 void Proxy::end (const Struct& item)
@@ -586,7 +587,7 @@ void Proxy::end (const Struct& item)
 	type_code_members (item, get_members (item));
 	cpp_.namespace_close ();
 	cpp_ << "NIRVANA_EXPORT (" << export_name (item) << "_TC, "
-		"CORBA::Nirvana::RepIdOf < " << qualified_name (item) << "::repository_id_, CORBA::TypeCode, CORBA::Nirvana::TypeCodeStruct < " << qualified_name (item) << ">)\n";
+		"CORBA::Nirvana::RepIdOf < " << QName (item) << "::repository_id_, CORBA::TypeCode, CORBA::Nirvana::TypeCodeStruct < " << QName (item) << ">)\n";
 }
 
 void Proxy::leaf (const Enum& item)
@@ -596,10 +597,10 @@ void Proxy::leaf (const Enum& item)
 	rep_id_of (item);
 	cpp_ << "\n"
 		"template <>\n"
-		"const char TypeCodeEnum < " << qualified_name (item) << ">::name_ [] = \"" << static_cast <const string&> (item.name ()) << "\";\n"
+		"const char TypeCodeEnum < " << QName (item) << ">::name_ [] = \"" << static_cast <const string&> (item.name ()) << "\";\n"
 		"\n"
 		"template <>\n"
-		"const char* const TypeCodeEnum < " << qualified_name (item) << ">::members_ [] = {\n";
+		"const char* const TypeCodeEnum < " << QName (item) << ">::members_ [] = {\n";
 
 	cpp_.indent ();
 	auto it = item.begin ();
@@ -612,5 +613,5 @@ void Proxy::leaf (const Enum& item)
 
 	cpp_.namespace_close ();
 	cpp_ << "NIRVANA_EXPORT (" << export_name (item) << "_TC, \"" << item.repository_id ()
-		<< "\", CORBA::TypeCode, CORBA::Nirvana::TypeCodeEnum < " << qualified_name (item) << ">)\n";
+		<< "\", CORBA::TypeCode, CORBA::Nirvana::TypeCodeEnum < " << QName (item) << ">)\n";
 }

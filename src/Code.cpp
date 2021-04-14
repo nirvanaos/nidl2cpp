@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Code.h"
+#include "CodeGenBase.h"
 
 using namespace std;
 using namespace std::filesystem;
@@ -96,4 +97,124 @@ void Code::namespace_close ()
 		spec_namespace_ = nullptr;
 		*this << endl;
 	}
+}
+
+Code& operator << (Code& stm, const Identifier& id)
+{
+	if (CodeGenBase::is_keyword (id))
+		stm << CodeGenBase::protected_prefix_;
+	stm << static_cast <const string&> (id);
+	return stm;
+}
+
+Code& operator << (Code& stm, const Type& t)
+{
+	static const char* const basic_types [(size_t)BasicType::ANY + 1] = {
+		"Boolean",
+		"Octet",
+		"Char",
+		"Wchar",
+		"UShort",
+		"ULong",
+		"ULongLong",
+		"Short",
+		"Long",
+		"LongLong",
+		"Float",
+		"Double",
+		"LongDouble",
+		"Object_var",
+		"ValueBase_var",
+		"Any"
+	};
+
+	switch (t.tkind ()) {
+		case Type::Kind::VOID:
+			stm << "void";
+			break;
+		case Type::Kind::BASIC_TYPE:
+			if (stm.spec_namespace () != CodeGenBase::internal_namespace_)
+				stm << "::CORBA::";
+			stm << basic_types [(size_t)t.basic_type ()];
+			break;
+		case Type::Kind::NAMED_TYPE:
+			stm << CodeGenBase::QName (t.named_type ());
+			switch (t.named_type ().kind ()) {
+				case Item::Kind::INTERFACE:
+				case Item::Kind::VALUE_TYPE:
+				case Item::Kind::VALUE_BOX:
+					stm << "_var";
+			}
+			break;
+		case Type::Kind::STRING:
+			if (stm.spec_namespace () != CodeGenBase::internal_namespace_)
+				stm << "::CORBA::Nirvana::";
+			if (t.string_bound ())
+				stm << "BoundedString <" << t.string_bound () << '>';
+			else
+				stm << "String";
+			break;
+		case Type::Kind::WSTRING:
+			if (stm.spec_namespace () != CodeGenBase::internal_namespace_)
+				stm << "::CORBA::Nirvana::";
+			if (t.string_bound ())
+				stm << "BoundedWString <" << t.string_bound () << '>';
+			else
+				stm << "WString";
+			break;
+		case Type::Kind::FIXED:
+			if (stm.spec_namespace () != CodeGenBase::internal_namespace_)
+				stm << "::CORBA::Nirvana::";
+			stm << "Fixed <" << t.fixed_digits () << ", " << t.fixed_scale () << '>';
+			break;
+		case Type::Kind::SEQUENCE: {
+			const Sequence& seq = t.sequence ();
+			if (stm.spec_namespace () != CodeGenBase::internal_namespace_)
+				stm << "::CORBA::Nirvana::";
+			stm << "Sequence <" << static_cast <const Type&> (t.sequence ());
+			if (seq.bound ())
+				stm << ", " << seq.bound ();
+			stm << '>';
+		} break;
+		case Type::Kind::ARRAY: {
+			const Array& arr = t.array ();
+			for (size_t cnt = arr.dimensions ().size (); cnt; --cnt) {
+				stm << "std::array <";
+			}
+			stm << static_cast <const Type&> (arr);
+			for (auto dim = arr.dimensions ().rbegin (); dim != arr.dimensions ().rend (); ++dim) {
+				stm << ", " << *dim << '>';
+			}
+		} break;
+		default:
+			assert (false);
+	}
+
+	return stm;
+}
+
+Code& operator << (Code& stm, const Variant& var)
+{
+	switch (var.vtype ()) {
+
+		case Variant::VT::FIXED:
+			stm << '"' << var.to_string () << '"';
+			break;
+
+		case Variant::VT::ENUM_ITEM: {
+			const EnumItem& item = var.as_enum_item ();
+			ScopedName sn = item.scoped_name ();
+			sn.insert (sn.begin () + sn.size () - 1, item.enum_type ().name ());
+			stm << sn.stringize ();
+		} break;
+
+		case Variant::VT::CONSTANT:
+			stm << CodeGenBase::QName (var.as_constant ());
+			break;
+
+		default:
+			stm << var.to_string ();
+	}
+
+	return stm;
 }

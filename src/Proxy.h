@@ -11,8 +11,8 @@ public:
 	Proxy (const std::filesystem::path& file, const std::filesystem::path& servant, const AST::Root& root) :
 		cpp_ (file, root)
 	{
-		cpp_ << "#include " << servant.filename () << std::endl
-			<< "#include <CORBA/Proxy/Proxy.h>\n\n";
+		cpp_ << "#include <CORBA/Proxy/Proxy.h>\n"
+			"#include " << servant.filename () << std::endl;
 	}
 
 protected:

@@ -12,10 +12,9 @@ public:
 		h_ (file_h, root),
 		cpp_ (file_cpp, root)
 	{
-		h_ << "#include <CORBA/CORBA.h>\n\n";
-
-		cpp_ << "\n#include " << file_h.filename () << "\n"
-			"#include <Nirvana/OLF.h>\n\n";
+		cpp_ << "#include <CORBA/CORBA.h>\n"
+			"#include <Nirvana/OLF.h>\n"
+			"#include " << file_h.filename () << std::endl;
 	}
 
 protected:
@@ -43,14 +42,9 @@ private:
 	void interface_forward (const AST::NamedItem& item, AST::InterfaceKind ik);
 	void environment (const AST::Raises& raises);
 	void type_code_decl (const AST::NamedItem& item);
-	void type_code_def (const AST::RepositoryId& type);
-	static bool constant (std::ofstream& stm, const AST::Constant& item);
-	static void value (std::ofstream& stm, const AST::Variant& var);
-	void define_type (const std::string& fqname, const Members& members);
-	void marshal_traits (const std::string& name, const Members& members);
-	void client_param (const AST::Parameter& param);
-	void client_param (const AST::Type& t, AST::Parameter::Attribute att = AST::Parameter::Attribute::IN);
-	std::ostream& type_prefix (const AST::Type& t);
+	void type_code_def (const AST::NamedItem& item);
+	static bool constant (Code& stm, const AST::Constant& item);
+	void define_type (const AST::NamedItem& item, const Members& members, const char* suffix = "");
 	std::ostream& member_type_prefix (const AST::Type& t);
 	void struct_end (const AST::Identifier& name, const Members& members);
 	static const char* default_value (const AST::Type& t);

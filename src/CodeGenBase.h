@@ -1,8 +1,83 @@
 #ifndef NIDL2CPP_CODEGENBASE_H_
 #define NIDL2CPP_CODEGENBASE_H_
 
+#include "Code.h"
+
 class CodeGenBase : public AST::CodeGen
 {
+public:
+	static bool is_keyword (const AST::Identifier& id);
+	inline static const char protected_prefix_ [] = "_cxx_";
+	static const char internal_namespace_ [];
+
+	struct QName
+	{
+		QName (const AST::NamedItem& ni) :
+			item (ni)
+		{}
+
+		const AST::NamedItem& item;
+	};
+
+	struct ParentName
+	{
+		ParentName (const AST::NamedItem& ni) :
+			item (ni)
+		{}
+
+		const AST::NamedItem& item;
+	};
+
+	struct TypePrefix
+	{
+		TypePrefix (const AST::Type& t) :
+			type (t)
+		{}
+
+		const AST::Type& type;
+	};
+
+	struct TypeABI_ret
+	{
+		TypeABI_ret (const AST::Type& t) :
+			type (t)
+		{}
+
+		const AST::Type& type;
+	};
+
+	struct TypeABI_param
+	{
+		TypeABI_param (const AST::Parameter& p) :
+			type (p),
+			att (p.attribute ())
+		{}
+
+		TypeABI_param (const AST::Type& t) :
+			type (t),
+			att (AST::Parameter::Attribute::IN)
+		{}
+
+		const AST::Type& type;
+		const AST::Parameter::Attribute att;
+	};
+
+	struct TypeC_param
+	{
+		TypeC_param (const AST::Parameter& p) :
+			type (p),
+			att (p.attribute ())
+		{}
+
+		TypeC_param (const AST::Type& t) :
+			type (t),
+			att (AST::Parameter::Attribute::IN)
+		{}
+
+		const AST::Type& type;
+		const AST::Parameter::Attribute att;
+	};
+
 protected:
 	virtual void leaf (const AST::Include& item) {}
 	virtual void leaf (const AST::Native&) {}
@@ -37,10 +112,6 @@ protected:
 	virtual void leaf (const AST::ValueFactory&);
 	virtual void leaf (const AST::ValueBox&);
 
-	static void bridge_ret (std::ofstream& stm, const AST::Type& t);
-	static void bridge_param (std::ofstream& stm, const AST::Parameter& param);
-	static void bridge_param (std::ofstream& stm, const AST::Type& t, AST::Parameter::Attribute att = AST::Parameter::Attribute::IN);
-
 	typedef std::vector <const AST::Member*> Members;
 
 	static Members get_members (const AST::Struct& cont)
@@ -61,15 +132,7 @@ protected:
 	static bool is_var_len (const AST::Type& type);
 	static bool is_var_len (const Members& members);
 
-	static std::string qualified_name (const AST::NamedItem& item, bool fully = true);
-	static std::string qualified_parent_name (const AST::NamedItem& item, bool fully = true);
-
-	friend std::ostream& operator << (std::ostream& stm, const AST::Identifier& id);
-	friend std::ostream& operator << (std::ostream& stm, const AST::Type& t);
-
 private:
-	static bool is_keyword (const AST::Identifier& id);
-
 	static bool pred (const char* l, const char* r)
 	{
 		return strcmp (l, r) < 0;
@@ -77,14 +140,15 @@ private:
 
 	static Members get_members (const AST::ItemContainer& cont, AST::Item::Kind member_kind);
 
-protected:
-	static const char internal_namespace_ [];
-
 private:
 	static const char* const protected_names_ [];
 };
 
-std::ostream& operator << (std::ostream& stm, const AST::Identifier& id);
-std::ostream& operator << (std::ostream& stm, const AST::Type& t);
+Code& operator << (Code& stm, const CodeGenBase::QName& qn);
+Code& operator << (Code& stm, const CodeGenBase::ParentName& qn);
+Code& operator << (Code& stm, const CodeGenBase::TypePrefix& t);
+Code& operator << (Code& stm, const CodeGenBase::TypeABI_ret& t);
+Code& operator << (Code& stm, const CodeGenBase::TypeABI_param& t);
+Code& operator << (Code& stm, const CodeGenBase::TypeC_param& t);
 
 #endif

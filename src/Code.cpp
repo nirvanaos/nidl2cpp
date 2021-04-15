@@ -124,6 +124,49 @@ void Code::namespace_close ()
 	}
 }
 
+void Code::check_digraph (char c)
+{
+	switch (c) {
+		case '>':
+			if (last_char () == '>')
+				static_cast <Base&> (*this) << ' ';
+			break;
+
+		case ':':
+			if (last_char () == '<')
+				static_cast <Base&> (*this) << ' ';
+			break;
+	}
+}
+
+Code& operator << (Code& stm, char c)
+{
+	stm.check_digraph (c);
+	static_cast <BE::IndentedOut&> (stm) << c;
+	return stm;
+}
+
+Code& operator << (Code& stm, signed char c)
+{
+	stm.check_digraph (c);
+	static_cast <BE::IndentedOut&> (stm) << c;
+	return stm;
+}
+
+Code& operator << (Code& stm, unsigned char c)
+{
+	stm.check_digraph (c);
+	static_cast <BE::IndentedOut&> (stm) << c;
+	return stm;
+}
+
+Code& operator << (Code& stm, const char* s)
+{
+	stm.check_digraph (*s);
+	static_cast <BE::IndentedOut&> (stm) << s;
+	return stm;
+}
+
 Code& operator << (Code& stm, const Identifier& id)
 {
 	if (CodeGenBase::is_keyword (id))

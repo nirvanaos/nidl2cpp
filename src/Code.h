@@ -124,6 +124,8 @@ public:
 		return *this;
 	}
 
+	void check_digraph (char c);
+
 private:
 	typedef std::vector <const AST::NamedItem*> Namespaces;
 	void get_namespaces (const AST::NamedItem* item, Namespaces& namespaces);
@@ -133,33 +135,10 @@ private:
 	const char* spec_namespace_;
 };
 
-inline
-Code& operator << (Code& stm, char c)
-{
-	static_cast <BE::IndentedOut&> (stm) << c;
-	return stm;
-}
-
-inline
-Code& operator << (Code& stm, signed char c)
-{
-	static_cast <BE::IndentedOut&> (stm) << c;
-	return stm;
-}
-
-inline
-Code& operator << (Code& stm, unsigned char c)
-{
-	static_cast <BE::IndentedOut&> (stm) << c;
-	return stm;
-}
-
-inline
-Code& operator << (Code& stm, const char* s)
-{
-	static_cast <BE::IndentedOut&> (stm) << s;
-	return stm;
-}
+Code& operator << (Code& stm, char c);
+Code& operator << (Code& stm, signed char c);
+Code& operator << (Code& stm, unsigned char c);
+Code& operator << (Code& stm, const char* s);
 
 inline
 Code& operator << (Code& stm, const std::string& s)

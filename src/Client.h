@@ -64,6 +64,7 @@ protected:
 	virtual void leaf (const AST::Enum& item);
 
 private:
+	void forward_decl (const AST::NamedItem& item);
 	void interface_forward (const AST::NamedItem& item);
 	void standard_typedefs (const AST::NamedItem& item);
 	void environment (const AST::Raises& raises);

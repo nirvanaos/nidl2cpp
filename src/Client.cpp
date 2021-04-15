@@ -114,26 +114,28 @@ void Client::standard_typedefs (const AST::NamedItem& item)
 		<< "typedef ::CORBA::Nirvana::Type <" << item.name () << ">::C_inout " << item.name () << "_inout;\n";
 }
 
-void Client::interface_forward (const NamedItem& item)
+void Client::forward_decl (const NamedItem& item)
 {
 	h_.namespace_open (item);
 	h_.empty_line ();
-	h_ << "class " << item.name () << ";\n"
-		<< "typedef ::CORBA::Nirvana::I_ptr <" << item.name () << "> " << item.name () << "_ptr;\n"
-		<< "typedef ::CORBA::Nirvana::I_var <" << item.name () << "> " << item.name () << "_var;\n"
-		<< "typedef ::CORBA::Nirvana::I_out <" << item.name () << "> " << item.name () << "_out;\n";
+	h_ << "class " << item.name () << ";\n";
 	type_code_decl (item);
 }
 
 void Client::leaf (const InterfaceDecl& itf)
 {
-	interface_forward (itf);
+	forward_decl (itf);
 }
 
 void Client::begin (const Interface& itf)
 {
 	// Forward declarations
-	interface_forward (itf);
+	forward_decl (itf);
+
+	h_ << "typedef ::CORBA::Nirvana::I_ptr <" << itf.name () << "> " << itf.name () << "_ptr;\n"
+		<< "typedef ::CORBA::Nirvana::I_var <" << itf.name () << "> " << itf.name () << "_var;\n"
+		<< "typedef ::CORBA::Nirvana::I_out <" << itf.name () << "> " << itf.name () << "_out;\n"
+		<< "typedef ::CORBA::Nirvana::I_inout <" << itf.name () << "> " << itf.name () << "_inout;\n";
 
 	if (itf.interface_kind () != InterfaceKind::PSEUDO) {
 		type_code_def (itf);
@@ -141,7 +143,7 @@ void Client::begin (const Interface& itf)
 		h_.namespace_open (internal_namespace_);
 		h_.empty_line ();
 		h_ << "template <>\n"
-			"struct Type <I_var < " << QName (itf) << "> > : ";
+			"struct Type <" << QName (itf) << "> : ";
 		switch (itf.interface_kind ()) {
 			case InterfaceKind::LOCAL:
 				h_ << "TypeLocalObject";
@@ -650,10 +652,7 @@ void Client::define_type (const AST::NamedItem& item, const Members& members, co
 
 void Client::leaf (const StructDecl& item)
 {
-	h_namespace_open (item);
-	h_ << "class " << item.name () << ";\n";
-	standard_typedefs (item);
-	type_code_decl (item);
+	forward_decl (item);
 }
 
 void Client::begin (const Struct& item)
@@ -777,7 +776,7 @@ void Client::leaf (const Enum& item)
 	}
 	h_.unindent ();
 	h_ << "\n};\n";
-
+	standard_typedefs (item);
 	type_code_decl (item);
 
 	if (!nested (item))

@@ -65,7 +65,6 @@ protected:
 
 private:
 	void forward_decl (const AST::NamedItem& item);
-	void interface_forward (const AST::NamedItem& item);
 	void standard_typedefs (const AST::NamedItem& item);
 	void environment (const AST::Raises& raises);
 	void type_code_decl (const AST::NamedItem& item);
@@ -73,7 +72,9 @@ private:
 	static bool constant (Code& stm, const AST::Constant& item);
 	void define_type (const AST::NamedItem& item, const Members& members, const char* suffix = "");
 	std::ostream& member_type_prefix (const AST::Type& t);
-	void struct_end (const AST::Identifier& name, const Members& members);
+	void constructors_and_assignments (const AST::Identifier& name, const Members& members);
+	void accessors (const Members& members, const char* prefix = "_");
+	void member_variables (const Members& members);
 	static const char* default_value (const AST::Type& t);
 	static bool nested (const AST::NamedItem& item);
 	void h_namespace_open (const AST::NamedItem& item);

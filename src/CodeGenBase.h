@@ -63,23 +63,23 @@ public:
 		const AST::Type& type;
 	};
 
-	struct TypeABI_ret
+	struct ABI_ret
 	{
-		TypeABI_ret (const AST::Type& t) :
+		ABI_ret (const AST::Type& t) :
 			type (t)
 		{}
 
 		const AST::Type& type;
 	};
 
-	struct TypeABI_param
+	struct ABI_param
 	{
-		TypeABI_param (const AST::Parameter& p) :
+		ABI_param (const AST::Parameter& p) :
 			type (p),
 			att (p.attribute ())
 		{}
 
-		TypeABI_param (const AST::Type& t) :
+		ABI_param (const AST::Type& t) :
 			type (t),
 			att (AST::Parameter::Attribute::IN)
 		{}
@@ -88,20 +88,29 @@ public:
 		const AST::Parameter::Attribute att;
 	};
 
-	struct TypeC_param
+	struct C_param
 	{
-		TypeC_param (const AST::Parameter& p) :
+		C_param (const AST::Parameter& p) :
 			type (p),
 			att (p.attribute ())
 		{}
 
-		TypeC_param (const AST::Type& t) :
+		C_param (const AST::Type& t) :
 			type (t),
 			att (AST::Parameter::Attribute::IN)
 		{}
 
 		const AST::Type& type;
 		const AST::Parameter::Attribute att;
+	};
+
+	struct Var_type
+	{
+		Var_type (const AST::Type& t) :
+			type (t)
+		{}
+
+		const AST::Type& type;
 	};
 
 protected:
@@ -175,8 +184,9 @@ private:
 Code& operator << (Code& stm, const CodeGenBase::QName& qn);
 Code& operator << (Code& stm, const CodeGenBase::ParentName& qn);
 Code& operator << (Code& stm, const CodeGenBase::TypePrefix& t);
-Code& operator << (Code& stm, const CodeGenBase::TypeABI_ret& t);
-Code& operator << (Code& stm, const CodeGenBase::TypeABI_param& t);
-Code& operator << (Code& stm, const CodeGenBase::TypeC_param& t);
+Code& operator << (Code& stm, const CodeGenBase::ABI_ret& t);
+Code& operator << (Code& stm, const CodeGenBase::ABI_param& t);
+Code& operator << (Code& stm, const CodeGenBase::C_param& t);
+Code& operator << (Code& stm, const CodeGenBase::Var_type& t);
 
 #endif

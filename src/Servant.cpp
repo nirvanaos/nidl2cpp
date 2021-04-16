@@ -184,7 +184,7 @@ void Servant::leaf (const Operation& op)
 {
 	const ItemScope& itf = *op.parent ();
 
-	h_ << "static " << TypeABI_ret (op);
+	h_ << "static " << ABI_ret (op);
 
 	{
 		string name = "_";
@@ -194,7 +194,7 @@ void Servant::leaf (const Operation& op)
 	}
 
 	for (auto it = op.begin (); it != op.end (); ++it) {
-		h_ << ", " << TypeABI_param (**it);
+		h_ << ", " << ABI_param (**it);
 	}
 
 	h_ << ", Interface* _env)\n"
@@ -230,7 +230,7 @@ void Servant::leaf (const Attribute& att)
 {
 	const ItemScope& itf = *att.parent ();
 
-	h_ << "static " << TypeABI_ret (att);
+	h_ << "static " << ABI_ret (att);
 	{
 		string name = "__get_";
 		name += att.name ();
@@ -243,7 +243,7 @@ void Servant::leaf (const Attribute& att)
 	h_.indent ();
 	h_ << "return " << TypePrefix (att) << "ret (S::_implementation (_b)." << att.name () << " ());\n";
 	catch_block ();
-	h_ << "return " << TypeABI_ret (att);
+	h_ << "return " << ABI_ret (att);
 	h_ << " ();\n";
 	h_.unindent ();
 	h_ << "}\n";
@@ -252,7 +252,7 @@ void Servant::leaf (const Attribute& att)
 		{
 			string name = "__set_";
 			name += att.name ();
-			h_ << "static void " << name << " (Bridge < " << QName (itf) << ">* _b, " << TypeC_param (att) << " val, Interface* _env)\n"
+			h_ << "static void " << name << " (Bridge < " << QName (itf) << ">* _b, " << C_param (att) << " val, Interface* _env)\n"
 				"{\n";
 			epv_.push_back (move (name));
 		}

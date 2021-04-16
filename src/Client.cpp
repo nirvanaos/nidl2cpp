@@ -203,15 +203,15 @@ void Client::end (const Interface& itf)
 	// Bridge
 	h_.namespace_open (internal_namespace_);
 	h_.empty_line ();
-	h_ << "BRIDGE_BEGIN (" << QName (itf) << ", \"" << itf.repository_id () << "\")\n";
+	h_ << "NIRVANA_BRIDGE_BEGIN (" << QName (itf) << ", \"" << itf.repository_id () << "\")\n";
 
 	switch (itf.interface_kind ()) {
 		case InterfaceKind::UNCONSTRAINED:
 		case InterfaceKind::LOCAL:
-			h_ << "BASE_STRUCT_ENTRY (Object, CORBA_Object)\n";
+			h_ << "NIRVANA_BASE_ENTRY (Object, CORBA_Object)\n";
 			break;
 		case InterfaceKind::ABSTRACT:
-			h_ << "BASE_STRUCT_ENTRY (AbstractBase, CORBA_AbstractBase)\n";
+			h_ << "NIRVANA_BASE_ENTRY (AbstractBase, CORBA_AbstractBase)\n";
 			break;
 	}
 
@@ -225,11 +225,11 @@ void Client::end (const Interface& itf)
 				proc_name += *it;
 			}
 		}
-		h_ << "BASE_STRUCT_ENTRY (" << QName (*b) << ", " << proc_name << ")\n";
+		h_ << "NIRVANA_BASE_ENTRY (" << QName (*b) << ", " << proc_name << ")\n";
 	}
 
 	if (itf.interface_kind () != InterfaceKind::PSEUDO || !bases.empty ())
-		h_ << "BRIDGE_EPV\n";
+		h_ << "NIRVANA_BRIDGE_EPV\n";
 
 	for (auto it = itf.begin (); it != itf.end (); ++it) {
 		const Item& item = **it;
@@ -237,10 +237,10 @@ void Client::end (const Interface& itf)
 
 			case Item::Kind::OPERATION: {
 				const Operation& op = static_cast <const Operation&> (item);
-				h_ << TypeABI_ret (op) << " (*" << op.name () << ") (Bridge < " << QName (itf) << ">* _b";
+				h_ << ABI_ret (op) << " (*" << op.name () << ") (Bridge < " << QName (itf) << ">* _b";
 
 				for (auto it = op.begin (); it != op.end (); ++it) {
-					h_ << ", " << TypeABI_param (**it);
+					h_ << ", " << ABI_param (**it);
 				}
 
 				h_ << ", Interface* _env);\n";
@@ -249,17 +249,17 @@ void Client::end (const Interface& itf)
 
 			case Item::Kind::ATTRIBUTE: {
 				const Attribute& att = static_cast <const Attribute&> (item);
-				h_ << TypeABI_ret (att) << " (*_get_" << att.name () << ") (Bridge < " << QName (itf) << ">*, Interface*);\n";
+				h_ << ABI_ret (att) << " (*_get_" << att.name () << ") (Bridge < " << QName (itf) << ">*, Interface*);\n";
 
 				if (!att.readonly ()) {
-					h_ << "void (*_set_" << att.name () << ") (Bridge < " << QName (itf) << ">* _b, " << TypeABI_param (att) << ", Interface* _env);\n";
+					h_ << "void (*_set_" << att.name () << ") (Bridge < " << QName (itf) << ">* _b, " << ABI_param (att) << ", Interface* _env);\n";
 				}
 
 			} break;
 		}
 	}
 
-	h_ << "BRIDGE_END ()\n"
+	h_ << "NIRVANA_BRIDGE_END ()\n"
 		"\n" // Client interface
 		"template <class T>\n"
 		"class Client <T, " << QName (itf) << "> :\n";
@@ -282,10 +282,10 @@ void Client::end (const Interface& itf)
 
 				auto it = op.begin ();
 				if (it != op.end ()) {
-					h_ << TypeC_param (**it);
+					h_ << C_param (**it);
 					++it;
 					for (; it != op.end (); ++it) {
-						h_ << ", " << TypeC_param (**it);
+						h_ << ", " << C_param (**it);
 					}
 				}
 
@@ -299,7 +299,7 @@ void Client::end (const Interface& itf)
 				h_ << static_cast <const Type&> (att) << ' ' << att.name () << " ();\n";
 
 				if (!att.readonly ())
-					h_ << "void " << att.name () << " (" << TypeC_param (att) << ");\n";
+					h_ << "void " << att.name () << " (" << C_param (att) << ");\n";
 
 			} break;
 		}
@@ -323,10 +323,10 @@ void Client::end (const Interface& itf)
 
 				auto it = op.begin ();
 				if (it != op.end ()) {
-					h_ << TypeC_param (**it) << ' ' << (*it)->name ();
+					h_ << C_param (**it) << ' ' << (*it)->name ();
 					++it;
 					for (; it != op.end (); ++it) {
-						h_ << ", " << TypeC_param (**it) << ' ' << (*it)->name ();
+						h_ << ", " << C_param (**it) << ' ' << (*it)->name ();
 					}
 				}
 
@@ -377,7 +377,7 @@ void Client::end (const Interface& itf)
 				if (!att.readonly ()) {
 					h_ << "\ntemplate <class T>\n";
 
-					h_ << "void Client <T, " << QName (itf) << ">::" << att.name () << " (" << TypeC_param (att) << " val)\n"
+					h_ << "void Client <T, " << QName (itf) << ">::" << att.name () << " (" << C_param (att) << " val)\n"
 						"{\n";
 
 					h_.indent ();
@@ -501,32 +501,24 @@ void Client::end (const Exception& item)
 {
 	Members members = get_members (item);
 	if (!members.empty ()) {
-		for (const Member* m : members) {
-			h_.empty_line ();
-			h_ << TypePrefix (*m) << "Member_ret " << m->name () << " () const\n"
-				"{\n";
-			h_.indent ();
-			h_ << "return _data." << m->name () << " ();\n";
-			h_.unindent ();
-			h_ << "}\n"
-				"void " << m->name () << " (" << TypeC_param (*m) << " val)\n"
-				"{\n";
-			h_.indent ();
-			h_ << "_data." << m->name () << "(val);\n";
-			h_.unindent ();
-			h_ << "}\n";
-		}
 
-		h_ << "\nclass _Data\n"
-			"{\n"
-			"public:\n";
+		// Accessors to members of _data
+		accessors (members, "_data._");
+
+		h_ << "\n"
+			"struct _Data\n"
+			"{\n";
 
 		h_.indent ();
 		{
+			// Use some trick to prevent removal of the leading underscore in the Identifier constructor
 			string name ("_Data");
-			struct_end (static_cast <const Identifier&> (name), members);
+			constructors_and_assignments (static_cast <const Identifier&> (name), members);
+			member_variables (members);
 		}
 		h_.unindent ();
+
+		h_ << "};\n";
 
 		h_ << "\nprivate:\n";
 		h_.indent ();
@@ -564,7 +556,7 @@ void Client::implement (const AST::Exception& item)
 
 std::ostream& Client::member_type_prefix (const AST::Type& t)
 {
-	h_ << "Type <Type < " << t << ">::Member_type>::";
+	h_ << "Type <Type <" << t << ">::Member_type>::";
 	return h_;
 }
 
@@ -623,7 +615,7 @@ void Client::define_type (const AST::NamedItem& item, const Members& members, co
 			"{\n";
 		h_.indent ();
 		for (auto m : members) {
-			h_ << "_marshal_in (src._" << m->name () << ", marshaler, dst." << m->name () << ");\n";
+			h_ << TypePrefix (*m) << "marshal_in (src._" << m->name () << ", marshaler, dst." << m->name () << ");\n";
 		}
 		h_.unindent ();
 		h_ << "}\n\n"
@@ -631,7 +623,7 @@ void Client::define_type (const AST::NamedItem& item, const Members& members, co
 			"{\n";
 		h_.indent ();
 		for (auto m : members) {
-			h_ << "_marshal_out (src._" << m->name () << ", marshaler, dst." << m->name () << ");\n";
+			h_ << TypePrefix (*m) << "marshal_out (src._" << m->name () << ", marshaler, dst." << m->name () << ");\n";
 		}
 		h_.unindent ();
 		h_ << "}\n\n"
@@ -639,7 +631,7 @@ void Client::define_type (const AST::NamedItem& item, const Members& members, co
 			"{\n";
 		h_.indent ();
 		for (auto m : members) {
-			h_ << "_unmarshal (src." << m->name () << ", unmarshaler, dst._" << m->name () << ");\n";
+			h_ << TypePrefix (*m) << "unmarshal (src." << m->name () << ", unmarshaler, dst._" << m->name () << ");\n";
 		}
 		h_.unindent ();
 		h_ << "}\n";
@@ -669,7 +661,19 @@ void Client::end (const Struct& item)
 {
 	Members members = get_members (item);
 
-	struct_end (item.name (), members);
+	constructors_and_assignments (item.name (), members);
+
+	accessors (members);
+
+	// Member variables
+	h_.unindent ();
+	h_.empty_line ();
+	h_ << "private:\n";
+	h_.indent ();
+	h_ << "friend struct ::CORBA::Nirvana::Type <" << item.name () << ">;\n";
+	member_variables (members);
+	h_.unindent ();
+	h_ << "};\n";
 
 	// Type code
 	type_code_decl (item);
@@ -686,7 +690,7 @@ void Client::implement (const Struct& item)
 	type_code_def (item);
 }
 
-void Client::struct_end (const Identifier& name, const Members& members)
+void Client::constructors_and_assignments (const AST::Identifier& name, const Members& members)
 {
 	// Default constructor
 	h_ << name << " ()";
@@ -715,34 +719,44 @@ void Client::struct_end (const Identifier& name, const Members& members)
 		<< name << "(" << name << "&&) = default;\n"
 		<< name << "& operator = (const " << name << "&) = default;\n"
 		<< name << "& operator = (" << name << "&&) = default;\n";
+}
 
+void Client::accessors (const Members& members, const char* prefix)
+{
 	// Accessors
 	for (const Member* m : members) {
 		h_.empty_line ();
+
 		h_ << TypePrefix (*m) << "Member_ret " << m->name () << " () const\n"
 			"{\n";
 		h_.indent ();
-		h_ << "return _" << m->name () << ";\n";
+		h_ << "return " << prefix << m->name () << ";\n";
 		h_.unindent ();
 		h_ << "}\n"
-			"void " << m->name () << " (" << TypeC_param (*m) << " val)\n"
+			"void " << m->name () << " (const " << Var_type (*m) << "& val)\n"
 			"{\n";
 		h_.indent ();
-		h_ << '_' << m->name () << " = val;\n";
+		h_ << prefix << m->name () << " = val;\n";
 		h_.unindent ();
-		h_ << "}\n\n";
-	}
+		h_ << "}\n";
 
-	// Member variables
-	h_.unindent ();
-	h_ << "private:\n";
-	h_.indent ();
-	h_ << "friend struct ::CORBA::Nirvana::Type <" << name << ">;\n";
+		if (is_var_len (*m)) {
+			// The move setter
+			h_ << "void " << m->name () << " (" << Var_type (*m) << "&& val)\n"
+				"{\n";
+			h_.indent ();
+			h_ << prefix << m->name () << " = std::move (val);\n";
+			h_.unindent ();
+			h_ << "}\n";
+		}
+	}
+}
+
+void Client::member_variables (const Members& members)
+{
 	for (const Member* m : members) {
 		h_ << TypePrefix (*m) << "Member_type _" << m->name () << ";\n";
 	}
-	h_.unindent ();
-	h_ << "};\n";
 }
 
 const char* Client::default_value (const Type& t)
@@ -750,7 +764,7 @@ const char* Client::default_value (const Type& t)
 	const Type& td = t.dereference_type ();
 	if (td.tkind () == Type::Kind::BASIC_TYPE) {
 		if (td.basic_type () == BasicType::BOOLEAN)
-			return "false";
+			return "::CORBA::FALSE";
 		else if (td.basic_type () < BasicType::OBJECT)
 			return "0";
 	}
@@ -788,7 +802,7 @@ void Client::implement (const Enum& item)
 	h_.namespace_open (internal_namespace_);
 	h_.empty_line ();
 	h_ << "template <>\n"
-		"struct Type < " << QName (item) << "> : public TypeEnum < " << QName (item)
+		"struct Type <" << QName (item) << "> : public TypeEnum <" << QName (item)
 		<< ", " << QName (item) << "::" << item.back ()->name () << ">\n"
 		"{};\n";
 }

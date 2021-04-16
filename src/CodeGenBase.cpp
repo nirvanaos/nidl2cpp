@@ -155,7 +155,7 @@ Code& operator << (Code& stm, const CodeGenBase::ParentName& qn)
 						stm << "::";
 					stm << "CORBA::Nirvana::";
 				}
-				stm << "Definitions < " << CodeGenBase::QName (*parent) << '>';
+				stm << "Definitions <" << CodeGenBase::QName (*parent) << '>';
 			} else {
 				stm << CodeGenBase::QName (*parent);
 			}
@@ -173,10 +173,10 @@ Code& operator << (Code& stm, const CodeGenBase::TypePrefix& t)
 			stm << "::";
 		stm << "CORBA::Nirvana::";
 	}
-	return stm << "Type < " << t.type << ">::";
+	return stm << "Type <" << t.type << ">::";
 }
 
-Code& operator << (Code& stm, const CodeGenBase::TypeABI_ret& t)
+Code& operator << (Code& stm, const CodeGenBase::ABI_ret& t)
 {
 	if (t.type.tkind () != Type::Kind::VOID)
 		return stm << CodeGenBase::TypePrefix (t.type) << "ABI_ret";
@@ -184,7 +184,7 @@ Code& operator << (Code& stm, const CodeGenBase::TypeABI_ret& t)
 		return stm << "void";
 }
 
-Code& operator << (Code& stm, const CodeGenBase::TypeABI_param& t)
+Code& operator << (Code& stm, const CodeGenBase::ABI_param& t)
 {
 	stm << CodeGenBase::TypePrefix (t.type);
 	switch (t.att) {
@@ -201,7 +201,7 @@ Code& operator << (Code& stm, const CodeGenBase::TypeABI_param& t)
 	return stm;
 }
 
-Code& operator << (Code& stm, const CodeGenBase::TypeC_param& t)
+Code& operator << (Code& stm, const CodeGenBase::C_param& t)
 {
 	stm << CodeGenBase::TypePrefix (t.type);
 	switch (t.att) {
@@ -215,6 +215,12 @@ Code& operator << (Code& stm, const CodeGenBase::TypeC_param& t)
 			stm << "C_inout";
 			break;
 	}
+	return stm;
+}
+
+Code& operator << (Code& stm, const CodeGenBase::Var_type& t)
+{
+	stm << CodeGenBase::TypePrefix (t.type) << "Var_type";
 	return stm;
 }
 

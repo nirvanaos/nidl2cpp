@@ -191,8 +191,8 @@ Code& operator << (Code& stm, const Type& t)
 		"Float",
 		"Double",
 		"LongDouble",
-		"Object_var",
-		"ValueBase_var",
+		"Object",
+		"ValueBase",
 		"Any"
 	};
 

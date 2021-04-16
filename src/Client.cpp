@@ -101,17 +101,14 @@ void Client::leaf (const TypeDef& item)
 	h_namespace_open (item);
 	h_.empty_line ();
 	h_ << "typedef " << static_cast <const Type&> (item) << ' ' << item.name () << ";\n";
-	standard_typedefs (item);
 	type_code_decl (item);
 	type_code_def (item);
 }
 
-void Client::standard_typedefs (const AST::NamedItem& item)
+void Client::backward_compat_var (const AST::NamedItem& item)
 {
 	h_.namespace_open (item);
-	h_ << "typedef ::CORBA::Nirvana::Type <" << item.name () << ">::C_var " << item.name () << "_var;\n"
-		<< "typedef ::CORBA::Nirvana::Type <" << item.name () << ">::C_out " << item.name () << "_out;\n"
-		<< "typedef ::CORBA::Nirvana::Type <" << item.name () << ">::C_inout " << item.name () << "_inout;\n";
+	h_ << "typedef ::CORBA::Nirvana::Type <" << item.name () << ">::C_var " << item.name () << "_var;\n";
 }
 
 void Client::forward_decl (const NamedItem& item)
@@ -133,9 +130,7 @@ void Client::begin (const Interface& itf)
 	forward_decl (itf);
 
 	h_ << "typedef ::CORBA::Nirvana::I_ptr <" << itf.name () << "> " << itf.name () << "_ptr;\n"
-		<< "typedef ::CORBA::Nirvana::I_var <" << itf.name () << "> " << itf.name () << "_var;\n"
-		<< "typedef ::CORBA::Nirvana::I_out <" << itf.name () << "> " << itf.name () << "_out;\n"
-		<< "typedef ::CORBA::Nirvana::I_inout <" << itf.name () << "> " << itf.name () << "_inout;\n";
+		<< "typedef ::CORBA::Nirvana::I_var <" << itf.name () << "> " << itf.name () << "_var;\n";
 
 	if (itf.interface_kind () != InterfaceKind::PSEUDO) {
 		type_code_def (itf);
@@ -686,7 +681,7 @@ void Client::implement (const Struct& item)
 {
 	Members members = get_members (item);
 	define_type (item, members);
-	standard_typedefs (item);
+	backward_compat_var (item);
 	type_code_def (item);
 }
 
@@ -790,7 +785,6 @@ void Client::leaf (const Enum& item)
 	}
 	h_.unindent ();
 	h_ << "\n};\n";
-	standard_typedefs (item);
 	type_code_decl (item);
 
 	if (!nested (item))

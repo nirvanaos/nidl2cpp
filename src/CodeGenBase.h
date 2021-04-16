@@ -113,6 +113,30 @@ public:
 		const AST::Type& type;
 	};
 
+	typedef std::vector <const AST::Member*> Members;
+
+	static Members get_members (const AST::Struct& cont)
+	{
+		return get_members (cont, AST::Item::Kind::MEMBER);
+	}
+
+	static Members get_members (const AST::Exception& cont)
+	{
+		return get_members (cont, AST::Item::Kind::MEMBER);
+	}
+
+	static Members get_members (const AST::Union& cont)
+	{
+		return get_members (cont, AST::Item::Kind::UNION_ELEMENT);
+	}
+
+	static bool is_var_len (const AST::Type& type);
+	static bool is_var_len (const Members& members);
+
+	static bool is_pseudo (const AST::NamedItem& item);
+
+	static bool is_ref_type (const AST::Type& type);
+
 protected:
 	virtual void leaf (const AST::Include& item) {}
 	virtual void leaf (const AST::Native&) {}
@@ -146,28 +170,6 @@ protected:
 	virtual void leaf (const AST::StateMember&);
 	virtual void leaf (const AST::ValueFactory&);
 	virtual void leaf (const AST::ValueBox&);
-
-	typedef std::vector <const AST::Member*> Members;
-
-	static Members get_members (const AST::Struct& cont)
-	{
-		return get_members (cont, AST::Item::Kind::MEMBER);
-	}
-
-	static Members get_members (const AST::Exception& cont)
-	{
-		return get_members (cont, AST::Item::Kind::MEMBER);
-	}
-
-	static Members get_members (const AST::Union& cont)
-	{
-		return get_members (cont, AST::Item::Kind::UNION_ELEMENT);
-	}
-
-	static bool is_var_len (const AST::Type& type);
-	static bool is_var_len (const Members& members);
-
-	static bool is_pseudo (const AST::NamedItem& item);
 
 private:
 	static bool pred (const char* l, const char* r)

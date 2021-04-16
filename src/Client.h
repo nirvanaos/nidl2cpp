@@ -65,7 +65,7 @@ protected:
 
 private:
 	void forward_decl (const AST::NamedItem& item);
-	void standard_typedefs (const AST::NamedItem& item);
+	void backward_compat_var (const AST::NamedItem& item);
 	void environment (const AST::Raises& raises);
 	void type_code_decl (const AST::NamedItem& item);
 	void type_code_def (const AST::RepositoryId& rid);

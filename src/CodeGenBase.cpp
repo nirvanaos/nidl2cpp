@@ -173,7 +173,10 @@ Code& operator << (Code& stm, const CodeGenBase::TypePrefix& t)
 			stm << "::";
 		stm << "CORBA::Nirvana::";
 	}
-	return stm << "Type <" << t.type << ">::";
+	stm << "Type";
+	if (CodeGenBase::is_ref_type (t.type))
+		stm << "Itf";
+	return stm << " <" << t.type << ">::";
 }
 
 Code& operator << (Code& stm, const CodeGenBase::ABI_ret& t)
@@ -311,6 +314,21 @@ bool CodeGenBase::is_pseudo (const NamedItem& item)
 		}
 		p = p->parent ();
 	} while (p);
+	return false;
+}
+
+bool CodeGenBase::is_ref_type (const Type& type)
+{
+	const Type& t = type.dereference_type ();
+	if (t.tkind () == Type::Kind::NAMED_TYPE) {
+		switch (t.named_type ().kind ()) {
+			case Item::Kind::INTERFACE_DECL:
+			case Item::Kind::INTERFACE:
+			case Item::Kind::VALUE_TYPE_DECL:
+			case Item::Kind::VALUE_TYPE:
+				return true;
+		}
+	}
 	return false;
 }
 

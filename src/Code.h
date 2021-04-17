@@ -58,6 +58,8 @@ public:
 		return !module_namespace_ && !spec_namespace_;
 	}
 
+	void prefix_namespace (const char* pref);
+
 	Code& operator << (short val)
 	{
 		Base::operator << (val);

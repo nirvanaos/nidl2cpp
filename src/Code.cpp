@@ -124,6 +124,15 @@ void Code::namespace_close ()
 	}
 }
 
+void Code::prefix_namespace (const char* pref)
+{
+	if (spec_namespace () != CodeGenBase::internal_namespace_) {
+		if (module_namespace ())
+			*this << "::";
+		*this << pref;
+	}
+}
+
 void Code::check_digraph (char c)
 {
 	switch (c) {
@@ -201,38 +210,33 @@ Code& operator << (Code& stm, const Type& t)
 			stm << "void";
 			break;
 		case Type::Kind::BASIC_TYPE:
-			if (stm.spec_namespace () != CodeGenBase::internal_namespace_)
-				stm << "::CORBA::";
+			stm.prefix_namespace ("CORBA::");
 			stm << basic_types [(size_t)t.basic_type ()];
 			break;
 		case Type::Kind::NAMED_TYPE:
 			stm << CodeGenBase::QName (t.named_type ());
 			break;
 		case Type::Kind::STRING:
-			if (stm.spec_namespace () != CodeGenBase::internal_namespace_)
-				stm << "::CORBA::Nirvana::";
+			stm.prefix_namespace ("CORBA::Nirvana::");
 			if (t.string_bound ())
 				stm << "BoundedString <" << t.string_bound () << '>';
 			else
 				stm << "String";
 			break;
 		case Type::Kind::WSTRING:
-			if (stm.spec_namespace () != CodeGenBase::internal_namespace_)
-				stm << "::CORBA::Nirvana::";
+			stm.prefix_namespace ("CORBA::Nirvana::");
 			if (t.string_bound ())
 				stm << "BoundedWString <" << t.string_bound () << '>';
 			else
 				stm << "WString";
 			break;
 		case Type::Kind::FIXED:
-			if (stm.spec_namespace () != CodeGenBase::internal_namespace_)
-				stm << "::CORBA::Nirvana::";
+			stm.prefix_namespace ("CORBA::Nirvana::");
 			stm << "Fixed <" << t.fixed_digits () << ", " << t.fixed_scale () << '>';
 			break;
 		case Type::Kind::SEQUENCE: {
 			const Sequence& seq = t.sequence ();
-			if (stm.spec_namespace () != CodeGenBase::internal_namespace_)
-				stm << "::CORBA::Nirvana::";
+			stm.prefix_namespace ("CORBA::Nirvana::");
 			if (seq.bound ())
 				stm << "BoundedSequence <" << static_cast <const Type&> (t.sequence ()) << ", " << seq.bound ();
 			else

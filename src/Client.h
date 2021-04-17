@@ -42,13 +42,29 @@ public:
 			"#include " << file_h.filename () << std::endl;
 	}
 
-	struct TypeCodeName
+	struct Param
 	{
-		TypeCodeName (const AST::NamedItem& ni) :
-			item (ni)
+		Param (const AST::Parameter& p) :
+			type (p),
+			att (p.attribute ())
 		{}
 
-		const AST::NamedItem& item;
+		Param (const AST::Attribute& t) :
+			type (t),
+			att (AST::Parameter::Attribute::IN)
+		{}
+
+		const AST::Type& type;
+		const AST::Parameter::Attribute att;
+	};
+
+	struct Signature
+	{
+		Signature (const AST::Operation& o) :
+			op (o)
+		{}
+
+		const AST::Operation& op;
 	};
 
 protected:
@@ -80,6 +96,7 @@ private:
 	void type_code_decl (const AST::NamedItem& item);
 	void type_code_def (const AST::RepositoryId& rid);
 	static bool constant (Code& stm, const AST::Constant& item);
+	void rep_id_of (const AST::RepositoryId& rid);
 	void define_type (const AST::RepositoryId& rid, const Members& members, const char* suffix = "");
 	void type_code_func (const AST::NamedItem& item);
 	Code& member_type_prefix (const AST::Type& t);
@@ -100,6 +117,7 @@ private:
 	Code cpp_; // .cpp file.
 };
 
-Code& operator << (Code& stm, const Client::TypeCodeName& t);
+Code& operator << (Code& stm, const Client::Param& t);
+Code& operator << (Code& stm, const Client::Signature& op);
 
 #endif

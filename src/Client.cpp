@@ -30,6 +30,39 @@ using namespace std;
 using namespace std::filesystem;
 using namespace AST;
 
+Code& operator << (Code& stm, const Client::Param& t)
+{
+	stm << CodeGenBase::TypePrefix (t.type);
+	switch (t.att) {
+		case Parameter::Attribute::IN:
+			stm << "C_in";
+			break;
+		case Parameter::Attribute::OUT:
+			stm << "C_out";
+			break;
+		case Parameter::Attribute::INOUT:
+			stm << "C_inout";
+			break;
+	}
+	return stm;
+}
+
+Code& operator << (Code& stm, const Client::Signature& op)
+{
+	stm << op.op.name () << " (";
+
+	auto it = op.op.begin ();
+	if (it != op.op.end ()) {
+		stm << Client::Param (**it) << ' ' << (*it)->name ();
+		++it;
+		for (; it != op.op.end (); ++it) {
+			stm << ", " << Client::Param (**it) << ' ' << (*it)->name ();
+		}
+	}
+
+	return stm << ")";
+}
+
 void Client::end (const Root&)
 {
 	h_.close ();
@@ -53,11 +86,6 @@ void Client::type_code_decl (const NamedItem& item)
 	if (!nested (item))
 		h_ << "extern ";
 	h_ << "const ::Nirvana::ImportInterfaceT < ::CORBA::TypeCode> _tc_" << static_cast <const string&> (item.name ()) << ";\n";
-}
-
-Code& operator << (Code& stm, const Client::TypeCodeName& t)
-{
-	return stm << CodeGenBase::ParentName (t.item) << "_tc_" << static_cast <const string&> (t.item.name ());
 }
 
 void Client::type_code_def (const RepositoryId& rid)
@@ -306,7 +334,7 @@ void Client::end (const Interface& itf)
 			case Item::Kind::OPERATION: {
 				const Operation& op = static_cast <const Operation&> (item);
 
-				h_ << Var (op) << ' ' << ClientOp (op, false) << ";\n";
+				h_ << Var (op) << ' ' << Signature (op) << ";\n";
 
 			} break;
 
@@ -316,7 +344,7 @@ void Client::end (const Interface& itf)
 				h_ << Var (att) << ' ' << att.name () << " ();\n";
 
 				if (!att.readonly ())
-					h_ << "void " << att.name () << " (" << C_param (att) << ");\n";
+					h_ << "void " << att.name () << " (" << Param (att) << ");\n";
 
 			} break;
 		}
@@ -336,7 +364,7 @@ void Client::end (const Interface& itf)
 
 				h_ << "\ntemplate <class T>\n";
 
-				h_ << Var (op) << " Client <T, " << QName (itf) << ">::" << ClientOp (op, true) << "\n"
+				h_ << Var (op) << " Client <T, " << QName (itf) << ">::" << Signature (op) << "\n"
 					"{\n";
 
 				h_.indent ();
@@ -384,7 +412,7 @@ void Client::end (const Interface& itf)
 				if (!att.readonly ()) {
 					h_ << "\ntemplate <class T>\n";
 
-					h_ << "void Client <T, " << QName (itf) << ">::" << att.name () << " (" << C_param (att) << " val)\n"
+					h_ << "void Client <T, " << QName (itf) << ">::" << att.name () << " (" << Param (att) << " val)\n"
 						"{\n";
 
 					h_.indent ();
@@ -568,14 +596,21 @@ Code& Client::member_type_prefix (const Type& t)
 	return h_;
 }
 
+void Client::rep_id_of (const RepositoryId& rid)
+{
+	const NamedItem& item = rid.item ();
+	h_ << "template <>\n"
+		"const Char RepIdOf <" << QName (item) << ">::repository_id_ [] = \"" << rid.repository_id () << "\";\n\n";
+}
+
 void Client::define_type (const RepositoryId& rid, const Members& members, const char* suffix)
 {
 	h_.namespace_open (internal_namespace_);
 	h_.empty_line ();
 
+	rep_id_of (rid);
+
 	const NamedItem& item = rid.item ();
-	h_ << "template <>\n"
-		"const Char RepIdOf <" << QName (item) << ">::repository_id_ [] = \"" << rid.repository_id () << "\";\n\n";
 
 	// ABI
 	h_ << "template <>\n"
@@ -818,6 +853,7 @@ void Client::implement (const Enum& item)
 {
 	h_.namespace_open (internal_namespace_);
 	h_.empty_line ();
+	rep_id_of (item);
 	h_ << "template <>\n"
 		"struct Type <" << QName (item) << "> : public TypeEnum <" << QName (item)
 		<< ", " << QName (item) << "::" << item.back ()->name () << ">\n"

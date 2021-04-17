@@ -40,6 +40,15 @@ public:
 			"#include " << servant.filename () << std::endl;
 	}
 
+	struct WithAlias
+	{
+		WithAlias (const AST::Type& t) :
+			type (t)
+		{}
+
+		const AST::Type& type;
+	};
+
 protected:
 	virtual void end (const AST::Root&);
 
@@ -55,7 +64,6 @@ protected:
 private:
 	void abi_members (const Members& members);
 	std::ostream& abi_member (const AST::Type& t);
-	void proxy_param (const AST::Parameter& param);
 
 	static void get_parameters (const AST::Operation& op, Members& params_in, Members& params_out);
 
@@ -67,7 +75,6 @@ private:
 	void md_members (const Members& members);
 	void md_member (const AST::Member& m);
 	void md_member (const AST::Type& t, const std::string& name);
-	void tc_name (const AST::Type& t);
 
 	struct OpMetadata
 	{
@@ -81,12 +88,15 @@ private:
 
 	void md_operation (const AST::Interface& itf, const OpMetadata& op);
 
-	void rep_id_of (const AST::RepositoryId& rid);
 	void type_code_members (const AST::NamedItem& item, const Members& members);
 	void type_code_name (const AST::NamedItem& item);
+
+	Code& exp (const AST::NamedItem& item);
 
 private:
 	Code cpp_;
 };
+
+Code& operator << (Code& stm, const Proxy::WithAlias& t);
 
 #endif

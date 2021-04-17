@@ -202,23 +202,6 @@ Code& operator << (Code& stm, const CodeGenBase::ABI_param& t)
 	return stm;
 }
 
-Code& operator << (Code& stm, const CodeGenBase::C_param& t)
-{
-	stm << CodeGenBase::TypePrefix (t.type);
-	switch (t.att) {
-		case Parameter::Attribute::IN:
-			stm << "C_in";
-			break;
-		case Parameter::Attribute::OUT:
-			stm << "C_out";
-			break;
-		case Parameter::Attribute::INOUT:
-			stm << "C_inout";
-			break;
-	}
-	return stm;
-}
-
 Code& operator << (Code& stm, const CodeGenBase::Var& t)
 {
 	if (t.type.tkind () != Type::Kind::VOID)
@@ -227,24 +210,33 @@ Code& operator << (Code& stm, const CodeGenBase::Var& t)
 		return stm << "void";
 }
 
-Code& operator << (Code& stm, const CodeGenBase::ClientOp& op)
+Code& operator << (Code& stm, const CodeGenBase::TypeCodeName& t)
 {
-	stm << op.op.name () << " (";
+	return stm << CodeGenBase::ParentName (t.item) << "_tc_" << static_cast <const string&> (t.item.name ());
+}
 
+Code& operator << (Code& stm, const CodeGenBase::ServantParam& t)
+{
+	stm << CodeGenBase::TypePrefix (t.type);
+	if (t.att == Parameter::Attribute::IN)
+		stm << "ConstRef";
+	else
+		stm << "Var&";
+	return stm;
+}
+
+Code& operator << (Code& stm, const CodeGenBase::ServantOp& op)
+{
+	stm << CodeGenBase::Var (op.op) << ' ' << op.op.name () << " (";
 	auto it = op.op.begin ();
 	if (it != op.op.end ()) {
-		stm << CodeGenBase::C_param (**it);
-		if (op.names)
-			stm << ' ' << (*it)->name ();
+		stm << CodeGenBase::ServantParam (**it) << ' ' << (*it)->name ();
 		++it;
 		for (; it != op.op.end (); ++it) {
-			stm << ", " << CodeGenBase::C_param (**it);
-			if (op.names)
-				stm << ' ' << (*it)->name ();
+			stm << ", " << CodeGenBase::ServantParam (**it) << ' ' << (*it)->name ();
 		}
 	}
-
-	return stm << ")";
+	return stm << ')';
 }
 
 CodeGenBase::Members CodeGenBase::get_members (const ItemContainer& cont, Item::Kind member_kind)

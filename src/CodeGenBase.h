@@ -88,22 +88,6 @@ public:
 		const AST::Parameter::Attribute att;
 	};
 
-	struct C_param
-	{
-		C_param (const AST::Parameter& p) :
-			type (p),
-			att (p.attribute ())
-		{}
-
-		C_param (const AST::Attribute& t) :
-			type (t),
-			att (AST::Parameter::Attribute::IN)
-		{}
-
-		const AST::Type& type;
-		const AST::Parameter::Attribute att;
-	};
-
 	struct Var
 	{
 		Var (const AST::Type& t) :
@@ -113,15 +97,38 @@ public:
 		const AST::Type& type;
 	};
 
-	struct ClientOp
+	struct TypeCodeName
 	{
-		ClientOp (const AST::Operation& o, bool param_names) :
-			op (o),
-			names (param_names)
+		TypeCodeName (const AST::NamedItem& ni) :
+			item (ni)
+		{}
+
+		const AST::NamedItem& item;
+	};
+
+	struct ServantParam
+	{
+		ServantParam (const AST::Parameter& p) :
+			type (p),
+			att (p.attribute ())
+		{}
+
+		ServantParam (const AST::Attribute& t) :
+			type (t),
+			att (AST::Parameter::Attribute::IN)
+		{}
+
+		const AST::Type& type;
+		const AST::Parameter::Attribute att;
+	};
+
+	struct ServantOp
+	{
+		ServantOp (const AST::Operation& o) :
+			op (o)
 		{}
 
 		const AST::Operation& op;
-		bool names;
 	};
 
 	typedef std::vector <const AST::Member*> Members;
@@ -199,8 +206,9 @@ Code& operator << (Code& stm, const CodeGenBase::ParentName& qn);
 Code& operator << (Code& stm, const CodeGenBase::TypePrefix& t);
 Code& operator << (Code& stm, const CodeGenBase::ABI_ret& t);
 Code& operator << (Code& stm, const CodeGenBase::ABI_param& t);
-Code& operator << (Code& stm, const CodeGenBase::C_param& t);
 Code& operator << (Code& stm, const CodeGenBase::Var& t);
-Code& operator << (Code& stm, const CodeGenBase::ClientOp& op);
+Code& operator << (Code& stm, const CodeGenBase::TypeCodeName& t);
+Code& operator << (Code& stm, const CodeGenBase::ServantParam& t);
+Code& operator << (Code& stm, const CodeGenBase::ServantOp& t);
 
 #endif

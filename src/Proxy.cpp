@@ -29,6 +29,15 @@
 using namespace std;
 using namespace AST;
 
+Code& operator << (Code& stm, const Proxy::WithAlias& t)
+{
+	if (t.type.tkind () == Type::Kind::NAMED_TYPE && t.type.named_type ().kind () == Item::Kind::TYPE_DEF)
+		stm << "Alias <&" << CodeGenBase::TypeCodeName (t.type.named_type ()) << ">";
+	else
+		stm << t.type;
+	return stm;
+}
+
 void Proxy::end (const Root&)
 {
 	cpp_.close ();
@@ -36,8 +45,22 @@ void Proxy::end (const Root&)
 
 void Proxy::leaf (const TypeDef& item)
 {
-	cpp_ << "NIRVANA_EXPORT (" << export_name (item) << "_TC, \"" << item.repository_id ()
-		<< "\", CORBA::TypeCode, CORBA::Nirvana::TypeCodeEnum < " << QName (item) << ">)\n";
+	string name = export_name (item) + "_TC";
+	cpp_.empty_line ();
+	cpp_ << "extern \"C\" NIRVANA_OLF_SECTION const Nirvana::ExportInterface " << name << ";\n\n";
+	cpp_.namespace_open (internal_namespace_);
+	cpp_ <<
+		"template <>\n"
+		"class TypeCodeTypeDef <&::" << name << "> :\n";
+	cpp_.indent ();
+	cpp_ << "public TypeCodeTypeDefImpl <&::" << name << ", " << WithAlias (item) << ">\n";
+	cpp_.unindent ();
+	cpp_ << "{};\n"
+		"\n"
+		"template <>\n"
+		"const Char TypeCodeName <TypeCodeTypeDef <&::" << name << "> >::name_ [] = \"" << static_cast <const string&> (item.name ()) << "\";\n";
+	cpp_.namespace_close ();
+	cpp_ << "NIRVANA_EXPORT (" << name << ", \"" << item.repository_id () << "\", CORBA::TypeCode, CORBA::Nirvana::TypeCodeTypeDef <&" << name << ">)\n";
 }
 
 void Proxy::get_parameters (const AST::Operation& op, Members& params_in, Members& params_out)
@@ -96,7 +119,7 @@ void Proxy::implement (const Operation& op)
 	}
 
 	cpp_.empty_line ();
-	cpp_ << "static void " << static_cast <const string&> (op.name ()) << "_request (I_ptr < " << QName (itf) << "> _servant, "
+	cpp_ << "static void " << static_cast <const string&> (op.name ()) << "_request (I_ptr <" << QName (itf) << "> _servant, "
 		" IORequest_ptr _call, ::Nirvana::ConstPointer _in_ptr, Unmarshal_var& _u, ::Nirvana::Pointer _out_ptr)\n"
 		"{\n";
 	cpp_.indent ();
@@ -105,22 +128,24 @@ void Proxy::implement (const Operation& op)
 
 	// out and inout params
 	for (auto p : params_out) {
-		cpp_ << static_cast <const Type&> (*p) << ' ' << p->name () << ";\n";
+		cpp_ << Var (*p) << ' ' << p->name () << ";\n";
 	}
 	if (op.tkind () != Type::Kind::VOID)
-		cpp_ << static_cast <const Type&> (op) << " _ret;\n";
+		cpp_ << Var (op) << " _ret;\n";
 
 	cpp_ << "{\n";
 	cpp_.indent ();
 
 	// in params
-	for (auto p : params_in) {
-		cpp_ << static_cast <const Type&> (*p) << ' ' << p->name () << ";\n";
+	for (auto it = op.begin (); it != op.end (); ++it) {
+		const Parameter* p = *it;
+		if (p->attribute () == Parameter::Attribute::IN)
+			cpp_ << Var (*p) << ' ' << p->name () << ";\n";
 	}
 
 	// Unmarshal in and inout
 	for (auto p : params_in) {
-		cpp_ << "_unmarshal (_in." << p->name () << ", _u, " << p->name () << ");\n";
+		cpp_ << TypePrefix (*p) << "unmarshal (_in." << p->name () << ", _u, " << p->name () << ");\n";
 	}
 
 	// Release resources
@@ -149,13 +174,14 @@ void Proxy::implement (const Operation& op)
 		bool marshal = is_var_len (params_out);
 		const char* m_param = marshal ? "_m" : "Marshal::_nil ()";
 		if (marshal)
-			cpp_ << "Marshal_var _m = _call->marshaler ();\n"
-			<< type_out << "& _out = *(" << type_out << "*)_out_ptr;\n";
+			cpp_ << "Marshal_var _m = _call->marshaler ();\n";
+		
+		cpp_ << type_out << "& _out = *(" << type_out << "*)_out_ptr;\n";
 		for (auto p : params_out) {
-			cpp_ << "_marshal_out (" << p->name () << ", " << m_param << " , _out." << p->name () << ");\n";
+			cpp_ << TypePrefix (*p) << "marshal_out (" << p->name () << ", " << m_param << " , _out." << p->name () << ");\n";
 		}
 		if (op.tkind () != Type::Kind::VOID)
-			cpp_ << "_marshal_out (_ret, " << m_param << " , _out._ret);\n";
+			cpp_ << TypePrefix (op) << "marshal_out (_ret, " << m_param << " , _out._ret);\n";
 	}
 
 	cpp_.unindent ();
@@ -165,12 +191,12 @@ void Proxy::implement (const Operation& op)
 void Proxy::abi_members (const Members& members)
 {
 	for (auto p : members)
-		abi_member (static_cast <const Type&> (*p)) << ' ' << p->name () << ";\n";
+		abi_member (*p) << ' ' << p->name () << ";\n";
 }
 
 ostream& Proxy::abi_member (const Type& t)
 {
-	cpp_ << "Type < " << t << ">::ABI ";
+	cpp_ << TypePrefix (t) << "ABI";
 	return cpp_;
 }
 
@@ -182,7 +208,7 @@ void Proxy::implement (const Attribute& att)
 	string att_abi = att.name ();
 	att_abi += "_att";
 	cpp_ << "typedef ";
-	abi_member (att) << att_abi << ";\n";
+	abi_member (att) << ' ' << att_abi << ";\n";
 
 	cpp_.empty_line ();
 	cpp_ << "static void _get_" << static_cast <const string&> (att.name ()) << "_request (I_ptr < " << QName (itf) << "> _servant, "
@@ -191,7 +217,7 @@ void Proxy::implement (const Attribute& att)
 	cpp_.indent ();
 
 	// ret
-	cpp_ << static_cast <const Type&> (att) << " _ret;\n";
+	cpp_ << Var (att) << " _ret;\n";
 
 	// Call
 	cpp_ << "_ret = _servant->" << att.name () << " ();\n";
@@ -200,7 +226,7 @@ void Proxy::implement (const Attribute& att)
 	if (marshal)
 		cpp_ << "Marshal_var _m = _call->marshaler ()";
 	cpp_ << ";\n";
-	cpp_ << "_marshal_out (_ret, " << (marshal ? "_m" : "Marshal::_nil ()") << " , *(" << att_abi << "*)_out_ptr);\n";
+	cpp_ << TypePrefix (att) << "marshal_out (_ret, " << (marshal ? "_m" : "Marshal::_nil ()") << " , *(" << att_abi << "*)_out_ptr);\n";
 
 	cpp_.unindent ();
 	cpp_ << "}\n";
@@ -214,8 +240,8 @@ void Proxy::implement (const Attribute& att)
 			"{\n";
 		cpp_.indent ();
 
-		cpp_ << static_cast <const Type&> (att) << " val;\n";
-		cpp_ << "_unmarshal (*(const " << att_abi << "*)_in_ptr, _u, val);\n";
+		cpp_ << Var (att) << " val;\n";
+		cpp_ << TypePrefix (att) << "unmarshal (*(const " << att_abi << "*)_in_ptr, _u, val);\n";
 
 		// Release resources
 		cpp_ << "_u = Unmarshal::_nil ();\n";
@@ -265,11 +291,11 @@ void Proxy::end (const Interface& itf)
 	cpp_.unindent ();
 	cpp_ << "};\n\n"
 		"template <>\n"
-		"class Proxy < " << QName (itf) << "> : public ProxyBase < " << QName (itf) << ">\n"
+		"class Proxy <" << QName (itf) << "> : public ProxyBase <" << QName (itf) << ">\n"
 		"{\n";
 	cpp_.indent ();
-	cpp_ << "typedef ProxyBase < " << QName (itf) << "> Base;\n"
-		"typedef ProxyTraits < " << QName (itf) << "> Traits;\n";
+	cpp_ << "typedef ProxyBase <" << QName (itf) << "> Base;\n"
+		"typedef ProxyTraits <" << QName (itf) << "> Traits;\n";
 	cpp_.unindent ();
 	cpp_ << "public:\n";
 	cpp_.indent ();
@@ -289,17 +315,7 @@ void Proxy::end (const Interface& itf)
 				op_md.name = op.name ();
 				op_md.type = &op;
 
-				cpp_ << static_cast <const Type&> (op) << ' ' << op.name () << " (";
-				auto it = op.begin ();
-				if (it != op.end ()) {
-					proxy_param (**it);
-					++it;
-					for (; it != op.end (); ++it) {
-						cpp_ << ", ";
-						proxy_param (**it);
-					}
-				}
-				cpp_ << ") const\n"
+				cpp_ << ServantOp (op) << " const\n"
 					"{\n";
 				cpp_.indent ();
 
@@ -314,7 +330,7 @@ void Proxy::end (const Interface& itf)
 					cpp_ << ";\n";
 
 					for (auto p : op_md.params_in) {
-						cpp_ << "_marshal_in (" << p->name () << ", _m, _in." << p->name () << ");\n";
+						cpp_ << TypePrefix (*p) << "marshal_in (" << p->name () << ", _m, _in." << p->name () << ");\n";
 					}
 				} else
 					cpp_ << "Marshal_var _m;\n";
@@ -336,12 +352,12 @@ void Proxy::end (const Interface& itf)
 				cpp_ << ");\n";
 
 				for (auto p : op_md.params_out) {
-					cpp_ << "_unmarshal (_out." << p->name () << ", _u, " << p->name () << ");\n";
+					cpp_ << TypePrefix (*p) << "unmarshal (_out." << p->name () << ", _u, " << p->name () << ");\n";
 				}
 
 				if (op.tkind () != Type::Kind::VOID) {
-					cpp_ << static_cast <const Type&> (op) << " _ret;\n"
-						"_unmarshal (_out._ret, _u, _ret);\n"
+					cpp_ << Var (op) << " _ret;\n"
+						<< TypePrefix (op) << "unmarshal (_out._ret, _u, _ret);\n"
 						"return _ret;\n";
 				}
 
@@ -361,7 +377,7 @@ void Proxy::end (const Interface& itf)
 					op_md.type = &att;
 				}
 
-				cpp_ << static_cast <const Type&> (att) << ' ' << att.name () << " () const\n"
+				cpp_ << Var (att) << ' ' << att.name () << " () const\n"
 					"{\n";
 				cpp_.indent ();
 
@@ -371,8 +387,8 @@ void Proxy::end (const Interface& itf)
 				cpp_ << "&_out, sizeof (_out)";
 				cpp_ << ");\n";
 
-				cpp_ << static_cast <const Type&> (att) << " _ret;\n"
-					"_unmarshal (_out, _u, _ret);\n"
+				cpp_ << Var (att) << " _ret;\n"
+					<< TypePrefix (att) << "unmarshal (_out, _u, _ret);\n"
 					"return _ret;\n";
 
 				cpp_.unindent ();
@@ -389,7 +405,7 @@ void Proxy::end (const Interface& itf)
 						op_md.params_in.push_back (&att);
 					}
 
-					cpp_ << "void " << att.name () << " (const " << static_cast <const Type&> (att) << "& val) const\n"
+					cpp_ << "void " << att.name () << " (" << ServantParam (att) << " val) const\n"
 						"{\n";
 					cpp_.indent ();
 
@@ -400,7 +416,7 @@ void Proxy::end (const Interface& itf)
 						cpp_ << " = _target ()->create_marshaler ()";
 					cpp_ << ";\n";
 
-					cpp_ << "_marshal_in (val, _m, _in);\n";
+					cpp_ << TypePrefix (att) << "marshal_in (val, _m, _in);\n";
 
 					cpp_ << "Unmarshal_var _u = _target ()->call (::CORBA::Nirvana::OperationIndex { _interface_idx (), " << (metadata.size () - 1)
 						<< " }, &_in, sizeof (_in), _m, 0, 0);\n";
@@ -420,7 +436,7 @@ void Proxy::end (const Interface& itf)
 
 		for (const auto& op : metadata) {
 			if (!op.params_in.empty ()) {
-				cpp_ << "const Parameter ProxyTraits < " << QName (itf) << ">::" << op.name << "_in_params_ [" << op.params_in.size () << "] = {\n";
+				cpp_ << "const Parameter ProxyTraits <" << QName (itf) << ">::" << op.name << "_in_params_ [" << op.params_in.size () << "] = {\n";
 				if (op.type) {
 					md_members (op.params_in);
 				} else {
@@ -434,13 +450,13 @@ void Proxy::end (const Interface& itf)
 				cpp_ << "};\n";
 			}
 			if (!op.params_out.empty ()) {
-				cpp_ << "const Parameter ProxyTraits < " << QName (itf) << ">::" << op.name << "_out_params_ [" << op.params_out.size () << "] = {\n";
+				cpp_ << "const Parameter ProxyTraits <" << QName (itf) << ">::" << op.name << "_out_params_ [" << op.params_out.size () << "] = {\n";
 				md_members (op.params_out);
 				cpp_ << "};\n";
 			}
 		}
 
-		cpp_ << "const Operation ProxyTraits < " << QName (itf) << ">::operations_ [" << metadata.size () << "] = {\n";
+		cpp_ << "const Operation ProxyTraits <" << QName (itf) << ">::operations_ [" << metadata.size () << "] = {\n";
 		cpp_.indent ();
 
 		auto it = metadata.cbegin ();
@@ -453,6 +469,27 @@ void Proxy::end (const Interface& itf)
 		cpp_.unindent ();
 		cpp_ << "\n};\n";
 	}
+
+	cpp_ << "const Char* const ProxyTraits <" << QName (itf) << ">::interfaces_ [] = {\n";
+	cpp_.indent ();
+	cpp_ << QName (itf) << "::repository_id_";
+	for (auto p : itf.bases ()) {
+		cpp_ << ",\n" << QName (*p) << "::repository_id_";
+	}
+	cpp_.unindent ();
+	cpp_ << "\n};\n";
+
+	cpp_ <<
+		"template <>\n"
+		"const InterfaceMetadata ProxyFactoryImpl <" << QName (itf) << ">::metadata_ = {\n";
+	cpp_.indent ();
+	cpp_ << "{ProxyTraits <" << QName (itf) << ">::interfaces_, countof (ProxyTraits <::Test::I1>::interfaces_)},\n";
+	if (metadata.empty ())
+		cpp_ << "{nullptr, 0}";
+	else
+		cpp_ << "{ProxyTraits <" << QName (itf) << ">::operations_, countof (ProxyTraits <::Test::I1>::operations_)}\n";
+	cpp_.unindent ();
+	cpp_ << "};\n";
 
 	cpp_.namespace_close ();
 	cpp_ << "NIRVANA_EXPORT (" << export_name (itf) << "_ProxyFactory, " << QName (itf)
@@ -473,16 +510,7 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
 		cpp_ << params << ", std::size (" << params << ')';
 	} else
 		cpp_ << "0, 0";
-	cpp_ << " }, ";
-	tc_name (op.type ? *op.type : Type ());
-	cpp_ << ", RqProcWrapper < " << QName (itf) << ", " << op.name << "_request> }";
-}
-
-void Proxy::proxy_param (const Parameter& param)
-{
-	if (param.attribute () == Parameter::Attribute::IN)
-		cpp_ << "const ";
-	cpp_ << static_cast <const Type&> (param) << "& " << param.name ();
+	cpp_ << " }, Type <" << WithAlias (op.type ? *op.type : Type ()) << ">::type_code, RqProcWrapper <" << QName (itf) << ", " << op.name << "_request> }";
 }
 
 string Proxy::export_name (const NamedItem& item)
@@ -518,65 +546,25 @@ void Proxy::md_members (const Members& members)
 
 void Proxy::md_member (const AST::Type& t, const std::string& name)
 {
-	cpp_ << "{ \"" << name << "\", ";
-	tc_name (t);
-	cpp_ << " }";
-}
-
-void Proxy::tc_name (const Type& t)
-{
-	static const char* const basic_types [(size_t)BasicType::ANY + 1] = {
-		"_tc_boolean",
-		"_tc_octet",
-		"_tc_char",
-		"_tc_wchar",
-		"_tc_ushort",
-		"_tc_ulong",
-		"_tc_ulonglong",
-		"_tc_short",
-		"_tc_long",
-		"_tc_longlong",
-		"_tc_float",
-		"_tc_double",
-		"_tc_longdouble",
-		"_tc_Object",
-		"_tc_ValueBase",
-		"_tc_any"
-	};
-	
-	switch (t.tkind ()) {
-		case Type::Kind::VOID:
-			cpp_ << "::CORBA::_tc_void";
-			break;
-		case Type::Kind::BASIC_TYPE:
-			cpp_ << "::CORBA::" << basic_types [(size_t)t.basic_type ()];
-			break;
-		case Type::Kind::NAMED_TYPE: {
-			const NamedItem& item = t.named_type ();
-			cpp_ << ParentName (item) << "_tc_" << item.name ();
-		} break;
-		case Type::Kind::STRING:
-			assert (!t.string_bound ()); // Anonymous types are not allowed.
-			cpp_ << "::CORBA::" << "_tc_string";
-			break;
-		case Type::Kind::WSTRING:
-			assert (!t.string_bound ()); // Anonymous types are not allowed.
-			cpp_ << "::CORBA::" << "_tc_wstring";
-			break;
-		default:
-			assert (false); // Anonymous types are not allowed.
-	}
+	cpp_ << "{ \"" << name << "\", Type <" << WithAlias (t) << ">::type_code }";
 }
 
 void Proxy::type_code_members (const NamedItem& item, const Members& members)
 {
 	assert (!members.empty ());
 	cpp_ << "template <>\n"
-		"const Parameter TypeCodeMembers < " << QName (item) << ">::members_ [] = {\n";
+		"const Parameter TypeCodeMembers <" << QName (item) << ">::members_ [] = {\n";
 
 	md_members (members);
 
 	cpp_ << "};\n\n";
+}
+
+Code& Proxy::exp (const AST::NamedItem& item)
+{
+	return cpp_ <<
+		"NIRVANA_EXPORT (" << export_name (item) << "_TC, "
+		"CORBA::Nirvana::RepIdOf <" << QName (item) << ">::repository_id_, CORBA::TypeCode, CORBA::Nirvana::";
 }
 
 void Proxy::end (const Exception& item)
@@ -588,21 +576,13 @@ void Proxy::end (const Exception& item)
 		type_code_members (item, members);
 
 	cpp_.namespace_close ();
-	cpp_ << "NIRVANA_EXPORT (" << export_name (item) << "_TC, "
-		<< QName (item) << "::repository_id_, CORBA::TypeCode, CORBA::Nirvana::TypeCodeException < " << QName (item)
-		<< ", " << (members.empty () ? "false" : "true") << ">)\n";
+	exp (item) << "TypeCodeException <" << QName (item) << ", " << (members.empty () ? "false" : "true") << ">)\n";
 }
 
 void Proxy::type_code_name (const NamedItem& item)
 {
 	cpp_ << "template <>\n"
-		"const char TypeCodeName < " << QName (item) << ">::name_ [] = \"" << static_cast <const string&> (item.name ()) << "\";\n";
-}
-
-void Proxy::rep_id_of (const RepositoryId& rid)
-{
-	cpp_ << "template <>\n"
-		"const char RepIdOf < " << QName (rid.item ()) << ">::repository_id_ [] = \"" << rid.repository_id () << "\";\n";
+		"const Char TypeCodeName <" << QName (item) << ">::name_ [] = \"" << static_cast <const string&> (item.name ()) << "\";\n";
 }
 
 void Proxy::end (const Struct& item)
@@ -611,12 +591,10 @@ void Proxy::end (const Struct& item)
 		return;
 
 	cpp_.namespace_open (internal_namespace_);
-	rep_id_of (item);
 	type_code_name (item);
 	type_code_members (item, get_members (item));
 	cpp_.namespace_close ();
-	cpp_ << "NIRVANA_EXPORT (" << export_name (item) << "_TC, "
-		"CORBA::Nirvana::RepIdOf < " << QName (item) << "::repository_id_, CORBA::TypeCode, CORBA::Nirvana::TypeCodeStruct < " << QName (item) << ">)\n";
+	exp (item) << "TypeCodeStruct <" << QName (item) << ">)\n";
 }
 
 void Proxy::leaf (const Enum& item)
@@ -626,13 +604,10 @@ void Proxy::leaf (const Enum& item)
 
 	cpp_.namespace_open (internal_namespace_);
 	cpp_.empty_line ();
-	rep_id_of (item);
+	type_code_name (item);
 	cpp_ << "\n"
 		"template <>\n"
-		"const char TypeCodeEnum < " << QName (item) << ">::name_ [] = \"" << static_cast <const string&> (item.name ()) << "\";\n"
-		"\n"
-		"template <>\n"
-		"const char* const TypeCodeEnum < " << QName (item) << ">::members_ [] = {\n";
+		"const char* const TypeCodeEnum <" << QName (item) << ">::members_ [] = {\n";
 
 	cpp_.indent ();
 	auto it = item.begin ();
@@ -644,6 +619,5 @@ void Proxy::leaf (const Enum& item)
 	cpp_ << "\n};\n";
 
 	cpp_.namespace_close ();
-	cpp_ << "NIRVANA_EXPORT (" << export_name (item) << "_TC, \"" << item.repository_id ()
-		<< "\", CORBA::TypeCode, CORBA::Nirvana::TypeCodeEnum < " << QName (item) << ">)\n";
+	exp (item) << "TypeCodeEnum <" << QName (item) << ">)\n";
 }

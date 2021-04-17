@@ -207,12 +207,6 @@ Code& operator << (Code& stm, const Type& t)
 			break;
 		case Type::Kind::NAMED_TYPE:
 			stm << CodeGenBase::QName (t.named_type ());
-			switch (t.named_type ().kind ()) {
-				case Item::Kind::INTERFACE:
-				case Item::Kind::VALUE_TYPE:
-				case Item::Kind::VALUE_BOX:
-					stm << "_var";
-			}
 			break;
 		case Type::Kind::STRING:
 			if (stm.spec_namespace () != CodeGenBase::internal_namespace_)

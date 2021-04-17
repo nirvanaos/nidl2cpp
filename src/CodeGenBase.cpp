@@ -223,8 +223,30 @@ Code& operator << (Code& stm, const CodeGenBase::C_param& t)
 
 Code& operator << (Code& stm, const CodeGenBase::Var_type& t)
 {
-	stm << CodeGenBase::TypePrefix (t.type) << "Var_type";
-	return stm;
+	if (t.type.tkind () != Type::Kind::VOID)
+		return stm << CodeGenBase::TypePrefix (t.type) << "Var_type";
+	else
+		return stm << "void";
+}
+
+Code& operator << (Code& stm, const CodeGenBase::ClientOp& op)
+{
+	stm << op.op.name () << " (";
+
+	auto it = op.op.begin ();
+	if (it != op.op.end ()) {
+		stm << CodeGenBase::C_param (**it);
+		if (op.names)
+			stm << ' ' << (*it)->name ();
+		++it;
+		for (; it != op.op.end (); ++it) {
+			stm << ", " << CodeGenBase::C_param (**it);
+			if (op.names)
+				stm << ' ' << (*it)->name ();
+		}
+	}
+
+	return stm << ")";
 }
 
 CodeGenBase::Members CodeGenBase::get_members (const ItemContainer& cont, Item::Kind member_kind)

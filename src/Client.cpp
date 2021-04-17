@@ -52,7 +52,12 @@ void Client::type_code_decl (const NamedItem& item)
 
 	if (!nested (item))
 		h_ << "extern ";
-	h_ << "const ::Nirvana::ImportInterfaceT < ::CORBA::TypeCode> _tc_" << item.name () << ";\n";
+	h_ << "const ::Nirvana::ImportInterfaceT < ::CORBA::TypeCode> _tc_" << static_cast <const string&> (item.name ()) << ";\n";
+}
+
+Code& operator << (Code& stm, const Client::TypeCodeName& t)
+{
+	return stm << CodeGenBase::ParentName (t.item) << "_tc_" << static_cast <const string&> (t.item.name ());
 }
 
 void Client::type_code_def (const RepositoryId& rid)
@@ -67,8 +72,7 @@ void Client::type_code_def (const RepositoryId& rid)
 	if (!nested (item))
 		cpp_ << "extern ";
 	cpp_ << "const Nirvana::ImportInterfaceT <CORBA::TypeCode>\n"
-		<< ParentName (item) << "_tc_" << static_cast <const string&> (item.name ())
-		<< " = { ::Nirvana::OLF_IMPORT_INTERFACE, ";
+		<< TypeCodeName (item) << " = { ::Nirvana::OLF_IMPORT_INTERFACE, ";
 
 	switch (item.kind ()) {
 		case Item::Kind::INTERFACE:
@@ -85,7 +89,7 @@ void Client::type_code_def (const RepositoryId& rid)
 	cpp_ << ", CORBA::TypeCode::repository_id_ };\n\n";
 }
 
-bool Client::nested (const AST::NamedItem& item)
+bool Client::nested (const NamedItem& item)
 {
 	return item.parent () && item.parent ()->kind () != Item::Kind::MODULE;
 }
@@ -103,12 +107,29 @@ void Client::leaf (const TypeDef& item)
 	h_ << "typedef " << static_cast <const Type&> (item) << ' ' << item.name () << ";\n";
 	type_code_decl (item);
 	type_code_def (item);
+
+	// <Type>_var
+	switch (item.tkind ()) {
+		case Type::Kind::ARRAY:
+		case Type::Kind::SEQUENCE:
+		case Type::Kind::STRING:
+			backward_compat_var (item);
+			break;
+
+		default:
+			if (is_ref_type (item))
+				h_ << "typedef " << static_cast <const string&> (item.named_type ().name ()) << "_ptr "
+				<< static_cast <const string&> (item.name ()) << "_ptr;\n";
+
+			h_ << "typedef " << static_cast <const string&> (item.named_type ().name ()) << "_var "
+				<< static_cast <const string&> (item.name ()) << "_var;\n";
+	}
 }
 
-void Client::backward_compat_var (const AST::NamedItem& item)
+void Client::backward_compat_var (const NamedItem& item)
 {
 	h_.namespace_open (item);
-	h_ << "typedef ::CORBA::Nirvana::Type <" << item.name () << ">::C_var " << item.name () << "_var;\n";
+	h_ << "typedef ::CORBA::Nirvana::Type <" << item.name () << ">::C_var " << static_cast <const string&> (item.name ()) << "_var;\n";
 }
 
 void Client::forward_decl (const NamedItem& item)
@@ -119,18 +140,35 @@ void Client::forward_decl (const NamedItem& item)
 	type_code_decl (item);
 }
 
+void Client::forward_interface (const NamedItem& item)
+{
+	forward_decl (item);
+
+	h_ << "typedef ::CORBA::Nirvana::TypeItf <" << item.name () << ">::C_ptr "
+		<< static_cast <const string&> (item.name ()) << "_ptr;\n"
+		"typedef ::CORBA::Nirvana::TypeItf <" << item.name () << ">::C_var "
+		<< static_cast <const string&> (item.name ()) << "_var;\n";
+}
+
 void Client::leaf (const InterfaceDecl& itf)
 {
-	forward_decl (itf);
+	forward_interface (itf);
+}
+
+void Client::type_code_func (const AST::NamedItem& item)
+{
+	h_ << "static TypeCode_ptr type_code ()\n"
+		"{\n";
+	h_.indent ();
+	h_ << "return " << TypeCodeName (item) << ";\n";
+	h_.unindent ();
+	h_ << "}\n";
 }
 
 void Client::begin (const Interface& itf)
 {
 	// Forward declarations
-	forward_decl (itf);
-
-	h_ << "typedef ::CORBA::Nirvana::I_ptr <" << itf.name () << "> " << itf.name () << "_ptr;\n"
-		<< "typedef ::CORBA::Nirvana::I_var <" << itf.name () << "> " << itf.name () << "_var;\n";
+	forward_interface (itf);
 
 	if (itf.interface_kind () != InterfaceKind::PSEUDO) {
 		type_code_def (itf);
@@ -153,12 +191,7 @@ void Client::begin (const Interface& itf)
 		h_ << " < " << QName (itf) << ">\n"
 			"{\n";
 		h_.indent ();
-		h_ << "static TypeCode_ptr type_code ()\n"
-			"{\n";
-		h_.indent ();
-		h_ << "return " << ParentName (itf) << "_tc_" << static_cast <const string&> (itf.name ()) << ";\n";
-		h_.unindent ();
-		h_ << "}\n";
+		type_code_func (itf);
 		h_.unindent ();
 		h_ << "};\n";
 	}
@@ -273,25 +306,14 @@ void Client::end (const Interface& itf)
 			case Item::Kind::OPERATION: {
 				const Operation& op = static_cast <const Operation&> (item);
 
-				h_ << static_cast <const Type&> (op) << ' ' << op.name () << " (";
-
-				auto it = op.begin ();
-				if (it != op.end ()) {
-					h_ << C_param (**it);
-					++it;
-					for (; it != op.end (); ++it) {
-						h_ << ", " << C_param (**it);
-					}
-				}
-
-				h_ << ");\n";
+				h_ << Var_type (op) << ' ' << ClientOp (op, false) << ";\n";
 
 			} break;
 
 			case Item::Kind::ATTRIBUTE: {
 				const Attribute& att = static_cast <const Attribute&> (item);
 
-				h_ << static_cast <const Type&> (att) << ' ' << att.name () << " ();\n";
+				h_ << Var_type (att) << ' ' << att.name () << " ();\n";
 
 				if (!att.readonly ())
 					h_ << "void " << att.name () << " (" << C_param (att) << ");\n";
@@ -314,19 +336,9 @@ void Client::end (const Interface& itf)
 
 				h_ << "\ntemplate <class T>\n";
 
-				h_ << static_cast <const Type&> (op) << " Client <T, " << QName (itf) << ">::" << op.name () << " (";
-
-				auto it = op.begin ();
-				if (it != op.end ()) {
-					h_ << C_param (**it) << ' ' << (*it)->name ();
-					++it;
-					for (; it != op.end (); ++it) {
-						h_ << ", " << C_param (**it) << ' ' << (*it)->name ();
-					}
-				}
-
-				h_ << ")\n"
+				h_ << Var_type (op) << " Client <T, " << QName (itf) << ">::" << ClientOp (op, true) << "\n"
 					"{\n";
+
 				h_.indent ();
 
 				environment (op.raises ());
@@ -336,7 +348,7 @@ void Client::end (const Interface& itf)
 					h_ << TypePrefix (op) << "C_ret _ret = ";
 
 				h_ << "(_b._epv ().epv." << op.name () << ") (&_b";
-				for (it = op.begin (); it != op.end (); ++it) {
+				for (auto it = op.begin (); it != op.end (); ++it) {
 					h_ << ", &" << (*it)->name ();
 				}
 				h_ << ", &_env);\n"
@@ -355,7 +367,7 @@ void Client::end (const Interface& itf)
 
 				h_ << "\ntemplate <class T>\n";
 
-				h_ << static_cast <const Type&> (att) << " Client <T, " << QName (itf) << ">::" << att.name () << " ()\n"
+				h_ << Var_type (att) << " Client <T, " << QName (itf) << ">::" << att.name () << " ()\n"
 					"{\n";
 
 				h_.indent ();
@@ -428,7 +440,7 @@ void Client::end (const Interface& itf)
 	h_ << "};\n";
 }
 
-void Client::environment (const AST::Raises& raises)
+void Client::environment (const Raises& raises)
 {
 	if (raises.empty ())
 		h_ << "Environment _env;\n";
@@ -513,9 +525,10 @@ void Client::end (const Exception& item)
 		}
 		h_.unindent ();
 
-		h_ << "};\n";
+		h_ << "};\n\n";
 
-		h_ << "\nprivate:\n";
+		h_.unindent ();
+		h_ << "private:\n";
 		h_.indent ();
 
 		h_ << "virtual void* __data () NIRVANA_NOEXCEPT\n"
@@ -537,7 +550,7 @@ void Client::end (const Exception& item)
 		implement (item);
 }
 
-void Client::implement (const AST::Exception& item)
+void Client::implement (const Exception& item)
 {
 	Members members = get_members (item);
 	define_type (item, members, "::_Data");
@@ -549,16 +562,20 @@ void Client::implement (const AST::Exception& item)
 	cpp_ << "NIRVANA_EXCEPTION_DEF (" << ParentName (item) << ", " << item.name () << ")\n\n";
 }
 
-std::ostream& Client::member_type_prefix (const AST::Type& t)
+Code& Client::member_type_prefix (const Type& t)
 {
-	h_ << "Type <Type <" << t << ">::Member_type>::";
+	h_ << "Type <" << TypePrefix (t) << "Member_type>::";
 	return h_;
 }
 
-void Client::define_type (const AST::NamedItem& item, const Members& members, const char* suffix)
+void Client::define_type (const RepositoryId& rid, const Members& members, const char* suffix)
 {
 	h_.namespace_open (internal_namespace_);
 	h_.empty_line ();
+
+	const NamedItem& item = rid.item ();
+	h_ << "template <>\n"
+		"const Char RepIdOf <" << QName (item) << ">::repository_id_ [] = \"" << rid.repository_id () << "\";\n\n";
 
 	// ABI
 	h_ << "template <>\n"
@@ -605,28 +622,33 @@ void Client::define_type (const AST::NamedItem& item, const Members& members, co
 		h_.unindent ();
 		h_ << "}\n";
 
-		h_ << "static const bool has_marshal = " << (is_var_len (members) ? "true" : "false") << ";\n\n"
-			"static void marshal_in (const " << QName (item) << suffix << "& src, Marshal_ptr marshaler, Type < " << QName (item) << suffix << ">::ABI_type& dst)\n"
+		if (!*suffix) {
+			h_ << endl;
+			type_code_func (item);
+		}
+
+		h_ << "\n"
+			"static void marshal_in (const Var_type& src, Marshal_ptr marshaler, ABI_type& dst)\n"
 			"{\n";
 		h_.indent ();
 		for (auto m : members) {
-			h_ << TypePrefix (*m) << "marshal_in (src._" << m->name () << ", marshaler, dst." << m->name () << ");\n";
+			member_type_prefix (*m) << "marshal_in (src._" << m->name () << ", marshaler, dst." << m->name () << ");\n";
 		}
 		h_.unindent ();
 		h_ << "}\n\n"
-			"static void marshal_out (" << QName (item) << suffix << "& src, Marshal_ptr marshaler, Type < " << QName (item) << suffix << ">::ABI_type& dst)\n"
+			"static void marshal_out (Var_type& src, Marshal_ptr marshaler, ABI_type& dst)\n"
 			"{\n";
 		h_.indent ();
 		for (auto m : members) {
-			h_ << TypePrefix (*m) << "marshal_out (src._" << m->name () << ", marshaler, dst." << m->name () << ");\n";
+			member_type_prefix (*m) << "marshal_out (src._" << m->name () << ", marshaler, dst." << m->name () << ");\n";
 		}
 		h_.unindent ();
 		h_ << "}\n\n"
-			"static void unmarshal (const Type < " << QName (item) << suffix << ">::ABI_type& src, Unmarshal_ptr unmarshaler, " << QName (item) << suffix << "& dst)\n"
+			"static void unmarshal (const ABI_type& src, Unmarshal_ptr unmarshaler, " << "Var_type& dst)\n"
 			"{\n";
 		h_.indent ();
 		for (auto m : members) {
-			h_ << TypePrefix (*m) << "unmarshal (src." << m->name () << ", unmarshaler, dst._" << m->name () << ");\n";
+			member_type_prefix (*m) << "unmarshal (src." << m->name () << ", unmarshaler, dst._" << m->name () << ");\n";
 		}
 		h_.unindent ();
 		h_ << "}\n";
@@ -685,7 +707,7 @@ void Client::implement (const Struct& item)
 	type_code_def (item);
 }
 
-void Client::constructors_and_assignments (const AST::Identifier& name, const Members& members)
+void Client::constructors_and_assignments (const Identifier& name, const Members& members)
 {
 	// Default constructor
 	h_ << name << " ()";
@@ -707,11 +729,11 @@ void Client::constructors_and_assignments (const AST::Identifier& name, const Me
 		}
 		h_.unindent ();
 	}
-	h_ << "\n {}\n";
+	h_ << "\n{}\n";
 
 	// Constructors and assignments
-	h_ << name << "(const " << name << "&) = default;\n"
-		<< name << "(" << name << "&&) = default;\n"
+	h_ << name << " (const " << name << "&) = default;\n"
+		<< name << " (" << name << "&&) = default;\n"
 		<< name << "& operator = (const " << name << "&) = default;\n"
 		<< name << "& operator = (" << name << "&&) = default;\n";
 }
@@ -722,13 +744,13 @@ void Client::accessors (const Members& members, const char* prefix)
 	for (const Member* m : members) {
 		h_.empty_line ();
 
-		h_ << TypePrefix (*m) << "Member_ret " << m->name () << " () const\n"
+		h_ << TypePrefix (*m) << "MemberRef " << m->name () << " () const\n"
 			"{\n";
 		h_.indent ();
 		h_ << "return " << prefix << m->name () << ";\n";
 		h_.unindent ();
 		h_ << "}\n"
-			"void " << m->name () << " (const " << Var_type (*m) << "& val)\n"
+			"void " << m->name () << " (" << TypePrefix (*m) << "MemberRef val)\n"
 			"{\n";
 		h_.indent ();
 		h_ << prefix << m->name () << " = val;\n";
@@ -749,6 +771,7 @@ void Client::accessors (const Members& members, const char* prefix)
 
 void Client::member_variables (const Members& members)
 {
+	h_.empty_line ();
 	for (const Member* m : members) {
 		h_ << TypePrefix (*m) << "Member_type _" << m->name () << ";\n";
 	}

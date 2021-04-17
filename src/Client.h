@@ -42,6 +42,15 @@ public:
 			"#include " << file_h.filename () << std::endl;
 	}
 
+	struct TypeCodeName
+	{
+		TypeCodeName (const AST::NamedItem& ni) :
+			item (ni)
+		{}
+
+		const AST::NamedItem& item;
+	};
+
 protected:
 	virtual void end (const AST::Root&);
 
@@ -65,13 +74,15 @@ protected:
 
 private:
 	void forward_decl (const AST::NamedItem& item);
+	void forward_interface (const AST::NamedItem& item);
 	void backward_compat_var (const AST::NamedItem& item);
 	void environment (const AST::Raises& raises);
 	void type_code_decl (const AST::NamedItem& item);
 	void type_code_def (const AST::RepositoryId& rid);
 	static bool constant (Code& stm, const AST::Constant& item);
-	void define_type (const AST::NamedItem& item, const Members& members, const char* suffix = "");
-	std::ostream& member_type_prefix (const AST::Type& t);
+	void define_type (const AST::RepositoryId& rid, const Members& members, const char* suffix = "");
+	void type_code_func (const AST::NamedItem& item);
+	Code& member_type_prefix (const AST::Type& t);
 	void constructors_and_assignments (const AST::Identifier& name, const Members& members);
 	void accessors (const Members& members, const char* prefix = "_");
 	void member_variables (const Members& members);
@@ -88,5 +99,7 @@ private:
 	Header h_; // .h file
 	Code cpp_; // .cpp file.
 };
+
+Code& operator << (Code& stm, const Client::TypeCodeName& t);
 
 #endif

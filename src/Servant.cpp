@@ -44,7 +44,7 @@ void Servant::begin (const Interface& itf)
 		"{\n"
 		"public:\n";
 	h_.indent ();
-	h_ << "static const typename Bridge < " << QName (itf) << ">::EPV epv_;\n\n";
+	h_ << "static const typename Bridge <" << QName (itf) << ">::EPV epv_;\n\n";
 	h_.unindent ();
 	h_ << "protected:\n";
 	h_.indent ();
@@ -55,13 +55,13 @@ void Servant::end (const Interface& itf)
 	h_.unindent ();
 	h_ << "};\n"
 		"\ntemplate <class S>\n"
-		"const Bridge < " << QName (itf) << ">::EPV Skeleton <S, " << QName (itf) << ">::epv_ = {\n";
+		"const Bridge <" << QName (itf) << ">::EPV Skeleton <S, " << QName (itf) << ">::epv_ = {\n";
 	h_.indent ();
 	h_ << "{ // header\n";
 	h_.indent ();
-	h_ << "Bridge < " << QName (itf) << ">::repository_id_,\n"
-		"S::template __duplicate < " << QName (itf) << ">,\n"
-		"S::template __release < " << QName (itf) << ">\n";
+	h_ << "Bridge <" << QName (itf) << ">::repository_id_,\n"
+		"S::template __duplicate <" << QName (itf) << ">,\n"
+		"S::template __release <" << QName (itf) << ">\n";
 	h_.unindent ();
 	h_ << "}";
 	
@@ -74,12 +74,12 @@ void Servant::end (const Interface& itf)
 		if (itf.interface_kind () == InterfaceKind::ABSTRACT)
 			h_ << "S::template _wide <AbstractBase, ";
 		else
-			h_ << "S::template _wide_object < ";
+			h_ << "S::template _wide_object <";
 		h_ << QName (itf) << ">\n";
 
 		for (auto b : itf.bases ()) {
 			h_ << ",\n"
-				"S::template _wide < " << QName (*b) << ", " << QName (itf) << ">\n";
+				"S::template _wide <" << QName (*b) << ", " << QName (itf) << ">\n";
 		}
 
 		h_.unindent ();
@@ -115,14 +115,35 @@ void Servant::end (const Interface& itf)
 		implementation_suffix (itf);
 		h_ << " <S, ";
 		implementation_parameters (itf, bases);
+		h_ << "{};\n";
 
 		// POA implementation
 		h_.empty_line ();
 		h_ << "template <>\n"
-			"class ServantPOA < " << QName (itf) << "> : public Implementation";
+			"class ServantPOA <" << QName (itf) << "> : public Implementation";
 		implementation_suffix (itf);
-		h_ << "POA < ";
+		h_ << "POA <";
 		implementation_parameters (itf, bases);
+		h_ << "{\n"
+			"public:\n";
+		h_.indent ();
+		for (auto it = itf.begin (); it != itf.end (); ++it) {
+			const Item& item = **it;
+			switch (item.kind ()) {
+				case Item::Kind::OPERATION: {
+					const Operation& op = static_cast <const Operation&> (item);
+					h_ << "virtual " << Var_type (op) << ' ' << ClientOp (op, false) << " = 0;\n";
+				} break;
+				case Item::Kind::ATTRIBUTE: {
+					const Attribute& att = static_cast <const Attribute&> (item);
+					h_ << "virtual " << Var_type (att) << ' ' << att.name () << " () = 0;\n";
+					if (!att.readonly ())
+						h_ << "virtual void " << att.name () << " (" << C_param (att) << ") = 0;\n";
+				} break;
+			}
+		}
+		h_.unindent ();
+		h_ << "};\n";
 
 		// Static implementation
 		h_.empty_line ();
@@ -131,6 +152,7 @@ void Servant::end (const Interface& itf)
 		implementation_suffix (itf);
 		h_ << "Static <S, ";
 		implementation_parameters (itf, bases);
+		h_ << "{};\n";
 
 		h_.namespace_close ();
 
@@ -146,14 +168,14 @@ void Servant::end (const Interface& itf)
 				h_ << "namespace " << *it << " {\n";
 			}
 
-			h_ << "\ntypedef ::CORBA::Nirvana::ServantPOA < " << QName (itf) << "> " << itf.name () << ";\n"
+			h_ << "\ntypedef ::CORBA::Nirvana::ServantPOA <" << QName (itf) << "> " << itf.name () << ";\n"
 				"template <class T> using " << itf.name () << "_tie = ::CORBA::Nirvana::ServantTied <T, " << QName (itf) << ">;\n\n";
 
 			for (size_t cnt = sn.size (); cnt; --cnt) {
 				h_ << "}\n";
 			}
 		} else {
-			h_ << "typedef ::CORBA::Nirvana::ServantPOA < " << QName (itf) << "> POA_" << static_cast <const string&> (itf.name ()) << ";\n"
+			h_ << "typedef ::CORBA::Nirvana::ServantPOA <" << QName (itf) << "> POA_" << static_cast <const string&> (itf.name ()) << ";\n"
 				"template <class T> using POA_" << static_cast <const string&> (itf.name ()) << "_tie = ::CORBA::Nirvana::ServantTied <T, " << QName (itf) << ">;\n\n";
 		}
 	}
@@ -177,7 +199,7 @@ void Servant::implementation_parameters (const Interface& primary, const Interfa
 	for (auto b : bases) {
 		h_ << ", " << QName (*b);
 	}
-	h_ << "> {};\n";
+	h_ << ">\n";
 }
 
 void Servant::leaf (const Operation& op)
@@ -189,12 +211,12 @@ void Servant::leaf (const Operation& op)
 	{
 		string name = "_";
 		name += op.name ();
-		h_ << ' ' << name << " (Bridge < " << QName (itf) << ">* _b";
+		h_ << ' ' << name << " (Bridge <" << QName (itf) << ">* _b";
 		epv_.push_back (move (name));
 	}
 
 	for (auto it = op.begin (); it != op.end (); ++it) {
-		h_ << ", " << ABI_param (**it);
+		h_ << ", " << ABI_param (**it) << ' ' << (*it)->name ();
 	}
 
 	h_ << ", Interface* _env)\n"
@@ -203,7 +225,7 @@ void Servant::leaf (const Operation& op)
 	h_ << "try {\n";
 	h_.indent ();
 	if (op.tkind () != Type::Kind::VOID)
-		h_ << "return " << TypePrefix (op) << "::ret (";
+		h_ << "return " << TypePrefix (op) << "ret (";
 	h_ << "S::_implementation (_b)." << op.name () << " (";
 	if (!op.empty ()) {
 		auto par = op.begin ();
@@ -219,7 +241,7 @@ void Servant::leaf (const Operation& op)
 	catch_block ();
 	if (op.tkind () != Type::Kind::VOID) {
 		// Return default value on exception
-		h_ << "return " << TypePrefix (op) << "::ret ();\n";
+		h_ << "return " << TypePrefix (op) << "ret ();\n";
 	}
 
 	h_.unindent ();
@@ -234,7 +256,7 @@ void Servant::leaf (const Attribute& att)
 	{
 		string name = "__get_";
 		name += att.name ();
-		h_ << ' ' << name << " (Bridge < " << QName (itf) << ">* _b, Interface* _env)\n"
+		h_ << ' ' << name << " (Bridge <" << QName (itf) << ">* _b, Interface* _env)\n"
 			"{\n";
 		epv_.push_back (move (name));
 	}
@@ -252,7 +274,7 @@ void Servant::leaf (const Attribute& att)
 		{
 			string name = "__set_";
 			name += att.name ();
-			h_ << "static void " << name << " (Bridge < " << QName (itf) << ">* _b, " << C_param (att) << " val, Interface* _env)\n"
+			h_ << "static void " << name << " (Bridge <" << QName (itf) << ">* _b, " << ABI_param (att) << " val, Interface* _env)\n"
 				"{\n";
 			epv_.push_back (move (name));
 		}

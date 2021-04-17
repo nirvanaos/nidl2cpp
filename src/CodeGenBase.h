@@ -113,6 +113,17 @@ public:
 		const AST::Type& type;
 	};
 
+	struct ClientOp
+	{
+		ClientOp (const AST::Operation& o, bool param_names) :
+			op (o),
+			names (param_names)
+		{}
+
+		const AST::Operation& op;
+		bool names;
+	};
+
 	typedef std::vector <const AST::Member*> Members;
 
 	static Members get_members (const AST::Struct& cont)
@@ -190,5 +201,6 @@ Code& operator << (Code& stm, const CodeGenBase::ABI_ret& t);
 Code& operator << (Code& stm, const CodeGenBase::ABI_param& t);
 Code& operator << (Code& stm, const CodeGenBase::C_param& t);
 Code& operator << (Code& stm, const CodeGenBase::Var_type& t);
+Code& operator << (Code& stm, const CodeGenBase::ClientOp& op);
 
 #endif

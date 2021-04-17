@@ -116,7 +116,7 @@ void Code::namespace_close ()
 		*this << endl;
 	} else if (spec_namespace_) {
 		empty_line ();
-		for (const char* s = spec_namespace_, *open; open = strchr (s, '{'); s = open + 1) {
+		for (const char* s = spec_namespace_, *open; (open = strchr (s, '{')); s = open + 1) {
 			*this << "}\n";
 		}
 		spec_namespace_ = nullptr;

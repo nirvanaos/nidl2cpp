@@ -104,9 +104,9 @@ public:
 		const AST::Parameter::Attribute att;
 	};
 
-	struct Var_type
+	struct Var
 	{
-		Var_type (const AST::Type& t) :
+		Var (const AST::Type& t) :
 			type (t)
 		{}
 
@@ -200,7 +200,7 @@ Code& operator << (Code& stm, const CodeGenBase::TypePrefix& t);
 Code& operator << (Code& stm, const CodeGenBase::ABI_ret& t);
 Code& operator << (Code& stm, const CodeGenBase::ABI_param& t);
 Code& operator << (Code& stm, const CodeGenBase::C_param& t);
-Code& operator << (Code& stm, const CodeGenBase::Var_type& t);
+Code& operator << (Code& stm, const CodeGenBase::Var& t);
 Code& operator << (Code& stm, const CodeGenBase::ClientOp& op);
 
 #endif

@@ -306,14 +306,14 @@ void Client::end (const Interface& itf)
 			case Item::Kind::OPERATION: {
 				const Operation& op = static_cast <const Operation&> (item);
 
-				h_ << Var_type (op) << ' ' << ClientOp (op, false) << ";\n";
+				h_ << Var (op) << ' ' << ClientOp (op, false) << ";\n";
 
 			} break;
 
 			case Item::Kind::ATTRIBUTE: {
 				const Attribute& att = static_cast <const Attribute&> (item);
 
-				h_ << Var_type (att) << ' ' << att.name () << " ();\n";
+				h_ << Var (att) << ' ' << att.name () << " ();\n";
 
 				if (!att.readonly ())
 					h_ << "void " << att.name () << " (" << C_param (att) << ");\n";
@@ -336,7 +336,7 @@ void Client::end (const Interface& itf)
 
 				h_ << "\ntemplate <class T>\n";
 
-				h_ << Var_type (op) << " Client <T, " << QName (itf) << ">::" << ClientOp (op, true) << "\n"
+				h_ << Var (op) << " Client <T, " << QName (itf) << ">::" << ClientOp (op, true) << "\n"
 					"{\n";
 
 				h_.indent ();
@@ -367,7 +367,7 @@ void Client::end (const Interface& itf)
 
 				h_ << "\ntemplate <class T>\n";
 
-				h_ << Var_type (att) << " Client <T, " << QName (itf) << ">::" << att.name () << " ()\n"
+				h_ << Var (att) << " Client <T, " << QName (itf) << ">::" << att.name () << " ()\n"
 					"{\n";
 
 				h_.indent ();
@@ -583,7 +583,7 @@ void Client::define_type (const RepositoryId& rid, const Members& members, const
 		"{\n";
 	h_.indent ();
 	for (auto member : members) {
-		member_type_prefix (*member) << "ABI_type " << member->name () << ";\n";
+		member_type_prefix (*member) << "ABI " << member->name () << ";\n";
 	}
 	h_.unindent ();
 	h_ << "};\n\n";
@@ -613,7 +613,7 @@ void Client::define_type (const RepositoryId& rid, const Members& members, const
 		h_.unindent ();
 		h_ << "{\n";
 		h_.indent ();
-		h_ << "static void check (const ABI_type& val)\n"
+		h_ << "static void check (const ABI& val)\n"
 			"{\n";
 		h_.indent ();
 		for (auto member : members) {
@@ -628,7 +628,7 @@ void Client::define_type (const RepositoryId& rid, const Members& members, const
 		}
 
 		h_ << "\n"
-			"static void marshal_in (const Var_type& src, Marshal_ptr marshaler, ABI_type& dst)\n"
+			"static void marshal_in (const Var& src, Marshal_ptr marshaler, ABI& dst)\n"
 			"{\n";
 		h_.indent ();
 		for (auto m : members) {
@@ -636,7 +636,7 @@ void Client::define_type (const RepositoryId& rid, const Members& members, const
 		}
 		h_.unindent ();
 		h_ << "}\n\n"
-			"static void marshal_out (Var_type& src, Marshal_ptr marshaler, ABI_type& dst)\n"
+			"static void marshal_out (Var& src, Marshal_ptr marshaler, ABI& dst)\n"
 			"{\n";
 		h_.indent ();
 		for (auto m : members) {
@@ -644,7 +644,7 @@ void Client::define_type (const RepositoryId& rid, const Members& members, const
 		}
 		h_.unindent ();
 		h_ << "}\n\n"
-			"static void unmarshal (const ABI_type& src, Unmarshal_ptr unmarshaler, " << "Var_type& dst)\n"
+			"static void unmarshal (const ABI& src, Unmarshal_ptr unmarshaler, " << "Var& dst)\n"
 			"{\n";
 		h_.indent ();
 		for (auto m : members) {
@@ -759,7 +759,7 @@ void Client::accessors (const Members& members, const char* prefix)
 
 		if (is_var_len (*m)) {
 			// The move setter
-			h_ << "void " << m->name () << " (" << Var_type (*m) << "&& val)\n"
+			h_ << "void " << m->name () << " (" << Var (*m) << "&& val)\n"
 				"{\n";
 			h_.indent ();
 			h_ << prefix << m->name () << " = std::move (val);\n";

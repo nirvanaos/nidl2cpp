@@ -170,7 +170,7 @@ void Proxy::abi_members (const Members& members)
 
 ostream& Proxy::abi_member (const Type& t)
 {
-	cpp_ << "Type < " << t << ">::ABI_type ";
+	cpp_ << "Type < " << t << ">::ABI ";
 	return cpp_;
 }
 

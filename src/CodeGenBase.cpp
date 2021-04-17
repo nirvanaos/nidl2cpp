@@ -219,10 +219,10 @@ Code& operator << (Code& stm, const CodeGenBase::C_param& t)
 	return stm;
 }
 
-Code& operator << (Code& stm, const CodeGenBase::Var_type& t)
+Code& operator << (Code& stm, const CodeGenBase::Var& t)
 {
 	if (t.type.tkind () != Type::Kind::VOID)
-		return stm << CodeGenBase::TypePrefix (t.type) << "Var_type";
+		return stm << CodeGenBase::TypePrefix (t.type) << "Var";
 	else
 		return stm << "void";
 }

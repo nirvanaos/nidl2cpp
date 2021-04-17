@@ -35,7 +35,7 @@ Code& operator << (Code& stm, const Servant::S_param& t)
 	if (t.att == Parameter::Attribute::IN)
 		stm << "ConstRef";
 	else
-		stm << "Var_type&";
+		stm << "Var&";
 	return stm;
 }
 
@@ -142,7 +142,7 @@ void Servant::end (const Interface& itf)
 			switch (item.kind ()) {
 				case Item::Kind::OPERATION: {
 					const Operation& op = static_cast <const Operation&> (item);
-					h_ << "virtual " << Var_type (op) << ' ' << op.name () << " (";
+					h_ << "virtual " << Var (op) << ' ' << op.name () << " (";
 					auto it = op.begin ();
 					if (it != op.end ()) {
 						h_ << S_param (**it);
@@ -155,7 +155,7 @@ void Servant::end (const Interface& itf)
 				} break;
 				case Item::Kind::ATTRIBUTE: {
 					const Attribute& att = static_cast <const Attribute&> (item);
-					h_ << "virtual " << Var_type (att) << ' ' << att.name () << " () = 0;\n";
+					h_ << "virtual " << Var (att) << ' ' << att.name () << " () = 0;\n";
 					if (!att.readonly ())
 						h_ << "virtual void " << att.name () << " (" << S_param (att) << ") = 0;\n";
 				} break;

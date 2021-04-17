@@ -195,10 +195,8 @@ Code& operator << (Code& stm, const CodeGenBase::ABI_param& t)
 			stm << "ABI_in";
 			break;
 		case Parameter::Attribute::OUT:
-			stm << "ABI_out";
-			break;
 		case Parameter::Attribute::INOUT:
-			stm << "ABI_inout";
+			stm << "ABI_out";
 			break;
 	}
 	return stm;

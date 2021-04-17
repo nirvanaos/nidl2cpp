@@ -39,6 +39,22 @@ public:
 		h_ << "#include " << client.filename () << std::endl << std::endl;
 	}
 
+	struct S_param
+	{
+		S_param (const AST::Parameter& p) :
+			type (p),
+			att (p.attribute ())
+		{}
+
+		S_param (const AST::Attribute& t) :
+			type (t),
+			att (AST::Parameter::Attribute::IN)
+		{}
+
+		const AST::Type& type;
+		const AST::Parameter::Attribute att;
+	};
+
 protected:
 	virtual void end (const AST::Root&);
 	virtual void begin (const AST::Interface& itf);
@@ -63,5 +79,7 @@ private:
 	Header h_;
 	std::vector<std::string> epv_;
 };
+
+Code& operator << (Code& stm, const Servant::S_param& t);
 
 #endif

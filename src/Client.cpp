@@ -744,13 +744,13 @@ void Client::accessors (const Members& members, const char* prefix)
 	for (const Member* m : members) {
 		h_.empty_line ();
 
-		h_ << TypePrefix (*m) << "MemberRef " << m->name () << " () const\n"
+		h_ << TypePrefix (*m) << "ConstRef " << m->name () << " () const\n"
 			"{\n";
 		h_.indent ();
 		h_ << "return " << prefix << m->name () << ";\n";
 		h_.unindent ();
 		h_ << "}\n"
-			"void " << m->name () << " (" << TypePrefix (*m) << "MemberRef val)\n"
+			"void " << m->name () << " (" << TypePrefix (*m) << "ConstRef val)\n"
 			"{\n";
 		h_.indent ();
 		h_ << prefix << m->name () << " = val;\n";

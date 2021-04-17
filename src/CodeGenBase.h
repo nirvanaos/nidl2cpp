@@ -79,7 +79,7 @@ public:
 			att (p.attribute ())
 		{}
 
-		ABI_param (const AST::Type& t) :
+		ABI_param (const AST::Attribute& t) :
 			type (t),
 			att (AST::Parameter::Attribute::IN)
 		{}
@@ -95,7 +95,7 @@ public:
 			att (p.attribute ())
 		{}
 
-		C_param (const AST::Type& t) :
+		C_param (const AST::Attribute& t) :
 			type (t),
 			att (AST::Parameter::Attribute::IN)
 		{}

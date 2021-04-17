@@ -29,6 +29,16 @@
 using namespace std;
 using namespace AST;
 
+Code& operator << (Code& stm, const Servant::S_param& t)
+{
+	stm << CodeGenBase::TypePrefix (t.type);
+	if (t.att == Parameter::Attribute::IN)
+		stm << "ConstRef";
+	else
+		stm << "Var_type&";
+	return stm;
+}
+
 void Servant::end (const Root&)
 {
 	h_.close ();
@@ -132,13 +142,22 @@ void Servant::end (const Interface& itf)
 			switch (item.kind ()) {
 				case Item::Kind::OPERATION: {
 					const Operation& op = static_cast <const Operation&> (item);
-					h_ << "virtual " << Var_type (op) << ' ' << ClientOp (op, false) << " = 0;\n";
+					h_ << "virtual " << Var_type (op) << ' ' << op.name () << " (";
+					auto it = op.begin ();
+					if (it != op.end ()) {
+						h_ << S_param (**it);
+						++it;
+						for (; it != op.end (); ++it) {
+							h_ << ", " << S_param (**it);
+						}
+					}
+					h_ << ") = 0;\n";
 				} break;
 				case Item::Kind::ATTRIBUTE: {
 					const Attribute& att = static_cast <const Attribute&> (item);
 					h_ << "virtual " << Var_type (att) << ' ' << att.name () << " () = 0;\n";
 					if (!att.readonly ())
-						h_ << "virtual void " << att.name () << " (" << C_param (att) << ") = 0;\n";
+						h_ << "virtual void " << att.name () << " (" << S_param (att) << ") = 0;\n";
 				} break;
 			}
 		}

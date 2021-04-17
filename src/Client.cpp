@@ -564,7 +564,7 @@ void Client::implement (const Exception& item)
 
 Code& Client::member_type_prefix (const Type& t)
 {
-	h_ << "Type <" << TypePrefix (t) << "Member_type>::";
+	h_ << "Type <" << TypePrefix (t) << "Member>::";
 	return h_;
 }
 
@@ -773,7 +773,7 @@ void Client::member_variables (const Members& members)
 {
 	h_.empty_line ();
 	for (const Member* m : members) {
-		h_ << TypePrefix (*m) << "Member_type _" << m->name () << ";\n";
+		h_ << TypePrefix (*m) << "Member _" << m->name () << ";\n";
 	}
 }
 

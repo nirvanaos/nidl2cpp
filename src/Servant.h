@@ -33,14 +33,16 @@
 class Servant : public CodeGenBase
 {
 public:
-	Servant (const std::filesystem::path& file, const std::filesystem::path& client, const AST::Root& root) :
-		h_ (file, root)
+	Servant (const std::filesystem::path& file, const std::filesystem::path& client, const AST::Root& root, const std::string& suffix) :
+		h_ (file, root),
+		suffix_ (suffix)
 	{
 		h_ << "#include " << client.filename () << std::endl << std::endl;
 	}
 
 protected:
 	virtual void end (const AST::Root&);
+	virtual void leaf (const AST::Include& item);
 	virtual void begin (const AST::Interface& itf);
 	virtual void leaf (const AST::Operation& op);
 	virtual void leaf (const AST::Attribute& att);
@@ -61,6 +63,7 @@ private:
 
 private:
 	Header h_;
+	const std::string suffix_;
 	std::vector<std::string> epv_;
 };
 

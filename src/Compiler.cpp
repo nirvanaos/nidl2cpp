@@ -109,27 +109,26 @@ path Compiler::out_file (const Root& tree, const path& dir, const string& suffix
 	path name (tree.file ().stem ().string () + suffix);
 	name.replace_extension (ext);
 	if (!dir.empty ())
-		name = dir / name;
+		return dir / name;
 	else
-		name = tree.file ().parent_path () / name;
-	return name;
+		return tree.file ().parent_path () / name;
 }
 
 void Compiler::generate_code (const Root& tree)
 {
-	path client_h = out_file (tree, out_h_, client_suffix_, ".h");
+	path client_h = out_file (tree, out_h_, client_suffix_, "h");
 	if (client_) {
-		path client_cpp = out_file (tree, out_cpp_, client_suffix_, ".cpp");
-		Client client (client_h, client_cpp, tree);
+		path client_cpp = out_file (tree, out_cpp_, client_suffix_, "cpp");
+		Client client (client_h, client_cpp, tree, client_suffix_);
 		tree.visit (client);
 	}
-	path servant_h = out_file (tree, out_h_, servant_suffix_, ".h");
+	path servant_h = out_file (tree, out_h_, servant_suffix_, "h");
 	if (server_) {
-		Servant servant (servant_h, client_h, tree);
+		Servant servant (servant_h, client_h, tree, servant_suffix_);
 		tree.visit (servant);
 	}
 	if (proxy_) {
-		Proxy proxy (out_file (tree, out_cpp_, proxy_suffix_, ".cpp"), servant_h, tree);
+		Proxy proxy (out_file (tree, out_cpp_, proxy_suffix_, "cpp"), servant_h, tree);
 		tree.visit (proxy);
 	}
 }

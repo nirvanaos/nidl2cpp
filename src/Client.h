@@ -33,9 +33,10 @@
 class Client : public CodeGenBase
 {
 public:
-	Client (const std::filesystem::path& file_h, const std::filesystem::path& file_cpp, const AST::Root& root) :
+	Client (const std::filesystem::path& file_h, const std::filesystem::path& file_cpp, const AST::Root& root, const std::string& suffix) :
 		h_ (file_h, root),
-		cpp_ (file_cpp, root)
+		cpp_ (file_cpp, root),
+		suffix_ (suffix)
 	{
 		cpp_ << "#include <CORBA/CORBA.h>\n"
 			"#include <Nirvana/OLF.h>\n"
@@ -115,6 +116,7 @@ private:
 private:
 	Header h_; // .h file
 	Code cpp_; // .cpp file.
+	const std::string suffix_;
 };
 
 Code& operator << (Code& stm, const Client::Param& t);

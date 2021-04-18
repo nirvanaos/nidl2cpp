@@ -71,11 +71,10 @@ void Client::end (const Root&)
 
 void Client::leaf (const Include& item)
 {
-	h_ << "#include ";
-	h_ << (item.system () ? '<' : '"');
-	h_ << filesystem::path (item.file ()).replace_extension (".h").string ();
-	h_ << (item.system () ? '>' : '"');
-	h_ << endl;
+	h_ << "#include " << (item.system () ? '<' : '"')
+		<< path (path (item.file ()).replace_extension ("").string () + suffix_).replace_extension ("h").string ()
+		<< (item.system () ? '>' : '"')
+		<< endl;
 }
 
 void Client::type_code_decl (const NamedItem& item)

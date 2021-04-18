@@ -27,11 +27,20 @@
 #include "Servant.h"
 
 using namespace std;
+using namespace std::filesystem;
 using namespace AST;
 
 void Servant::end (const Root&)
 {
 	h_.close ();
+}
+
+void Servant::leaf (const Include& item)
+{
+	h_ << "#include " << (item.system () ? '<' : '"')
+		<< path (path (item.file ()).replace_extension ("").string () + suffix_).replace_extension ("h").string ()
+		<< (item.system () ? '>' : '"')
+		<< endl;
 }
 
 void Servant::begin (const Interface& itf)

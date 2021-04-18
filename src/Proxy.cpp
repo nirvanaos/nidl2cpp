@@ -171,7 +171,7 @@ void Proxy::implement (const Operation& op)
 
 	if (!type_out.empty ()) {
 		// Marshal output
-		bool marshal = is_var_len (params_out);
+		bool marshal = is_var_len (params_out) || is_var_len (op);
 		const char* m_param = marshal ? "_m" : "Marshal::_nil ()";
 		if (marshal)
 			cpp_ << "Marshal_var _m = _call->marshaler ();\n";
@@ -287,20 +287,39 @@ void Proxy::end (const Interface& itf)
 				break;
 		}
 	}
-
 	cpp_.unindent ();
 	cpp_ << "};\n\n"
 		"template <>\n"
-		"class Proxy <" << QName (itf) << "> : public ProxyBase <" << QName (itf) << ">\n"
-		"{\n";
+		"class Proxy <" << QName (itf) << "> : public ProxyBase <" << QName (itf) << '>';
+
+	Interfaces bases = itf.get_all_bases ();
+	cpp_.indent ();
+	for (auto p : bases) {
+		cpp_ << ",\npublic ProxyBaseInterface <" << QName (*p) << '>';
+	}
+	cpp_.unindent ();
+	cpp_ << "\n{\n";
 	cpp_.indent ();
 	cpp_ << "typedef ProxyBase <" << QName (itf) << "> Base;\n"
 		"typedef ProxyTraits <" << QName (itf) << "> Traits;\n";
 	cpp_.unindent ();
 	cpp_ << "public:\n";
 	cpp_.indent ();
-	cpp_ << "Proxy (IOReference_ptr proxy_manager, uint16_t interface_idx) :\n"
-		"Base (proxy_manager, interface_idx) {}\n\n";
+	cpp_ << "Proxy (IOReference_ptr proxy_manager, uint16_t interface_idx) :\n";
+	cpp_.indent ();
+	cpp_ << "Base (proxy_manager, interface_idx)\n";
+	cpp_.unindent ();
+	cpp_ << '{';
+	if (!bases.empty ()) {
+		cpp_ << endl;
+		cpp_.indent ();
+		cpp_ << "AbstractBase_ptr ab = Object_ptr (proxy_manager);\n";
+		for (auto p : bases) {
+			cpp_ << "ProxyBaseInterface <" << QName (*p) << ">::init (ab);\n";
+		}
+		cpp_.unindent ();
+	}
+	cpp_ << "}\n";
 
 	Metadata metadata;
 	for (auto it = itf.begin (); it != itf.end (); ++it) {
@@ -473,7 +492,7 @@ void Proxy::end (const Interface& itf)
 	cpp_ << "const Char* const ProxyTraits <" << QName (itf) << ">::interfaces_ [] = {\n";
 	cpp_.indent ();
 	cpp_ << QName (itf) << "::repository_id_";
-	for (auto p : itf.bases ()) {
+	for (auto p : bases) {
 		cpp_ << ",\n" << QName (*p) << "::repository_id_";
 	}
 	cpp_.unindent ();
@@ -483,11 +502,11 @@ void Proxy::end (const Interface& itf)
 		"template <>\n"
 		"const InterfaceMetadata ProxyFactoryImpl <" << QName (itf) << ">::metadata_ = {\n";
 	cpp_.indent ();
-	cpp_ << "{ProxyTraits <" << QName (itf) << ">::interfaces_, countof (ProxyTraits <::Test::I1>::interfaces_)},\n";
+	cpp_ << "{ProxyTraits <" << QName (itf) << ">::interfaces_, countof (ProxyTraits <" << QName (itf) << ">::interfaces_)},\n";
 	if (metadata.empty ())
 		cpp_ << "{nullptr, 0}";
 	else
-		cpp_ << "{ProxyTraits <" << QName (itf) << ">::operations_, countof (ProxyTraits <::Test::I1>::operations_)}\n";
+		cpp_ << "{ProxyTraits <" << QName (itf) << ">::operations_, countof (ProxyTraits <" << QName (itf) << ">::operations_)}\n";
 	cpp_.unindent ();
 	cpp_ << "};\n";
 

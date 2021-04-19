@@ -40,7 +40,13 @@ public:
 	{
 		cpp_ << "#include <CORBA/CORBA.h>\n"
 			"#include <Nirvana/OLF.h>\n"
-			"#include " << file_h.filename () << std::endl;
+			"#include ";
+		std::filesystem::path cpp_dir = file_cpp.parent_path ();
+		if (file_h.parent_path () == cpp_dir)
+			cpp_ << file_h.filename ();
+		else
+			cpp_ << std::filesystem::relative (file_h, cpp_dir);
+		cpp_  << std::endl;
 	}
 
 	struct Param

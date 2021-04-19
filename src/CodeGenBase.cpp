@@ -30,10 +30,6 @@ using namespace std;
 using namespace std::filesystem;
 using namespace AST;
 
-const char CodeGenBase::internal_namespace_ [] =
-"namespace CORBA {\n"
-"namespace Nirvana {\n";
-
 const char* const CodeGenBase::protected_names_ [] = {
 	"FALSE",
 	"TRUE",
@@ -144,35 +140,24 @@ Code& operator << (Code& stm, const CodeGenBase::ParentName& qn)
 	if (parent) {
 		Item::Kind pk = parent->kind ();
 		if (pk == Item::Kind::MODULE) {
-			if (stm.module_namespace () != parent) {
-				stm << CodeGenBase::QName (*parent);
-				stm << "::";
-			}
+			stm.namespace_prefix (parent);
 		} else {
 			if (Item::Kind::INTERFACE == pk || Item::Kind::VALUE_TYPE == pk) {
-				if (stm.spec_namespace () != CodeGenBase::internal_namespace_) {
-					if (!stm.no_namespace ())
-						stm << "::";
-					stm << "CORBA::Nirvana::";
-				}
+				stm.namespace_prefix ("CORBA/Nirvana");
 				stm << "Definitions <" << CodeGenBase::QName (*parent) << '>';
 			} else {
 				stm << CodeGenBase::QName (*parent);
 			}
 			stm << "::";
 		}
-	} else if (!stm.no_namespace ())
+	} else if (stm.cur_namespace ().empty ())
 		stm << "::";
 	return stm;
 }
 
 Code& operator << (Code& stm, const CodeGenBase::TypePrefix& t)
 {
-	if (stm.spec_namespace () != CodeGenBase::internal_namespace_) {
-		if (stm.module_namespace ())
-			stm << "::";
-		stm << "CORBA::Nirvana::";
-	}
+	stm.namespace_prefix ("CORBA/Nirvana");
 	stm << "Type";
 	if (CodeGenBase::is_ref_type (t.type))
 		stm << "Itf";

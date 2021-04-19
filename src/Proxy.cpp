@@ -48,7 +48,7 @@ void Proxy::leaf (const TypeDef& item)
 	string name = export_name (item) + "_TC";
 	cpp_.empty_line ();
 	cpp_ << "extern \"C\" NIRVANA_OLF_SECTION const Nirvana::ExportInterface " << name << ";\n\n";
-	cpp_.namespace_open (internal_namespace_);
+	cpp_.namespace_open ("CORBA/Nirvana");
 	cpp_ <<
 		"template <>\n"
 		"class TypeCodeTypeDef <&::" << name << "> :\n";
@@ -259,7 +259,7 @@ void Proxy::end (const Interface& itf)
 	if (itf.interface_kind () == InterfaceKind::PSEUDO)
 		return;
 
-	cpp_.namespace_open (internal_namespace_);
+	cpp_.namespace_open ("CORBA/Nirvana");
 	cpp_.empty_line ();
 	cpp_ << "IMPLEMENT_PROXY_FACTORY(" << ParentName (itf) << ", " << itf.name () << ");\n"
 		"\n"
@@ -582,7 +582,7 @@ Code& Proxy::exp (const AST::NamedItem& item)
 
 void Proxy::end (const Exception& item)
 {
-	cpp_.namespace_open (internal_namespace_);
+	cpp_.namespace_open ("CORBA/Nirvana");
 	Members members = get_members (item);
 
 	if (!members.empty ())
@@ -603,7 +603,7 @@ void Proxy::end (const Struct& item)
 	if (is_pseudo (item))
 		return;
 
-	cpp_.namespace_open (internal_namespace_);
+	cpp_.namespace_open ("CORBA/Nirvana");
 	type_code_name (item);
 	type_code_members (item, get_members (item));
 	cpp_.namespace_close ();
@@ -615,7 +615,7 @@ void Proxy::leaf (const Enum& item)
 	if (is_pseudo (item))
 		return;
 
-	cpp_.namespace_open (internal_namespace_);
+	cpp_.namespace_open ("CORBA/Nirvana");
 	cpp_.empty_line ();
 	type_code_name (item);
 	cpp_ << "\n"

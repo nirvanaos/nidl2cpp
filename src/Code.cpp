@@ -31,21 +31,27 @@ using namespace std;
 using namespace std::filesystem;
 using namespace AST;
 
-Code::Code () :
-	module_namespace_ (nullptr),
-	spec_namespace_ (nullptr)
+Code::Code ()
 {}
 
-Code::Code (const path& file, const Root& root) :
-	module_namespace_ (nullptr),
-	spec_namespace_ (nullptr)
+Code::Code (const path& file, const Root& root)
 {
 	open (file, root);
+}
+
+Code::~Code ()
+{
+	if (is_open ()) {
+		Base::close ();
+		remove (file_);
+	}
 }
 
 void Code::open (const std::filesystem::path& file, const Root& root)
 {
 	Base::open (file);
+	cur_namespace_.clear ();
+	file_ = file;
 	*this << "// This file was generated from " << root.file ().filename () << endl;
 	*this << "// Nirvana IDL compiler version 1.0\n";
 }
@@ -56,80 +62,109 @@ void Code::close ()
 	Base::close ();
 }
 
+void Code::namespace_open (const char* ns)
+{
+	Namespaces nsv;
+	get_namespace (ns, nsv);
+	namespace_open (nsv);
+}
+
 void Code::namespace_open (const NamedItem& item)
 {
-	if (spec_namespace_)
-		namespace_close ();
 	auto p = item.parent ();
 	while (p && p->kind () != Item::Kind::MODULE)
 		p = p->parent ();
 
-	if (p != module_namespace_) {
-		Namespaces cur_namespaces, req_namespaces;
-		get_namespaces (module_namespace_, cur_namespaces);
-		get_namespaces (p, req_namespaces);
-		Namespaces::const_iterator cur = cur_namespaces.begin (), req = req_namespaces.begin ();
-		for (; cur != cur_namespaces.end () && req != req_namespaces.end (); ++cur, ++req) {
-			if (*cur != *req)
-				break;
-		}
-		empty_line ();
-		for (; cur != cur_namespaces.end (); ++cur) {
-			*this << "}\n";
-		}
-		empty_line ();
-		for (; req != req_namespaces.end (); ++req) {
-			*this << "namespace " << (*req)->name () << " {\n";
-		}
-		module_namespace_ = p;
-		*this << endl;
-	}
+	Namespaces ns;
+	get_namespace (p, ns);
+	namespace_open (ns);
 }
 
-void Code::get_namespaces (const NamedItem* item, Namespaces& namespaces)
+void Code::get_namespace (const NamedItem* item, Namespaces& ns)
 {
 	if (item) {
-		get_namespaces (item->parent (), namespaces);
-		namespaces.push_back (item);
+		assert (item->kind () == Item::Kind::MODULE);
+		get_namespace (item->parent (), ns);
+		ns.emplace_back (item->name ());
 	}
 }
 
-void Code::namespace_open (const char* spec_ns)
+void Code::get_namespace (const char* s, Namespaces& ns)
 {
-	if (module_namespace_)
-		namespace_close ();
-	if (spec_ns != spec_namespace_) {
-		empty_line ();
-		*this << spec_ns << endl;
-		spec_namespace_ = spec_ns;
+	if (s && *s) {
+		for (;;) {
+			const char* end = strchr (s, '/');
+			if (end) {
+				ns.emplace_back (s, end - s);
+				s = end + 1;
+			} else {
+				ns.emplace_back (s);
+				break;
+			}
+		}
 	}
 }
 
 void Code::namespace_close ()
 {
-	if (module_namespace_) {
-		do {
-			empty_line ();
-			*this << "}\n";
-			module_namespace_ = static_cast <const Module*> (module_namespace_->parent ());
-		} while (module_namespace_);
-		*this << endl;
-	} else if (spec_namespace_) {
+	if (!cur_namespace_.empty ()) {
 		empty_line ();
-		for (const char* s = spec_namespace_, *open; (open = strchr (s, '{')); s = open + 1) {
+		for (size_t cnt = cur_namespace_.size (); cnt; --cnt) {
 			*this << "}\n";
 		}
-		spec_namespace_ = nullptr;
+		cur_namespace_.clear ();
+	}
+}
+
+void Code::namespace_prefix (const AST::NamedItem* mod)
+{
+	Namespaces nsv;
+	get_namespace (mod, nsv);
+	namespace_prefix (nsv);
+}
+
+void Code::namespace_prefix (const char* ns)
+{
+	Namespaces nsv;
+	get_namespace (ns, nsv);
+	namespace_prefix (nsv);
+}
+
+void Code::namespace_open (const Namespaces& ns)
+{
+	Namespaces::const_iterator cur = cur_namespace_.begin (), req = ns.begin ();
+	for (; cur != cur_namespace_.end () && req != ns.end (); ++cur, ++req) {
+		if (*cur != *req)
+			break;
+	}
+	if (cur != cur_namespace_.end () || req != ns.end ()) {
+		empty_line ();
+		for (size_t cnt = cur_namespace_.end () - cur; cnt; --cnt) {
+			*this << "}\n";
+		}
+		cur_namespace_.erase (cur, cur_namespace_.end ());
+		empty_line ();
+		for (; req != ns.end (); ++req) {
+			*this << "namespace " << *req << " {\n";
+			cur_namespace_.push_back (*req);
+		}
 		*this << endl;
 	}
 }
 
-void Code::prefix_namespace (const char* pref)
+void Code::namespace_prefix (const Namespaces& ns)
 {
-	if (spec_namespace () != CodeGenBase::internal_namespace_) {
-		if (module_namespace ())
+	Namespaces::const_iterator cur = cur_namespace_.begin (), req = ns.begin ();
+	for (; cur != cur_namespace_.end () && req != ns.end (); ++cur, ++req) {
+		if (*cur != *req)
+			break;
+	}
+	if (req != ns.end ()) {
+		if (!cur_namespace_.empty () && req == ns.begin ())
 			*this << "::";
-		*this << pref;
+		for (; req != ns.end (); ++req) {
+			*this << *req << "::";
+		}
 	}
 }
 
@@ -210,33 +245,33 @@ Code& operator << (Code& stm, const Type& t)
 			stm << "void";
 			break;
 		case Type::Kind::BASIC_TYPE:
-			stm.prefix_namespace ("CORBA::");
+			stm.namespace_prefix ("CORBA");
 			stm << basic_types [(size_t)t.basic_type ()];
 			break;
 		case Type::Kind::NAMED_TYPE:
 			stm << CodeGenBase::QName (t.named_type ());
 			break;
 		case Type::Kind::STRING:
-			stm.prefix_namespace ("CORBA::Nirvana::");
+			stm.namespace_prefix ("CORBA/Nirvana");
 			if (t.string_bound ())
 				stm << "BoundedString <" << t.string_bound () << '>';
 			else
 				stm << "String";
 			break;
 		case Type::Kind::WSTRING:
-			stm.prefix_namespace ("CORBA::Nirvana::");
+			stm.namespace_prefix ("CORBA/Nirvana");
 			if (t.string_bound ())
 				stm << "BoundedWString <" << t.string_bound () << '>';
 			else
 				stm << "WString";
 			break;
 		case Type::Kind::FIXED:
-			stm.prefix_namespace ("CORBA::Nirvana::");
+			stm.namespace_prefix ("CORBA/Nirvana");
 			stm << "Fixed <" << t.fixed_digits () << ", " << t.fixed_scale () << '>';
 			break;
 		case Type::Kind::SEQUENCE: {
 			const Sequence& seq = t.sequence ();
-			stm.prefix_namespace ("CORBA::Nirvana::");
+			stm.namespace_prefix ("CORBA/Nirvana");
 			if (seq.bound ())
 				stm << "BoundedSequence <" << static_cast <const Type&> (t.sequence ()) << ", " << seq.bound ();
 			else

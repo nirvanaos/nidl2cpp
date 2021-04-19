@@ -45,7 +45,7 @@ void Servant::leaf (const Include& item)
 
 void Servant::begin (const Interface& itf)
 {
-	h_.namespace_open (internal_namespace_);
+	h_.namespace_open ("CORBA/Nirvana");
 	h_.empty_line ();
 
 	h_ << "template <class S>\n"
@@ -295,8 +295,10 @@ void Servant::leaf (const Attribute& att)
 		h_ << ");\n";
 		catch_block ();
 		h_.unindent ();
-		h_ << "}\n\n";
+		h_ << "}\n";
 	}
+
+	h_ << endl;
 }
 
 void Servant::servant_param (const Type& t, const string& name, Parameter::Attribute att)

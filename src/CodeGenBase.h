@@ -33,8 +33,6 @@ class CodeGenBase : public AST::CodeGen
 public:
 	static bool is_keyword (const AST::Identifier& id);
 	inline static const char protected_prefix_ [] = "_cxx_";
-	static const char internal_namespace_ [];
-	inline static const char typedef_prefix_ [] = "_TD_";
 
 	struct QName
 	{

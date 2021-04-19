@@ -27,6 +27,7 @@
 #define NIDL2CPP_CODE_H_
 
 #include <BE/IndentedOut.h>
+#include <string_view>
 
 // C++ code file output.
 class Code : public BE::IndentedOut
@@ -35,30 +36,24 @@ class Code : public BE::IndentedOut
 public:
 	Code ();
 	Code (const std::filesystem::path& file, const AST::Root& root);
+	~Code ();
 
 	void open (const std::filesystem::path& file, const AST::Root& root);
 	void close ();
 
 	void namespace_open (const AST::NamedItem& item);
-	void namespace_open (const char* spec_ns);
+	void namespace_open (const char* ns);
 	void namespace_close ();
 
-	const AST::NamedItem* module_namespace () const
+	typedef std::vector <std::string_view> Namespaces;
+
+	const Namespaces& cur_namespace () const
 	{
-		return module_namespace_;
+		return cur_namespace_;
 	}
 
-	const char* spec_namespace () const
-	{
-		return spec_namespace_;
-	}
-
-	bool no_namespace () const
-	{
-		return !module_namespace_ && !spec_namespace_;
-	}
-
-	void prefix_namespace (const char* pref);
+	void namespace_prefix (const char* pref);
+	void namespace_prefix (const AST::NamedItem* mod);
 
 	Code& operator << (short val)
 	{
@@ -129,12 +124,14 @@ public:
 	void check_digraph (char c);
 
 private:
-	typedef std::vector <const AST::NamedItem*> Namespaces;
-	void get_namespaces (const AST::NamedItem* item, Namespaces& namespaces);
+	void namespace_open (const Namespaces& ns);
+	void namespace_prefix (const Namespaces& ns);
+	static void get_namespace (const AST::NamedItem* item, Namespaces& ns);
+	static void get_namespace (const char* s, Namespaces& ns);
 
 private:
-	const AST::NamedItem* module_namespace_;
-	const char* spec_namespace_;
+	Namespaces cur_namespace_;
+	std::filesystem::path file_;
 };
 
 Code& operator << (Code& stm, char c);

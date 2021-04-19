@@ -89,7 +89,7 @@ void Client::type_code_decl (const NamedItem& item)
 
 void Client::type_code_def (const RepositoryId& rid)
 {
-	assert (cpp_.no_namespace ());
+	assert (cpp_.cur_namespace ().empty ());
 	const NamedItem& item = rid.item ();
 	if (is_pseudo (item))
 		return;
@@ -99,7 +99,7 @@ void Client::type_code_def (const RepositoryId& rid)
 	if (!nested (item))
 		cpp_ << "extern ";
 	cpp_ << "const Nirvana::ImportInterfaceT <CORBA::TypeCode>\n"
-		<< TypeCodeName (item) << " = { ::Nirvana::OLF_IMPORT_INTERFACE, ";
+		<< TypeCodeName (item) << " = { Nirvana::OLF_IMPORT_INTERFACE, ";
 
 	switch (item.kind ()) {
 		case Item::Kind::INTERFACE:
@@ -197,32 +197,37 @@ void Client::begin (const Interface& itf)
 	// Forward declarations
 	forward_interface (itf);
 
-	if (itf.interface_kind () != InterfaceKind::PSEUDO) {
+	if (itf.interface_kind () != InterfaceKind::PSEUDO)
 		type_code_def (itf);
 
-		h_.namespace_open (internal_namespace_);
-		h_.empty_line ();
-		h_ << "template <>\n"
-			"struct Type <" << QName (itf) << "> : ";
-		switch (itf.interface_kind ()) {
-			case InterfaceKind::LOCAL:
-				h_ << "TypeLocalObject";
-				break;
-			case InterfaceKind::ABSTRACT:
-				h_ << "TypeAbstractInterface";
-				break;
-			default:
-				h_ << "TypeObject";
-				break;
-		}
-		h_ << " < " << QName (itf) << ">\n"
-			"{\n";
+	h_.namespace_open ("CORBA/Nirvana");
+	h_.empty_line ();
+	h_ << "template <>\n"
+		"struct Type <" << QName (itf) << "> : ";
+	switch (itf.interface_kind ()) {
+		case InterfaceKind::LOCAL:
+			h_ << "TypeLocalObject";
+			break;
+		case InterfaceKind::ABSTRACT:
+			h_ << "TypeAbstractInterface";
+			break;
+		case InterfaceKind::UNCONSTRAINED:
+			h_ << "TypeObject";
+			break;
+		default:
+			h_ << "TypeItf";
+			break;
+	}
+	h_ << " < " << QName (itf) << ">\n"
+		"{";
+	if (itf.interface_kind () != InterfaceKind::PSEUDO) {
+		h_ << endl;
 		h_.indent ();
 		type_code_func (itf);
 		h_.unindent ();
-		h_ << "};\n";
 	}
-	h_.namespace_open (internal_namespace_);
+	h_ << "};\n";
+
 	h_.empty_line ();
 	h_ << "template <>\n"
 		"struct Definitions < " << QName (itf) << ">\n"
@@ -256,7 +261,7 @@ void Client::end (const Interface& itf)
 	}
 
 	// Bridge
-	h_.namespace_open (internal_namespace_);
+	h_.namespace_open ("CORBA/Nirvana");
 	h_.empty_line ();
 	h_ << "NIRVANA_BRIDGE_BEGIN (" << QName (itf) << ", \"" << itf.repository_id () << "\")\n";
 
@@ -586,7 +591,7 @@ void Client::implement (const Exception& item)
 	type_code_def (item);
 
 	// Define exception
-	assert (cpp_.no_namespace ());
+	assert (cpp_.cur_namespace ().empty ());
 	cpp_.empty_line ();
 	cpp_ << "NIRVANA_EXCEPTION_DEF (" << ParentName (item) << ", " << item.name () << ")\n\n";
 }
@@ -600,13 +605,14 @@ Code& Client::member_type_prefix (const Type& t)
 void Client::rep_id_of (const RepositoryId& rid)
 {
 	const NamedItem& item = rid.item ();
-	h_ << "template <>\n"
-		"const Char RepIdOf <" << QName (item) << ">::repository_id_ [] = \"" << rid.repository_id () << "\";\n\n";
+	if (!is_pseudo (item))
+		h_ << "template <>\n"
+			"const Char RepIdOf <" << QName (item) << ">::repository_id_ [] = \"" << rid.repository_id () << "\";\n\n";
 }
 
 void Client::define_type (const RepositoryId& rid, const Members& members, const char* suffix)
 {
-	h_.namespace_open (internal_namespace_);
+	h_.namespace_open ("CORBA/Nirvana");
 	h_.empty_line ();
 
 	rep_id_of (rid);
@@ -852,7 +858,7 @@ void Client::leaf (const Enum& item)
 
 void Client::implement (const Enum& item)
 {
-	h_.namespace_open (internal_namespace_);
+	h_.namespace_open ("CORBA/Nirvana");
 	h_.empty_line ();
 	rep_id_of (item);
 	h_ << "template <>\n"

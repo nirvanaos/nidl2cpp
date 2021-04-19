@@ -458,7 +458,7 @@ void Client::end (const Interface& itf)
 			default: {
 				const NamedItem& def = static_cast <const NamedItem&> (item);
 				h_ << "using ::CORBA::Nirvana::Definitions <" << itf.name () << ">::" << def.name () << ";\n";
-				if (RepositoryId::cast (&def))
+				if (itf.interface_kind () != InterfaceKind::PSEUDO && RepositoryId::cast (&def))
 					h_ << "using ::CORBA::Nirvana::Definitions <" << itf.name () << ">::_tc_" << def.name () << ";\n";
 			}
 		}
@@ -486,7 +486,9 @@ void Client::leaf (const Constant& item)
 {
 	h_namespace_open (item);
 
-	if (!nested (item))
+	if (nested (item))
+		h_ << "static ";
+	else
 		h_ << "extern ";
 	bool outline = constant (h_, item);
 	h_ << ' ' << item.name ();

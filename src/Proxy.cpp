@@ -261,13 +261,7 @@ void Proxy::end (const Interface& itf)
 
 	cpp_.namespace_open (internal_namespace_);
 	cpp_.empty_line ();
-	cpp_ << "IMPLEMENT_PROXY_FACTORY(";
-	{
-		auto parent = itf.parent ();
-		if (parent)
-			cpp_ << QName (*parent);
-	}
-	cpp_ << ", " << itf.name () << ");\n"
+	cpp_ << "IMPLEMENT_PROXY_FACTORY(" << ParentName (itf) << ", " << itf.name () << ");\n"
 		"\n"
 		"template <>\n"
 		"struct ProxyTraits < " << QName (itf) << ">\n"

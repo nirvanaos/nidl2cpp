@@ -182,7 +182,7 @@ void Client::leaf (const InterfaceDecl& itf)
 	forward_interface (itf);
 }
 
-void Client::type_code_func (const AST::NamedItem& item)
+void Client::type_code_func (const NamedItem& item)
 {
 	h_ << "static TypeCode_ptr type_code ()\n"
 		"{\n";
@@ -233,6 +233,61 @@ void Client::begin (const Interface& itf)
 		"struct Definitions < " << QName (itf) << ">\n"
 		"{\n";
 	h_.indent ();
+}
+
+inline
+void Client::native_itf_template (const Operation& op)
+{
+	// Generate template method for native Interface returning functions
+	if (is_native_interface (static_cast <const Type&> (op))) {
+		const Parameter* par_iid = nullptr;
+		for (auto it = op.begin (); it != op.end (); ++it) {
+			const Parameter& par = **it;
+			if (par.dereference_type ().tkind () == Type::Kind::STRING && par.name () == "interface_id") {
+				par_iid = &par;
+				break;
+			}
+		}
+
+		if (par_iid) {
+			// Generate template
+			h_ << "template <class I>\n"
+				"I_var <I> " << op.name () << " (";
+
+			auto it = op.begin ();
+			if (par_iid == *it)
+				++it;
+			if (it != op.end ()) {
+				h_ << Client::Param (**it) << ' ' << (*it)->name ();
+				++it;
+				for (; it != op.end (); ++it) {
+					if (par_iid != *it)
+						h_ << ", " << Client::Param (**it) << ' ' << (*it)->name ();
+				}
+			}
+
+			h_ << ")\n"
+				"{\n";
+			h_.indent ();
+			h_ << "return I_ptr <I> (static_cast <I*> (&" << op.name () << " (";
+			it = op.begin ();
+			if (par_iid == *it)
+				h_ << "I::repository_id_";
+			else
+				h_ << (*it)->name ();
+			++it;
+			for (; it != op.end (); ++it) {
+				h_ << ", ";
+				if (par_iid == *it)
+					h_ << "I::repository_id_";
+				else
+					h_ << (*it)->name ();
+			}
+			h_ << ")._retn ()));\n";
+			h_.unindent ();
+			h_ << "}\n";
+		}
+	}
 }
 
 void Client::end (const Interface& itf)
@@ -320,7 +375,8 @@ void Client::end (const Interface& itf)
 	}
 
 	h_ << "NIRVANA_BRIDGE_END ()\n"
-		"\n" // Client interface
+		"\n" 
+		// Client interface
 		"template <class T>\n"
 		"class Client <T, " << QName (itf) << "> :\n";
 	h_.indent ();
@@ -339,6 +395,8 @@ void Client::end (const Interface& itf)
 				const Operation& op = static_cast <const Operation&> (item);
 
 				h_ << Var (op) << ' ' << Signature (op) << ";\n";
+
+				native_itf_template (op);
 
 			} break;
 
@@ -437,6 +495,7 @@ void Client::end (const Interface& itf)
 
 	// Interface definition
 	h_.namespace_open (itf);
+	h_.empty_line ();
 	h_ << "class " << itf.name () << " : public CORBA::Nirvana::ClientInterface <" << itf.name ();
 	for (auto b : bases) {
 		h_ << ", " << QName (*b);

@@ -166,23 +166,50 @@ Code& operator << (Code& stm, const CodeGenBase::TypePrefix& t)
 
 Code& operator << (Code& stm, const CodeGenBase::ABI_ret& t)
 {
-	if (t.type.tkind () != Type::Kind::VOID)
-		return stm << CodeGenBase::TypePrefix (t.type) << "ABI_ret";
+	if (t.type.tkind () == Type::Kind::VOID)
+		stm << "void";
+	else if (CodeGenBase::is_ref_type (t.type))
+		stm << "Interface*";
+	else if (CodeGenBase::is_enum (t.type))
+		stm << "ABI_enum";
 	else
-		return stm << "void";
+		stm << CodeGenBase::TypePrefix (t.type) << "ABI_ret";
+	return stm;
 }
 
 Code& operator << (Code& stm, const CodeGenBase::ABI_param& t)
 {
-	stm << CodeGenBase::TypePrefix (t.type);
-	switch (t.att) {
-		case Parameter::Attribute::IN:
-			stm << "ABI_in";
-			break;
-		case Parameter::Attribute::OUT:
-		case Parameter::Attribute::INOUT:
-			stm << "ABI_out";
-			break;
+	if (CodeGenBase::is_ref_type (t.type)) {
+		switch (t.att) {
+			case Parameter::Attribute::IN:
+				stm << "Interface*";
+				break;
+			case Parameter::Attribute::OUT:
+			case Parameter::Attribute::INOUT:
+				stm << "Interface**";
+				break;
+		}
+	} else if (CodeGenBase::is_enum (t.type)) {
+		switch (t.att) {
+			case Parameter::Attribute::IN:
+				stm << "ABI_enum";
+				break;
+			case Parameter::Attribute::OUT:
+			case Parameter::Attribute::INOUT:
+				stm << "ABI_enum*";
+				break;
+		}
+	} else {
+		stm << CodeGenBase::TypePrefix (t.type);
+		switch (t.att) {
+			case Parameter::Attribute::IN:
+				stm << "ABI_in";
+				break;
+			case Parameter::Attribute::OUT:
+			case Parameter::Attribute::INOUT:
+				stm << "ABI_out";
+				break;
+		}
 	}
 	return stm;
 }
@@ -266,6 +293,10 @@ bool CodeGenBase::is_var_len (const Type& type)
 				case Item::Kind::VALUE_TYPE_DECL:
 				case Item::Kind::VALUE_BOX:
 					return true;
+
+				case Item::Kind::NATIVE:
+					return is_native_interface (item);
+
 				case Item::Kind::STRUCT:
 					return is_var_len (get_members (static_cast <const Struct&> (item)));
 					break;
@@ -317,16 +348,50 @@ bool CodeGenBase::is_pseudo (const NamedItem& item)
 bool CodeGenBase::is_ref_type (const Type& type)
 {
 	const Type& t = type.dereference_type ();
-	if (t.tkind () == Type::Kind::NAMED_TYPE) {
-		switch (t.named_type ().kind ()) {
-			case Item::Kind::INTERFACE_DECL:
-			case Item::Kind::INTERFACE:
-			case Item::Kind::VALUE_TYPE_DECL:
-			case Item::Kind::VALUE_TYPE:
-				return true;
-		}
+	switch (t.tkind ()) {
+		case Type::Kind::BASIC_TYPE:
+			switch (t.basic_type ()) {
+				case BasicType::OBJECT:
+				case BasicType::VALUE_BASE:
+					return true;
+			} break;
+		case Type::Kind::NAMED_TYPE:
+			switch (t.named_type ().kind ()) {
+				case Item::Kind::INTERFACE_DECL:
+				case Item::Kind::INTERFACE:
+				case Item::Kind::VALUE_TYPE_DECL:
+				case Item::Kind::VALUE_TYPE:
+					return true;
+
+				case Item::Kind::NATIVE:
+					return is_native_interface (t.named_type ());
+			} break;
 	}
 	return false;
+}
+
+bool CodeGenBase::is_native_interface (const Type& type)
+{
+	const Type& t = type.dereference_type ();
+	return t.tkind () == Type::Kind::NAMED_TYPE
+		&& t.named_type ().kind () == Item::Kind::NATIVE
+		&& is_native_interface (t.named_type ());
+}
+
+bool CodeGenBase::is_native_interface (const NamedItem& type)
+{
+	assert (type.kind () == Item::Kind::NATIVE);
+	if (type.name () == "Interface") {
+		const NamedItem* parent = type.parent ();
+		return parent && parent->kind () == Item::Kind::MODULE && parent->name () == "Nirvana";
+	}
+	return false;
+}
+
+bool CodeGenBase::is_enum (const Type& type)
+{
+	const Type& t = type.dereference_type ();
+	return t.tkind () == Type::Kind::NAMED_TYPE && t.named_type ().kind () == Item::Kind::ENUM;
 }
 
 void CodeGenBase::leaf (const UnionDecl&)

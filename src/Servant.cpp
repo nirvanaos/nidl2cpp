@@ -274,8 +274,7 @@ void Servant::leaf (const Attribute& att)
 	h_.indent ();
 	h_ << "return " << TypePrefix (att) << "ret (S::_implementation (_b)." << att.name () << " ());\n";
 	catch_block ();
-	h_ << "return " << ABI_ret (att);
-	h_ << " ();\n";
+	h_ << "return " << TypePrefix (att) << "ret ();\n";
 	h_.unindent ();
 	h_ << "}\n";
 

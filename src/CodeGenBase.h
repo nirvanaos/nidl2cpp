@@ -148,10 +148,10 @@ public:
 
 	static bool is_var_len (const AST::Type& type);
 	static bool is_var_len (const Members& members);
-
 	static bool is_pseudo (const AST::NamedItem& item);
-
 	static bool is_ref_type (const AST::Type& type);
+	static bool is_enum (const AST::Type& type);
+	static bool is_native_interface (const AST::Type& type);
 
 protected:
 	virtual void leaf (const AST::Include& item) {}
@@ -194,6 +194,8 @@ private:
 	}
 
 	static Members get_members (const AST::ItemContainer& cont, AST::Item::Kind member_kind);
+	
+	static bool is_native_interface (const AST::NamedItem& type);
 
 private:
 	static const char* const protected_names_ [];

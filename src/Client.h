@@ -119,6 +119,8 @@ private:
 	void implement (const AST::Union& item);
 	void implement (const AST::Enum& item);
 
+	void native_itf_template (const AST::Operation& op);
+
 private:
 	Header h_; // .h file
 	Code cpp_; // .cpp file.

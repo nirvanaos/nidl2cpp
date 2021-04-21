@@ -850,8 +850,18 @@ void Client::accessors (const Members& members, const char* prefix)
 		h_.indent ();
 		h_ << "return " << prefix << m->name () << ";\n";
 		h_.unindent ();
-		h_ << "}\n"
-			"void " << m->name () << " (" << TypePrefix (*m) << "ConstRef val)\n"
+		h_ << "}\n";
+
+		if (is_var_len (*m)) {
+			h_ << Var (*m) << "& " << m->name () << " ()\n"
+				"{\n";
+			h_.indent ();
+			h_ << "return " << prefix << m->name () << ";\n";
+			h_.unindent ();
+			h_ << "}\n";
+		}
+
+		h_ << "void " << m->name () << " (" << TypePrefix (*m) << "ConstRef val)\n"
 			"{\n";
 		h_.indent ();
 		h_ << prefix << m->name () << " = val;\n";

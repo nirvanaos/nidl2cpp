@@ -23,29 +23,27 @@
 * Send comments and/or bug reports to:
 *  popov.nirvana@gmail.com
 */
-#ifndef NIDL2CPP_COMPILER_H_
-#define NIDL2CPP_COMPILER_H_
+#ifndef NIDL2CPP_OPTIONS_H_
+#define NIDL2CPP_OPTIONS_H_
 
-#include <IDL_FrontEnd.h>
-#include "Options.h"
-
-class Compiler :
-	public IDL_FrontEnd,
-	public Options
+struct Options
 {
-private:
-	// Override print_usage_info for additional usage information.
-	virtual void print_usage_info (const char* exe_name);
+public:
+	Options () :
+		servant_suffix ("_s"),
+		proxy_suffix ("_p"),
+		client (true),
+		server (true),
+		proxy (true),
+		legacy (false)
+	{}
 
-	// Override parse_command_line to parse own command line switches.
-	virtual bool parse_command_line (CmdLine& args);
-
-	static const char* option (const char* arg, const char* opt);
-
-	// Override generate_code to build output from the AST.
-	virtual void generate_code (const AST::Root& tree);
-
-	std::filesystem::path out_file (const AST::Root& tree, const std::filesystem::path& dir, const std::string& suffix, const std::filesystem::path& ext) const;
+	std::filesystem::path out_h, out_cpp;
+	std::string client_suffix;
+	std::string servant_suffix;
+	std::string proxy_suffix;
+	bool client, server, proxy;
+	bool legacy;
 };
 
 #endif

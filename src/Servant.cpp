@@ -38,7 +38,7 @@ void Servant::end (const Root&)
 void Servant::leaf (const Include& item)
 {
 	h_ << "#include " << (item.system () ? '<' : '"')
-		<< path (path (item.file ()).replace_extension ("").string () + suffix_).replace_extension ("h").string ()
+		<< path (path (item.file ()).replace_extension ("").string () + options ().servant_suffix).replace_extension ("h").string ()
 		<< (item.system () ? '>' : '"')
 		<< endl;
 }

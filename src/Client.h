@@ -33,10 +33,11 @@
 class Client : public CodeGenBase
 {
 public:
-	Client (const std::filesystem::path& file_h, const std::filesystem::path& file_cpp, const AST::Root& root, const std::string& suffix) :
+	Client (const Options& options, const AST::Root& root,
+		const std::filesystem::path& file_h, const std::filesystem::path& file_cpp) :
+		CodeGenBase (options),
 		h_ (file_h, root),
-		cpp_ (file_cpp, root),
-		suffix_ (suffix)
+		cpp_ (file_cpp, root)
 	{
 		cpp_ << "#include <CORBA/CORBA.h>\n"
 			"#include <Nirvana/OLF.h>\n"
@@ -47,6 +48,7 @@ public:
 		else
 			cpp_ << std::filesystem::relative (file_h, cpp_dir);
 		cpp_  << std::endl;
+		initial_cpp_size_ = cpp_.size ();
 	}
 
 	struct Param
@@ -104,7 +106,7 @@ private:
 	void type_code_def (const AST::RepositoryId& rid);
 	static bool constant (Code& stm, const AST::Constant& item);
 	void rep_id_of (const AST::RepositoryId& rid);
-	void define_type (const AST::RepositoryId& rid, const Members& members, const char* suffix = "");
+	void define_structured_type (const AST::RepositoryId& rid, const Members& members, const char* suffix = "");
 	void type_code_func (const AST::NamedItem& item);
 	Code& member_type_prefix (const AST::Type& t);
 	void constructors_and_assignments (const AST::Identifier& name, const Members& members);
@@ -114,6 +116,7 @@ private:
 	static bool nested (const AST::NamedItem& item);
 	void h_namespace_open (const AST::NamedItem& item);
 
+	void implement_nested_items (const AST::ItemContainer& parent);
 	void implement (const AST::Exception& item);
 	void implement (const AST::Struct& item);
 	void implement (const AST::Union& item);
@@ -124,7 +127,7 @@ private:
 private:
 	Header h_; // .h file
 	Code cpp_; // .cpp file.
-	const std::string suffix_;
+	size_t initial_cpp_size_;
 };
 
 Code& operator << (Code& stm, const Client::Param& t);

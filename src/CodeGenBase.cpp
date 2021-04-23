@@ -337,6 +337,7 @@ bool CodeGenBase::is_pseudo (const NamedItem& item)
 					return true;
 			} break;
 
+			case Item::Kind::EXCEPTION:
 			case Item::Kind::MODULE:
 				return false;
 		}

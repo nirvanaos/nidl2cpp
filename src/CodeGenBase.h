@@ -27,6 +27,7 @@
 #define NIDL2CPP_CODEGENBASE_H_
 
 #include "Code.h"
+#include "Options.h"
 
 class CodeGenBase : public AST::CodeGen
 {
@@ -153,7 +154,16 @@ public:
 	static bool is_enum (const AST::Type& type);
 	static bool is_native_interface (const AST::Type& type);
 
+	const Options& options () const
+	{
+		return options_;
+	}
+
 protected:
+	CodeGenBase (const Options& options) :
+		options_ (options)
+	{}
+
 	virtual void leaf (const AST::Include& item) {}
 	virtual void leaf (const AST::Native&) {}
 	virtual void leaf (const AST::TypeDef& item) {}
@@ -199,6 +209,8 @@ private:
 
 private:
 	static const char* const protected_names_ [];
+
+	const Options& options_;
 };
 
 Code& operator << (Code& stm, const CodeGenBase::QName& qn);

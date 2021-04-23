@@ -50,7 +50,8 @@ void Compiler::print_usage_info (const char* exe_name)
 		"\t-proxy Generate the proxy code only.\n"
 		"\t-client_suffix suffix The suffix for client file names. Default is empty.\n"
 		"\t-server_suffix suffix The suffix for server file name. Default is _s.\n"
-		"\t-proxy_suffix suffix The suffix for proxy file name. Default is _p.\n";
+		"\t-proxy_suffix suffix The suffix for proxy file name. Default is _p.\n"
+		"\t-legacy Generate old C++ language mapping 1.3.\n";
 }
 
 const char* Compiler::option (const char* arg, const char* opt)
@@ -70,32 +71,34 @@ bool Compiler::parse_command_line (CmdLine& args)
 
 	const char* arg = nullptr;
 	if ((arg = option (args.arg (), "out_h")))
-		out_h_ = args.parameter (arg);
+		out_h = args.parameter (arg);
 	else if ((arg = option (args.arg (), "out_cpp")))
-		out_cpp_ = args.parameter (arg);
+		out_cpp = args.parameter (arg);
 	else if ((arg = option (args.arg (), "out")))
-		out_h_ = out_cpp_ = args.parameter (arg);
+		out_h = out_cpp = args.parameter (arg);
 	else if ((arg = option (args.arg (), "no_client")))
-		client_ = false;
+		client = false;
 	else if ((arg = option (args.arg (), "no_server")))
-		server_ = false;
+		server = false;
 	else if ((arg = option (args.arg (), "no_proxy")))
-		proxy_ = false;
+		proxy = false;
 	else if ((arg = option (args.arg (), "client"))) {
-		server_ = false;
-		proxy_ = false;
+		server = false;
+		proxy = false;
 	} else if ((arg = option (args.arg (), "server"))) {
-		client_ = false;
-		proxy_ = false;
+		client = false;
+		proxy = false;
 	} else if ((arg = option (args.arg (), "proxy"))) {
-		client_ = false;
-		server_ = false;
+		client = false;
+		server = false;
 	} else if ((arg = option (args.arg (), "client_suffix")))
-		client_suffix_ = args.parameter (arg);
+		client_suffix = args.parameter (arg);
 	else if ((arg = option (args.arg (), "server_suffix")))
-		servant_suffix_ = args.parameter (arg);
+		servant_suffix = args.parameter (arg);
 	else if ((arg = option (args.arg (), "proxy_suffix")))
-		proxy_suffix_ = args.parameter (arg);
+		proxy_suffix = args.parameter (arg);
+	else if ((arg = option (args.arg (), "legacy")))
+		legacy = true;
 
 	if (arg) {
 		args.next ();
@@ -116,19 +119,19 @@ path Compiler::out_file (const Root& tree, const path& dir, const string& suffix
 
 void Compiler::generate_code (const Root& tree)
 {
-	path client_h = out_file (tree, out_h_, client_suffix_, "h");
-	if (client_) {
-		path client_cpp = out_file (tree, out_cpp_, client_suffix_, "cpp");
-		Client client (client_h, client_cpp, tree, client_suffix_);
+	path client_h = out_file (tree, out_h, client_suffix, "h");
+	if (client) {
+		path client_cpp = out_file (tree, out_cpp, client_suffix, "cpp");
+		Client client (*this, tree, client_h, client_cpp);
 		tree.visit (client);
 	}
-	path servant_h = out_file (tree, out_h_, servant_suffix_, "h");
-	if (server_) {
-		Servant servant (servant_h, client_h, tree, servant_suffix_);
+	path servant_h = out_file (tree, out_h, servant_suffix, "h");
+	if (server) {
+		Servant servant (*this, tree, servant_h, client_h);
 		tree.visit (servant);
 	}
-	if (proxy_) {
-		Proxy proxy (out_file (tree, out_cpp_, proxy_suffix_, "cpp"), servant_h, tree);
+	if (proxy) {
+		Proxy proxy (*this, tree, out_file (tree, out_cpp, proxy_suffix, "cpp"), servant_h);
 		tree.visit (proxy);
 	}
 }

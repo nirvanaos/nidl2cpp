@@ -66,13 +66,15 @@ Code& operator << (Code& stm, const Client::Signature& op)
 void Client::end (const Root&)
 {
 	h_.close ();
-	cpp_.close ();
+	if (cpp_.size () > initial_cpp_size_)
+		cpp_.close ();
+	// Otherwise the .cpp file will be deleted.
 }
 
 void Client::leaf (const Include& item)
 {
 	h_ << "#include " << (item.system () ? '<' : '"')
-		<< path (path (item.file ()).replace_extension ("").string () + suffix_).replace_extension ("h").string ()
+		<< path (path (item.file ()).replace_extension ("").string () + options ().client_suffix).replace_extension ("h").string ()
 		<< (item.system () ? '>' : '"')
 		<< endl;
 }
@@ -296,24 +298,7 @@ void Client::end (const Interface& itf)
 	h_.unindent ();
 	h_ << "};\n";
 
-	// Implement nested items
-	for (auto it = itf.begin (); it != itf.end (); ++it) {
-		const Item& item = **it;
-		switch (item.kind ()) {
-			case Item::Kind::EXCEPTION:
-				implement (static_cast <const Exception&> (item));
-				break;
-			case Item::Kind::STRUCT:
-				implement (static_cast <const Struct&> (item));
-				break;
-			case Item::Kind::UNION:
-				implement (static_cast <const Union&> (item));
-				break;
-			case Item::Kind::ENUM:
-				implement (static_cast <const Enum&> (item));
-				break;
-		}
-	}
+	implement_nested_items (itf);
 
 	// Bridge
 	h_.namespace_open ("CORBA/Nirvana");
@@ -531,6 +516,27 @@ void Client::end (const Interface& itf)
 	h_ << "};\n";
 }
 
+void Client::implement_nested_items (const ItemContainer& parent)
+{
+	for (auto it = parent.begin (); it != parent.end (); ++it) {
+		const Item& item = **it;
+		switch (item.kind ()) {
+			case Item::Kind::EXCEPTION:
+				implement (static_cast <const Exception&> (item));
+				break;
+			case Item::Kind::STRUCT:
+				implement (static_cast <const Struct&> (item));
+				break;
+			case Item::Kind::UNION:
+				implement (static_cast <const Union&> (item));
+				break;
+			case Item::Kind::ENUM:
+				implement (static_cast <const Enum&> (item));
+				break;
+		}
+	}
+}
+
 void Client::environment (const Raises& raises)
 {
 	if (raises.empty ())
@@ -646,13 +652,18 @@ void Client::end (const Exception& item)
 void Client::implement (const Exception& item)
 {
 	Members members = get_members (item);
-	define_type (item, members, "::_Data");
+	if (!members.empty ())
+		define_structured_type (item, members, "::_Data");
+	else
+		rep_id_of (item);
 	type_code_def (item);
 
 	// Define exception
 	assert (cpp_.cur_namespace ().empty ());
 	cpp_.empty_line ();
 	cpp_ << "NIRVANA_EXCEPTION_DEF (" << ParentName (item) << ", " << item.name () << ")\n\n";
+
+	implement_nested_items (item);
 }
 
 Code& Client::member_type_prefix (const Type& t)
@@ -664,16 +675,16 @@ Code& Client::member_type_prefix (const Type& t)
 void Client::rep_id_of (const RepositoryId& rid)
 {
 	const NamedItem& item = rid.item ();
-	if (!is_pseudo (item))
+	if (!is_pseudo (item)) {
+		h_.namespace_open ("CORBA/Nirvana");
+		h_.empty_line ();
 		h_ << "template <>\n"
 			"const Char RepIdOf <" << QName (item) << ">::repository_id_ [] = \"" << rid.repository_id () << "\";\n\n";
+	}
 }
 
-void Client::define_type (const RepositoryId& rid, const Members& members, const char* suffix)
+void Client::define_structured_type (const RepositoryId& rid, const Members& members, const char* suffix)
 {
-	h_.namespace_open ("CORBA/Nirvana");
-	h_.empty_line ();
-
 	rep_id_of (rid);
 
 	const NamedItem& item = rid.item ();
@@ -756,7 +767,7 @@ void Client::define_type (const RepositoryId& rid, const Members& members, const
 		h_.unindent ();
 		h_ << "};\n";
 	} else {
-		h_ << "TypeFixLen < " << QName (item) << suffix << "> {};\n";
+		h_ << "TypeByRef < " << QName (item) << suffix << "> {};\n";
 	}
 }
 
@@ -803,9 +814,10 @@ void Client::end (const Struct& item)
 void Client::implement (const Struct& item)
 {
 	Members members = get_members (item);
-	define_type (item, members);
+	define_structured_type (item, members);
 	backward_compat_var (item);
 	type_code_def (item);
+	implement_nested_items (item);
 }
 
 void Client::constructors_and_assignments (const Identifier& name, const Members& members)
@@ -903,6 +915,7 @@ const char* Client::default_value (const Type& t)
 void Client::implement (const Union& item)
 {
 	// TODO:: Implement
+	implement_nested_items (item);
 }
 
 void Client::leaf (const Enum& item)
@@ -927,8 +940,6 @@ void Client::leaf (const Enum& item)
 
 void Client::implement (const Enum& item)
 {
-	h_.namespace_open ("CORBA/Nirvana");
-	h_.empty_line ();
 	rep_id_of (item);
 	h_ << "template <>\n"
 		"struct Type <" << QName (item) << "> : public TypeEnum <" << QName (item)

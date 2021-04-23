@@ -33,9 +33,10 @@
 class Servant : public CodeGenBase
 {
 public:
-	Servant (const std::filesystem::path& file, const std::filesystem::path& client, const AST::Root& root, const std::string& suffix) :
-		h_ (file, root),
-		suffix_ (suffix)
+	Servant (const Options& options, const AST::Root& root,
+		const std::filesystem::path& file, const std::filesystem::path& client) :
+		CodeGenBase (options),
+		h_ (file, root)
 	{
 		h_ << "#include " << client.filename () << std::endl << std::endl;
 	}
@@ -63,7 +64,6 @@ private:
 
 private:
 	Header h_;
-	const std::string suffix_;
 	std::vector<std::string> epv_;
 };
 

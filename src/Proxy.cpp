@@ -174,7 +174,7 @@ void Proxy::implement (const Operation& op)
 		bool marshal = is_var_len (params_out) || is_var_len (op);
 		const char* m_param = marshal ? "_m" : "Marshal::_nil ()";
 		if (marshal)
-			cpp_ << "Marshal_var _m = _call->marshaler ();\n";
+			cpp_ << "Marshal_ptr _m = _call->marshaler ();\n";
 		
 		cpp_ << type_out << "& _out = *(" << type_out << "*)_out_ptr;\n";
 		for (auto p : params_out) {
@@ -224,7 +224,7 @@ void Proxy::implement (const Attribute& att)
 
 	bool marshal = is_var_len (att);
 	if (marshal)
-		cpp_ << "Marshal_var _m = _call->marshaler ()";
+		cpp_ << "Marshal_ptr _m = _call->marshaler ()";
 	cpp_ << ";\n";
 	cpp_ << TypePrefix (att) << "marshal_out (_ret, " << (marshal ? "_m" : "Marshal::_nil ()") << " , *(" << att_abi << "*)_out_ptr);\n";
 

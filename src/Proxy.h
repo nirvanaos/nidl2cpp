@@ -33,7 +33,9 @@
 class Proxy : public CodeGenBase
 {
 public:
-	Proxy (const std::filesystem::path& file, const std::filesystem::path& servant, const AST::Root& root) :
+	Proxy (const Options& options, const AST::Root& root,
+		const std::filesystem::path& file, const std::filesystem::path& servant) :
+		CodeGenBase (options),
 		cpp_ (file, root)
 	{
 		cpp_ << "#include <CORBA/Proxy/Proxy.h>\n"

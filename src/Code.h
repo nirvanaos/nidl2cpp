@@ -53,7 +53,8 @@ public:
 	}
 
 	void namespace_prefix (const char* pref);
-	void namespace_prefix (const AST::NamedItem* mod);
+	void namespace_prefix (const AST::NamedItem& item);
+	void namespace_prefix (const AST::Module* mod);
 
 	Code& operator << (short val)
 	{
@@ -121,12 +122,18 @@ public:
 		return *this;
 	}
 
+	Code& operator << (Code& (*func)(Code&))
+	{
+		return (func) (*this);
+	}
+
 	void check_digraph (char c);
 
 private:
 	void namespace_open (const Namespaces& ns);
 	void namespace_prefix (const Namespaces& ns);
-	static void get_namespace (const AST::NamedItem* item, Namespaces& ns);
+	static void get_namespace (const AST::NamedItem& item, Namespaces& ns);
+	static void get_namespace (const AST::Module* item, Namespaces& ns);
 	static void get_namespace (const char* s, Namespaces& ns);
 
 private:

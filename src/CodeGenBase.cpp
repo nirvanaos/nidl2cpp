@@ -140,7 +140,7 @@ Code& operator << (Code& stm, const CodeGenBase::ParentName& qn)
 	if (parent) {
 		Item::Kind pk = parent->kind ();
 		if (pk == Item::Kind::MODULE) {
-			stm.namespace_prefix (parent);
+			stm.namespace_prefix (static_cast <const Module*> (parent));
 		} else {
 			if (Item::Kind::INTERFACE == pk || Item::Kind::VALUE_TYPE == pk) {
 				stm.namespace_prefix ("CORBA/Nirvana");
@@ -249,6 +249,18 @@ Code& operator << (Code& stm, const CodeGenBase::ServantOp& op)
 		}
 	}
 	return stm << ')';
+}
+
+Code& operator << (Code& stm, const CodeGenBase::Namespace& ns)
+{
+	stm.namespace_prefix (ns.prefix);
+	return stm;
+}
+
+Code& operator << (Code& stm, const CodeGenBase::ItemNamespace& ns)
+{
+	stm.namespace_prefix (ns.item);
+	return stm;
 }
 
 CodeGenBase::Members CodeGenBase::get_members (const ItemContainer& cont, Item::Kind member_kind)

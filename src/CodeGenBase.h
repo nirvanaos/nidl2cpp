@@ -130,6 +130,24 @@ public:
 		const AST::Operation& op;
 	};
 
+	struct Namespace
+	{
+		Namespace (const char* ns) :
+			prefix (ns)
+		{}
+
+		const char* prefix;
+	};
+
+	struct ItemNamespace
+	{
+		ItemNamespace (const AST::NamedItem& ni) :
+			item (ni)
+		{}
+
+		const AST::NamedItem& item;
+	};
+
 	typedef std::vector <const AST::Member*> Members;
 
 	static Members get_members (const AST::Struct& cont)
@@ -163,6 +181,24 @@ protected:
 	CodeGenBase (const Options& options) :
 		options_ (options)
 	{}
+
+	static Code& indent (Code& stm)
+	{
+		stm.indent ();
+		return stm;
+	}
+
+	static Code& unindent (Code& stm)
+	{
+		stm.unindent ();
+		return stm;
+	}
+
+	static Code& empty_line (Code& stm)
+	{
+		stm.empty_line ();
+		return stm;
+	}
 
 	virtual void leaf (const AST::Include& item) {}
 	virtual void leaf (const AST::Native&) {}
@@ -222,5 +258,7 @@ Code& operator << (Code& stm, const CodeGenBase::Var& t);
 Code& operator << (Code& stm, const CodeGenBase::TypeCodeName& t);
 Code& operator << (Code& stm, const CodeGenBase::ServantParam& t);
 Code& operator << (Code& stm, const CodeGenBase::ServantOp& t);
+Code& operator << (Code& stm, const CodeGenBase::Namespace& ns);
+Code& operator << (Code& stm, const CodeGenBase::ItemNamespace& ns);
 
 #endif

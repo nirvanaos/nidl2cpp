@@ -86,7 +86,7 @@ void Client::type_code_decl (const NamedItem& item)
 
 	if (!nested (item))
 		h_ << "extern ";
-	h_ << "const ::Nirvana::ImportInterfaceT < ::CORBA::TypeCode> _tc_" << static_cast <const string&> (item.name ()) << ";\n";
+	h_ << "const " << Namespace ("Nirvana") << "ImportInterfaceT <" << Namespace ("CORBA") << "TypeCode> _tc_" << static_cast <const string&> (item.name ()) << ";\n";
 }
 
 void Client::type_code_def (const RepositoryId& rid)
@@ -100,7 +100,7 @@ void Client::type_code_def (const RepositoryId& rid)
 	cpp_ << "NIRVANA_OLF_SECTION ";
 	if (!nested (item))
 		cpp_ << "extern ";
-	cpp_ << "const Nirvana::ImportInterfaceT <CORBA::TypeCode>\n"
+	cpp_ << "const " << Namespace ("Nirvana") << "ImportInterfaceT <" << Namespace ("CORBA") << "TypeCode>\n"
 		<< TypeCodeName (item) << " = { Nirvana::OLF_IMPORT_INTERFACE, ";
 
 	switch (item.kind ()) {
@@ -146,19 +146,26 @@ void Client::leaf (const TypeDef& item)
 			break;
 
 		default:
+			h_ <<
+				"#ifdef LEGACY_CORBA_CPP\n"
+				"typedef " << static_cast <const string&> (item.named_type ().name ()) << "_var "
+				<< static_cast <const string&> (item.name ()) << "_var;\n";
+
 			if (is_ref_type (item))
 				h_ << "typedef " << static_cast <const string&> (item.named_type ().name ()) << "_ptr "
 				<< static_cast <const string&> (item.name ()) << "_ptr;\n";
-
-			h_ << "typedef " << static_cast <const string&> (item.named_type ().name ()) << "_var "
-				<< static_cast <const string&> (item.name ()) << "_var;\n";
+			h_ << "#endif\n";
 	}
 }
 
 void Client::backward_compat_var (const NamedItem& item)
 {
 	h_.namespace_open (item);
-	h_ << "typedef ::CORBA::Nirvana::Type <" << item.name () << ">::C_var " << static_cast <const string&> (item.name ()) << "_var;\n";
+	h_ <<
+		"#ifdef LEGACY_CORBA_CPP\n"
+		"typedef " << Namespace ("CORBA/Nirvana") << "Type <" << item.name () << ">::C_var " << static_cast <const string&> (item.name ()) << "_var;\n"
+		"typedef " << static_cast <const string&> (item.name ()) << "_var& " << static_cast <const string&> (item.name ()) << "_out;\n"
+		"#endif\n";
 }
 
 void Client::forward_decl (const NamedItem& item)
@@ -173,10 +180,14 @@ void Client::forward_interface (const NamedItem& item)
 {
 	forward_decl (item);
 
-	h_ << "typedef ::CORBA::Nirvana::TypeItf <" << item.name () << ">::C_ptr "
+	h_ <<
+		"#ifdef LEGACY_CORBA_CPP\n"
+		"typedef " << Namespace ("CORBA/Nirvana") << "TypeItf <" << item.name () << ">::C_ptr "
 		<< static_cast <const string&> (item.name ()) << "_ptr;\n"
-		"typedef ::CORBA::Nirvana::TypeItf <" << item.name () << ">::C_var "
-		<< static_cast <const string&> (item.name ()) << "_var;\n";
+		"typedef " << Namespace ("CORBA/Nirvana") << "TypeItf <" << item.name () << ">::C_var "
+		<< static_cast <const string&> (item.name ()) << "_var;\n"
+		"typedef " << static_cast <const string&> (item.name ()) << "_var& " << static_cast <const string&> (item.name ()) << "_out;\n"
+		"#endif\n";
 }
 
 void Client::leaf (const InterfaceDecl& itf)
@@ -186,7 +197,7 @@ void Client::leaf (const InterfaceDecl& itf)
 
 void Client::type_code_func (const NamedItem& item)
 {
-	h_ << "static TypeCode_ptr type_code ()\n"
+	h_ << "static I_ptr <TypeCode> type_code ()\n"
 		"{\n";
 	h_.indent ();
 	h_ << "return " << TypeCodeName (item) << ";\n";
@@ -271,7 +282,7 @@ void Client::native_itf_template (const Operation& op)
 			h_ << ")\n"
 				"{\n";
 			h_.indent ();
-			h_ << "return I_ptr <I> (static_cast <I*> (&" << op.name () << " (";
+			h_ << "return I_ptr <I> (static_cast <I*> (&Interface::_ptr_type (" << op.name () << " (";
 			it = op.begin ();
 			if (par_iid == *it)
 				h_ << "I::repository_id_";
@@ -285,7 +296,7 @@ void Client::native_itf_template (const Operation& op)
 				else
 					h_ << (*it)->name ();
 			}
-			h_ << ")._retn ()));\n";
+			h_ << "))));\n";
 			h_.unindent ();
 			h_ << "}\n";
 		}
@@ -360,16 +371,18 @@ void Client::end (const Interface& itf)
 	}
 
 	h_ << "NIRVANA_BRIDGE_END ()\n"
-		"\n" 
+		"\n"
 		// Client interface
 		"template <class T>\n"
-		"class Client <T, " << QName (itf) << "> :\n";
-	h_.indent ();
-	h_ << "public T,\n"
-		"public Definitions <" << QName (itf) << ">\n";
-	h_.unindent ();
-	h_ << "{\n"
+		"class Client <T, " << QName (itf) << "> :\n"
+		<< indent
+		<< "public T,\n"
+		"public Definitions <" << QName (itf) << ">\n"
+		<< unindent
+		<<
+		"{\n"
 		"public:\n";
+
 	h_.indent ();
 
 	for (auto it = itf.begin (); it != itf.end (); ++it) {
@@ -481,17 +494,17 @@ void Client::end (const Interface& itf)
 	// Interface definition
 	h_.namespace_open (itf);
 	h_.empty_line ();
-	h_ << "class " << itf.name () << " : public CORBA::Nirvana::ClientInterface <" << itf.name ();
+	h_ << "class " << itf.name () << " : public " << Namespace ("CORBA/Nirvana") << "ClientInterface <" << itf.name ();
 	for (auto b : bases) {
 		h_ << ", " << QName (*b);
 	}
 	switch (itf.interface_kind ()) {
 		case InterfaceKind::UNCONSTRAINED:
 		case InterfaceKind::LOCAL:
-			h_ << ", ::CORBA::Object";
+			h_ << ", " << Namespace ("CORBA") << "Object";
 			break;
 		case InterfaceKind::ABSTRACT:
-			h_ << ", ::CORBA::AbstractBase";
+			h_ << ", " << Namespace ("CORBA") << "AbstractBase";
 			break;
 	}
 	h_ << ">\n"
@@ -506,9 +519,9 @@ void Client::end (const Interface& itf)
 				break;
 			default: {
 				const NamedItem& def = static_cast <const NamedItem&> (item);
-				h_ << "using ::CORBA::Nirvana::Definitions <" << itf.name () << ">::" << def.name () << ";\n";
+				h_ << "using " << Namespace ("CORBA/Nirvana") << "Definitions <" << itf.name () << ">::" << def.name () << ";\n";
 				if (itf.interface_kind () != InterfaceKind::PSEUDO && RepositoryId::cast (&def))
-					h_ << "using ::CORBA::Nirvana::Definitions <" << itf.name () << ">::_tc_" << def.name () << ";\n";
+					h_ << "using " << Namespace ("CORBA/Nirvana") << "Definitions <" << itf.name () << ">::_tc_" << def.name () << ";\n";
 			}
 		}
 	}
@@ -596,7 +609,7 @@ void Client::begin (const Exception& item)
 {
 	h_namespace_open (item);
 	h_.empty_line ();
-	h_ << "class " << item.name () << " : public ::CORBA::UserException\n"
+	h_ << "class " << item.name () << " : public " << Namespace ("CORBA") << "UserException\n"
 		"{\n"
 		"public:\n";
 	h_.indent ();
@@ -799,7 +812,7 @@ void Client::end (const Struct& item)
 	h_.empty_line ();
 	h_ << "private:\n";
 	h_.indent ();
-	h_ << "friend struct ::CORBA::Nirvana::Type <" << item.name () << ">;\n";
+	h_ << "friend struct " << Namespace ("CORBA/Nirvana") << "Type <" << item.name () << ">;\n";
 	member_variables (members);
 	h_.unindent ();
 	h_ << "};\n";
@@ -922,7 +935,7 @@ void Client::leaf (const Enum& item)
 {
 	h_namespace_open (item);
 	h_.empty_line ();
-	h_ << "enum class " << item.name () << " : ::CORBA::Nirvana::ABI_enum\n"
+	h_ << "enum class " << item.name () << " : " << Namespace ("CORBA/Nirvana") << "ABI_enum\n"
 		"{\n";
 	h_.indent ();
 	auto it = item.begin ();

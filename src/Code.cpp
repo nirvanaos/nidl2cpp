@@ -71,21 +71,26 @@ void Code::namespace_open (const char* ns)
 
 void Code::namespace_open (const NamedItem& item)
 {
+	Namespaces ns;
+	get_namespace (item, ns);
+	namespace_open (ns);
+}
+
+void Code::get_namespace (const NamedItem& item, Namespaces& ns)
+{
 	auto p = item.parent ();
 	while (p && p->kind () != Item::Kind::MODULE)
 		p = p->parent ();
 
-	Namespaces ns;
-	get_namespace (p, ns);
-	namespace_open (ns);
+	get_namespace (static_cast <const Module*> (p), ns);
 }
 
-void Code::get_namespace (const NamedItem* item, Namespaces& ns)
+void Code::get_namespace (const Module* mod, Namespaces& ns)
 {
-	if (item) {
-		assert (item->kind () == Item::Kind::MODULE);
-		get_namespace (item->parent (), ns);
-		ns.emplace_back (item->name ());
+	if (mod) {
+		assert (mod->kind () == Item::Kind::MODULE);
+		get_namespace (static_cast <const Module*> (mod->parent ()), ns);
+		ns.emplace_back (mod->name ());
 	}
 }
 
@@ -116,11 +121,18 @@ void Code::namespace_close ()
 	}
 }
 
-void Code::namespace_prefix (const AST::NamedItem* mod)
+void Code::namespace_prefix (const AST::NamedItem& item)
 {
-	Namespaces nsv;
-	get_namespace (mod, nsv);
-	namespace_prefix (nsv);
+	Namespaces ns;
+	get_namespace (item, ns);
+	namespace_prefix (ns);
+}
+
+void Code::namespace_prefix (const Module* mod)
+{
+	Namespaces ns;
+	get_namespace (mod, ns);
+	namespace_prefix (ns);
 }
 
 void Code::namespace_prefix (const char* ns)

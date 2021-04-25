@@ -235,7 +235,7 @@ void Client::begin (const Interface& itf)
 			h_ << "TypeItf";
 			break;
 	}
-	h_ << " < " << QName (itf) << ">\n"
+	h_ << " <" << QName (itf) << ">\n"
 		"{";
 	if (itf.interface_kind () != InterfaceKind::PSEUDO) {
 		h_ << endl;
@@ -269,7 +269,7 @@ void Client::native_itf_template (const Operation& op)
 		if (par_iid) {
 			// Generate template
 			h_ << "template <class I>\n"
-				"I_var <I> " << op.name () << " (";
+				"typename TypeItf <I>::Var " << op.name () << " (";
 
 			auto it = op.begin ();
 			if (par_iid == *it)
@@ -286,7 +286,7 @@ void Client::native_itf_template (const Operation& op)
 			h_ << ")\n"
 				"{\n";
 			h_.indent ();
-			h_ << "return I_ptr <I> (static_cast <I*> (&Interface::_ptr_type (" << op.name () << " (";
+			h_ << "return " << op.name () << " (";
 			it = op.begin ();
 			if (par_iid == *it)
 				h_ << "I::repository_id_";
@@ -300,7 +300,7 @@ void Client::native_itf_template (const Operation& op)
 				else
 					h_ << (*it)->name ();
 			}
-			h_ << "))));\n";
+			h_ << ").downcast <I> ();\n";
 			h_.unindent ();
 			h_ << "}\n";
 		}
@@ -625,6 +625,17 @@ void Client::end (const Exception& item)
 	Members members = get_members (item);
 	if (!members.empty ()) {
 
+		// Explicit constructor
+		explicit_constructor (item.name (), members);
+		h_.indent ();
+		auto it = members.begin ();
+		h_ << "_data (std::move (" << (*it)->name () << ')';
+		for (++it; it != members.end (); ++it) {
+			h_ << ", std::move (" << (*it)->name () << ')';
+		}
+		h_.unindent ();
+		h_ << ")\n{}\n";
+
 		// Accessors to members of _data
 		accessors (members, "_data._");
 
@@ -844,9 +855,9 @@ void Client::constructors_and_assignments (const Identifier& name, const Members
 	h_ << name << " () :\n";
 	h_.indent ();
 	auto it = members.begin ();
-	h_ << MemberInit (**it);
+	h_ << MemberDefault (**it);
 	for (++it; it != members.end (); ++it) {
-		h_ << ",\n" << MemberInit (**it);
+		h_ << ",\n" << MemberDefault (**it);
 	}
 	h_.unindent ();
 	h_ << "\n{}\n";
@@ -856,6 +867,27 @@ void Client::constructors_and_assignments (const Identifier& name, const Members
 		<< name << " (" << name << "&&) = default;\n"
 		<< name << "& operator = (const " << name << "&) = default;\n"
 		<< name << "& operator = (" << name << "&&) = default;\n";
+
+	explicit_constructor (name, members);
+	h_.indent ();
+	it = members.begin ();
+	h_ << MemberInit (**it);
+	for (++it; it != members.end (); ++it) {
+		h_ << ",\n" << MemberInit (**it);
+	}
+	h_.unindent ();
+	h_ << "\n{}\n";
+}
+
+void Client::explicit_constructor (const AST::Identifier& name, const Members& members)
+{
+	h_ << "explicit " << name << " (";
+	auto it = members.begin ();
+	h_ << Var (**it) << ' ' << (*it)->name ();
+	for (++it; it != members.end (); ++it) {
+		h_ << ", " << Var (**it) << ' ' << (*it)->name ();
+	}
+	h_ << ") :\n";
 }
 
 void Client::accessors (const Members& members, const char* prefix)
@@ -907,7 +939,7 @@ void Client::member_variables (const Members& members)
 	}
 }
 
-Code& operator << (Code& stm, const Client::MemberInit& m)
+Code& operator << (Code& stm, const Client::MemberDefault& m)
 {
 	stm << '_' << static_cast <const string&> (m.member.name ()) << " (";
 	const Type& td = m.member.dereference_type ();
@@ -928,6 +960,13 @@ Code& operator << (Code& stm, const Client::MemberInit& m)
 		} break;
 	}
 	return stm << ')';
+}
+
+Code& operator << (Code& stm, const Client::MemberInit& m)
+{
+	stm << '_' << static_cast <const string&> (m.member.name ()) << " (std::move ("
+		<< m.member.name () << "))";
+	return stm;
 }
 
 void Client::implement (const Union& item)

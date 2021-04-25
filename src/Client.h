@@ -76,6 +76,15 @@ public:
 		const AST::Operation& op;
 	};
 
+	struct MemberDefault
+	{
+		MemberDefault (const AST::Member& m) :
+			member (m)
+		{}
+
+		const AST::Member& member;
+	};
+
 	struct MemberInit
 	{
 		MemberInit (const AST::Member& m) :
@@ -119,6 +128,7 @@ private:
 	void type_code_func (const AST::NamedItem& item);
 	Code& member_type_prefix (const AST::Type& t);
 	void constructors_and_assignments (const AST::Identifier& name, const Members& members);
+	void explicit_constructor (const AST::Identifier& name, const Members& members);
 	void accessors (const Members& members, const char* prefix = "_");
 	void member_variables (const Members& members);
 	static bool nested (const AST::NamedItem& item);
@@ -140,6 +150,7 @@ private:
 
 Code& operator << (Code& stm, const Client::Param& t);
 Code& operator << (Code& stm, const Client::Signature& op);
+Code& operator << (Code& stm, const Client::MemberDefault& val);
 Code& operator << (Code& stm, const Client::MemberInit& val);
 
 #endif

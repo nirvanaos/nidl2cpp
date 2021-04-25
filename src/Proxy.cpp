@@ -352,7 +352,7 @@ void Proxy::end (const Interface& itf)
 
 				if (has_out)
 					cpp_ << "Traits::" << static_cast <const string&> (op.name ()) << "_out _out;\n";
-				cpp_ << "Unmarshal_var _u = _target ()->call (::CORBA::Nirvana::OperationIndex { _interface_idx (), " << (metadata.size () - 1) << " }, ";
+				cpp_ << "Unmarshal_var _u = _target ()->call (_make_op_idx (" << (metadata.size () - 1) << "), ";
 				if (!op_md.params_in.empty ())
 					cpp_ << "&_in, sizeof (_in)";
 				else
@@ -396,7 +396,7 @@ void Proxy::end (const Interface& itf)
 
 				cpp_ << "Traits::" << static_cast <const string&> (att.name ()) << "_att _out;\n"
 					"Marshal_var _m;\n";
-				cpp_ << "Unmarshal_var _u = _target ()->call (::CORBA::Nirvana::OperationIndex { _interface_idx (), " << (metadata.size () - 1) << " }, 0, 0, _m, ";
+				cpp_ << "Unmarshal_var _u = _target ()->call (_make_op_idx (" << (metadata.size () - 1) << "), 0, 0, _m, ";
 				cpp_ << "&_out, sizeof (_out)";
 				cpp_ << ");\n";
 
@@ -431,8 +431,8 @@ void Proxy::end (const Interface& itf)
 
 					cpp_ << TypePrefix (att) << "marshal_in (val, _m, _in);\n";
 
-					cpp_ << "Unmarshal_var _u = _target ()->call (::CORBA::Nirvana::OperationIndex { _interface_idx (), " << (metadata.size () - 1)
-						<< " }, &_in, sizeof (_in), _m, 0, 0);\n";
+					cpp_ << "Unmarshal_var _u = _target ()->call (_make_op_idx (" << (metadata.size () - 1)
+						<< "), &_in, sizeof (_in), _m, 0, 0);\n";
 
 					cpp_.unindent ();
 					cpp_ << "}\n\n";

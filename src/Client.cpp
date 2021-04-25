@@ -139,17 +139,21 @@ void Client::leaf (const TypeDef& item)
 
 	// <Type>_var
 	switch (item.tkind ()) {
-		case Type::Kind::ARRAY:
-		case Type::Kind::SEQUENCE:
 		case Type::Kind::STRING:
+		case Type::Kind::WSTRING:
+		case Type::Kind::FIXED:
+		case Type::Kind::SEQUENCE:
+		case Type::Kind::ARRAY:
 			backward_compat_var (item);
 			break;
 
-		default:
+		case Type::Kind::NAMED_TYPE:
 			h_ <<
 				"#ifdef LEGACY_CORBA_CPP\n"
 				"typedef " << static_cast <const string&> (item.named_type ().name ()) << "_var "
-				<< static_cast <const string&> (item.name ()) << "_var;\n";
+				<< static_cast <const string&> (item.name ()) << "_var;\n"
+				"typedef " << static_cast <const string&> (item.named_type ().name ()) << "_out "
+				<< static_cast <const string&> (item.name ()) << "_out;\n";
 
 			if (is_ref_type (item))
 				h_ << "typedef " << static_cast <const string&> (item.named_type ().name ()) << "_ptr "
@@ -835,26 +839,16 @@ void Client::implement (const Struct& item)
 
 void Client::constructors_and_assignments (const Identifier& name, const Members& members)
 {
+	assert (!members.empty ());
 	// Default constructor
-	h_ << name << " ()";
-	const char* def_val = nullptr;
+	h_ << name << " () :\n";
+	h_.indent ();
 	auto it = members.begin ();
-	for (; it != members.end (); ++it) {
-		if ((def_val = default_value (**it)))
-			break;
+	h_ << MemberInit (**it);
+	for (++it; it != members.end (); ++it) {
+		h_ << ",\n" << MemberInit (**it);
 	}
-	if (def_val) {
-		h_ << " :\n";
-		h_.indent ();
-		h_ << '_' << (*it)->name () << " (" << def_val << ')';
-		for (++it; it != members.end (); ++it) {
-			if ((def_val = default_value (**it))) {
-				h_ << ",\n"
-					<< '_' << (*it)->name () << " (" << def_val << ')';
-			}
-		}
-		h_.unindent ();
-	}
+	h_.unindent ();
 	h_ << "\n{}\n";
 
 	// Constructors and assignments
@@ -913,16 +907,27 @@ void Client::member_variables (const Members& members)
 	}
 }
 
-const char* Client::default_value (const Type& t)
+Code& operator << (Code& stm, const Client::MemberInit& m)
 {
-	const Type& td = t.dereference_type ();
-	if (td.tkind () == Type::Kind::BASIC_TYPE) {
-		if (td.basic_type () == BasicType::BOOLEAN)
-			return "::CORBA::FALSE";
-		else if (td.basic_type () < BasicType::OBJECT)
-			return "0";
+	stm << '_' << static_cast <const string&> (m.member.name ()) << " (";
+	const Type& td = m.member.dereference_type ();
+	switch (td.tkind ()) {
+		case Type::Kind::BASIC_TYPE:
+			if (td.basic_type () == BasicType::BOOLEAN)
+				stm << CodeGenBase::Namespace ("CORBA") << "FALSE";
+			else if (td.basic_type () < BasicType::OBJECT)
+				stm << "0";
+			break;
+
+		case Type::Kind::NAMED_TYPE: {
+			const NamedItem& nt = td.named_type ();
+			if (nt.kind () == Item::Kind::ENUM) {
+				const Enum& en = static_cast <const Enum&> (nt);
+				stm << CodeGenBase::QName (*en.front ());
+			}
+		} break;
 	}
-	return nullptr;
+	return stm << ')';
 }
 
 void Client::implement (const Union& item)

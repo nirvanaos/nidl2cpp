@@ -76,6 +76,15 @@ public:
 		const AST::Operation& op;
 	};
 
+	struct MemberInit
+	{
+		MemberInit (const AST::Member& m) :
+			member (m)
+		{}
+
+		const AST::Member& member;
+	};
+
 protected:
 	virtual void end (const AST::Root&);
 
@@ -112,7 +121,6 @@ private:
 	void constructors_and_assignments (const AST::Identifier& name, const Members& members);
 	void accessors (const Members& members, const char* prefix = "_");
 	void member_variables (const Members& members);
-	static const char* default_value (const AST::Type& t);
 	static bool nested (const AST::NamedItem& item);
 	void h_namespace_open (const AST::NamedItem& item);
 
@@ -132,5 +140,6 @@ private:
 
 Code& operator << (Code& stm, const Client::Param& t);
 Code& operator << (Code& stm, const Client::Signature& op);
+Code& operator << (Code& stm, const Client::MemberInit& val);
 
 #endif

@@ -91,7 +91,7 @@ void Client::type_code_decl (const NamedItem& item)
 
 void Client::type_code_def (const RepositoryId& rid)
 {
-	assert (cpp_.cur_namespace ().empty ());
+	cpp_.namespace_close ();
 	const NamedItem& item = rid.item ();
 	if (is_pseudo (item))
 		return;
@@ -180,15 +180,44 @@ void Client::forward_decl (const NamedItem& item)
 	type_code_decl (item);
 }
 
-void Client::forward_interface (const NamedItem& item)
+void Client::forward_interface (const NamedItem& item, InterfaceKind kind)
 {
 	forward_decl (item);
 
+	h_.namespace_open ("CORBA/Nirvana");
+	h_.empty_line ();
+	h_ << "template <>\n"
+		"struct Type <" << QName (item) << "> : ";
+	switch (kind.interface_kind ()) {
+		case InterfaceKind::LOCAL:
+			h_ << "TypeLocalObject";
+			break;
+		case InterfaceKind::ABSTRACT:
+			h_ << "TypeAbstractInterface";
+			break;
+		case InterfaceKind::UNCONSTRAINED:
+			h_ << "TypeObject";
+			break;
+		default:
+			h_ << "TypeItf";
+			break;
+	}
+	h_ << " <" << QName (item) << ">\n"
+		"{";
+	if (kind.interface_kind () != InterfaceKind::PSEUDO) {
+		h_ << endl;
+		h_.indent ();
+		type_code_func (item);
+		h_.unindent ();
+	}
+	h_ << "};\n";
+
+	h_.namespace_open (item);
 	h_ <<
 		"#ifdef LEGACY_CORBA_CPP\n"
-		"typedef " << Namespace ("CORBA/Nirvana") << "TypeItf <" << item.name () << ">::C_ptr "
+		"typedef " << Namespace ("CORBA/Nirvana") << "Type <" << item.name () << ">::C_ptr "
 		<< static_cast <const string&> (item.name ()) << "_ptr;\n"
-		"typedef " << Namespace ("CORBA/Nirvana") << "TypeItf <" << item.name () << ">::C_var "
+		"typedef " << Namespace ("CORBA/Nirvana") << "Type <" << item.name () << ">::C_var "
 		<< static_cast <const string&> (item.name ()) << "_var;\n"
 		"typedef " << static_cast <const string&> (item.name ()) << "_var& " << static_cast <const string&> (item.name ()) << "_out;\n"
 		"#endif\n";
@@ -196,7 +225,7 @@ void Client::forward_interface (const NamedItem& item)
 
 void Client::leaf (const InterfaceDecl& itf)
 {
-	forward_interface (itf);
+	forward_interface (itf, itf);
 }
 
 void Client::type_code_func (const NamedItem& item)
@@ -211,8 +240,8 @@ void Client::type_code_func (const NamedItem& item)
 
 void Client::begin (const Interface& itf)
 {
-	// Forward declarations
-	forward_interface (itf);
+	if (!itf.has_forward_dcl ())
+		forward_interface (itf, itf);
 
 	if (itf.interface_kind () != InterfaceKind::PSEUDO)
 		type_code_def (itf);
@@ -220,91 +249,9 @@ void Client::begin (const Interface& itf)
 	h_.namespace_open ("CORBA/Nirvana");
 	h_.empty_line ();
 	h_ << "template <>\n"
-		"struct Type <" << QName (itf) << "> : ";
-	switch (itf.interface_kind ()) {
-		case InterfaceKind::LOCAL:
-			h_ << "TypeLocalObject";
-			break;
-		case InterfaceKind::ABSTRACT:
-			h_ << "TypeAbstractInterface";
-			break;
-		case InterfaceKind::UNCONSTRAINED:
-			h_ << "TypeObject";
-			break;
-		default:
-			h_ << "TypeItf";
-			break;
-	}
-	h_ << " <" << QName (itf) << ">\n"
-		"{";
-	if (itf.interface_kind () != InterfaceKind::PSEUDO) {
-		h_ << endl;
-		h_.indent ();
-		type_code_func (itf);
-		h_.unindent ();
-	}
-	h_ << "};\n";
-
-	h_.empty_line ();
-	h_ << "template <>\n"
 		"struct Definitions < " << QName (itf) << ">\n"
 		"{\n";
 	h_.indent ();
-}
-
-inline
-void Client::native_itf_template (const Operation& op)
-{
-	// Generate template method for native Interface returning functions
-	if (is_native_interface (static_cast <const Type&> (op))) {
-		const Parameter* par_iid = nullptr;
-		for (auto it = op.begin (); it != op.end (); ++it) {
-			const Parameter& par = **it;
-			if (par.dereference_type ().tkind () == Type::Kind::STRING && par.name () == "interface_id") {
-				par_iid = &par;
-				break;
-			}
-		}
-
-		if (par_iid) {
-			// Generate template
-			h_ << "template <class I>\n"
-				"typename TypeItf <I>::Var " << op.name () << " (";
-
-			auto it = op.begin ();
-			if (par_iid == *it)
-				++it;
-			if (it != op.end ()) {
-				h_ << Client::Param (**it) << ' ' << (*it)->name ();
-				++it;
-				for (; it != op.end (); ++it) {
-					if (par_iid != *it)
-						h_ << ", " << Client::Param (**it) << ' ' << (*it)->name ();
-				}
-			}
-
-			h_ << ")\n"
-				"{\n";
-			h_.indent ();
-			h_ << "return " << op.name () << " (";
-			it = op.begin ();
-			if (par_iid == *it)
-				h_ << "I::repository_id_";
-			else
-				h_ << (*it)->name ();
-			++it;
-			for (; it != op.end (); ++it) {
-				h_ << ", ";
-				if (par_iid == *it)
-					h_ << "I::repository_id_";
-				else
-					h_ << (*it)->name ();
-			}
-			h_ << ").downcast <I> ();\n";
-			h_.unindent ();
-			h_ << "}\n";
-		}
-	}
 }
 
 void Client::end (const Interface& itf)
@@ -531,6 +478,61 @@ void Client::end (const Interface& itf)
 	}
 	h_.unindent ();
 	h_ << "};\n";
+}
+
+inline
+void Client::native_itf_template (const Operation& op)
+{
+	// Generate template method for native Interface returning functions
+	if (is_native_interface (static_cast <const Type&> (op))) {
+		const Parameter* par_iid = nullptr;
+		for (auto it = op.begin (); it != op.end (); ++it) {
+			const Parameter& par = **it;
+			if (par.dereference_type ().tkind () == Type::Kind::STRING && par.name () == "interface_id") {
+				par_iid = &par;
+				break;
+			}
+		}
+
+		if (par_iid) {
+			// Generate template
+			h_ << "template <class I>\n"
+				"typename Type <I>::Var " << op.name () << " (";
+
+			auto it = op.begin ();
+			if (par_iid == *it)
+				++it;
+			if (it != op.end ()) {
+				h_ << Client::Param (**it) << ' ' << (*it)->name ();
+				++it;
+				for (; it != op.end (); ++it) {
+					if (par_iid != *it)
+						h_ << ", " << Client::Param (**it) << ' ' << (*it)->name ();
+				}
+			}
+
+			h_ << ")\n"
+				"{\n";
+			h_.indent ();
+			h_ << "return " << op.name () << " (";
+			it = op.begin ();
+			if (par_iid == *it)
+				h_ << "I::repository_id_";
+			else
+				h_ << (*it)->name ();
+			++it;
+			for (; it != op.end (); ++it) {
+				h_ << ", ";
+				if (par_iid == *it)
+					h_ << "I::repository_id_";
+				else
+					h_ << (*it)->name ();
+			}
+			h_ << ").downcast <I> ();\n";
+			h_.unindent ();
+			h_ << "}\n";
+		}
+	}
 }
 
 void Client::implement_nested_items (const ItemContainer& parent)

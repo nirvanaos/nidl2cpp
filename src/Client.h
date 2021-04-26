@@ -117,7 +117,7 @@ protected:
 
 private:
 	void forward_decl (const AST::NamedItem& item);
-	void forward_interface (const AST::NamedItem& item);
+	void forward_interface (const AST::NamedItem& item, AST::InterfaceKind kind);
 	void backward_compat_var (const AST::NamedItem& item);
 	void environment (const AST::Raises& raises);
 	void type_code_decl (const AST::NamedItem& item);

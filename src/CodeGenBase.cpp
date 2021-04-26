@@ -159,8 +159,6 @@ Code& operator << (Code& stm, const CodeGenBase::TypePrefix& t)
 {
 	stm.namespace_prefix ("CORBA/Nirvana");
 	stm << "Type";
-	if (CodeGenBase::is_ref_type (t.type))
-		stm << "Itf";
 	return stm << " <" << t.type << ">::";
 }
 

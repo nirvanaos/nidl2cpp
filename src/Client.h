@@ -126,10 +126,9 @@ private:
 	void rep_id_of (const AST::RepositoryId& rid);
 	void define_structured_type (const AST::RepositoryId& rid, const Members& members, const char* suffix = "");
 	void type_code_func (const AST::NamedItem& item);
-	Code& member_type_prefix (const AST::Type& t);
 	void constructors_and_assignments (const AST::Identifier& name, const Members& members);
 	void explicit_constructor (const AST::Identifier& name, const Members& members);
-	void accessors (const Members& members, const char* prefix = "_");
+	void accessors (const Members& members);
 	void member_variables (const Members& members);
 	static bool nested (const AST::NamedItem& item);
 	void h_namespace_open (const AST::NamedItem& item);
@@ -141,6 +140,12 @@ private:
 	void implement (const AST::Enum& item);
 
 	void native_itf_template (const AST::Operation& op);
+
+	static bool is_boolean (const AST::Type& t)
+	{
+		const AST::Type& dt = t.dereference_type ();
+		return dt.tkind () == AST::Type::Kind::BASIC_TYPE && dt.basic_type () == AST::BasicType::BOOLEAN;
+	}
 
 private:
 	Header h_; // .h file

@@ -627,31 +627,16 @@ void Client::end (const Exception& item)
 	Members members = get_members (item);
 	if (!members.empty ()) {
 
-		// Explicit constructor
-		explicit_constructor (item.name (), members);
-		h_.indent ();
-		auto it = members.begin ();
-		h_ << "_data (std::move (" << (*it)->name () << ')';
-		for (++it; it != members.end (); ++it) {
-			h_ << ", std::move (" << (*it)->name () << ')';
-		}
-		h_.unindent ();
-		h_ << ")\n{}\n";
+		constructors_and_assignments (item.name (), members);
+		accessors (members);
 
-		// Accessors to members of _data
-		accessors (members, "_data._");
-
+		// Define struct _Data
 		h_ << "\n"
 			"struct _Data\n"
 			"{\n";
 
 		h_.indent ();
-		{
-			// Use some trick to prevent removal of the leading underscore in the Identifier constructor
-			string name ("_Data");
-			constructors_and_assignments (static_cast <const Identifier&> (name), members);
-			member_variables (members);
-		}
+		member_variables (members);
 		h_.unindent ();
 
 		h_ << "};\n\n";
@@ -663,11 +648,11 @@ void Client::end (const Exception& item)
 		h_ << "virtual void* __data () NIRVANA_NOEXCEPT\n"
 			"{\n";
 		h_.indent ();
-		h_ << "return &_data;\n";
+		h_ << "return &_" << static_cast <const string&> (members.front ()->name ()) << ";\n";
 		h_.unindent ();
 		h_ << "}\n\n";
 
-		h_ << "_Data _data;\n";
+		member_variables (members);
 	}
 	h_.unindent ();
 	h_ << "};\n";
@@ -696,12 +681,6 @@ void Client::implement (const Exception& item)
 	implement_nested_items (item);
 }
 
-Code& Client::member_type_prefix (const Type& t)
-{
-	h_ << "Type <" << TypePrefix (t) << "Member>::";
-	return h_;
-}
-
 void Client::rep_id_of (const RepositoryId& rid)
 {
 	const NamedItem& item = rid.item ();
@@ -725,7 +704,7 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 		"{\n";
 	h_.indent ();
 	for (auto member : members) {
-		member_type_prefix (*member) << "ABI " << member->name () << ";\n";
+		h_ << TypePrefix (*member) << "ABI " << member->name () << ";\n";
 	}
 	h_.unindent ();
 	h_ << "};\n\n";
@@ -742,12 +721,11 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 		h_ << "TypeVarLen < " << QName (item) << suffix << ", \n";
 		h_.indent ();
 
-		member_type_prefix (**vl_member) << "has_check";
+		h_ << TypePrefix (**vl_member) << "has_check";
 
 		while (++vl_member != members.end ()) {
 			if (is_var_len (**vl_member)) {
-				h_ << "\n| ";
-				member_type_prefix (**vl_member) << "has_check";
+				h_ << "\n| " << TypePrefix (**vl_member) << "has_check";
 			}
 		}
 
@@ -759,7 +737,7 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 			"{\n";
 		h_.indent ();
 		for (auto member : members) {
-			member_type_prefix (*member) << "check (val." << member->name () << ");\n";
+			h_ << TypePrefix (*member) << "check (val." << member->name () << ");\n";
 		}
 		h_.unindent ();
 		h_ << "}\n";
@@ -774,7 +752,7 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 			"{\n";
 		h_.indent ();
 		for (auto m : members) {
-			member_type_prefix (*m) << "marshal_in (src._" << m->name () << ", marshaler, dst." << m->name () << ");\n";
+			h_ << TypePrefix (*m) << "marshal_in (src._" << m->name () << ", marshaler, dst." << m->name () << ");\n";
 		}
 		h_.unindent ();
 		h_ << "}\n\n"
@@ -782,7 +760,7 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 			"{\n";
 		h_.indent ();
 		for (auto m : members) {
-			member_type_prefix (*m) << "marshal_out (src._" << m->name () << ", marshaler, dst." << m->name () << ");\n";
+			h_ << TypePrefix (*m) << "marshal_out (src._" << m->name () << ", marshaler, dst." << m->name () << ");\n";
 		}
 		h_.unindent ();
 		h_ << "}\n\n"
@@ -790,7 +768,7 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 			"{\n";
 		h_.indent ();
 		for (auto m : members) {
-			member_type_prefix (*m) << "unmarshal (src." << m->name () << ", unmarshaler, dst._" << m->name () << ");\n";
+			h_ << TypePrefix (*m) << "unmarshal (src." << m->name () << ", unmarshaler, dst._" << m->name () << ");\n";
 		}
 		h_.unindent ();
 		h_ << "}\n";
@@ -892,7 +870,7 @@ void Client::explicit_constructor (const AST::Identifier& name, const Members& m
 	h_ << ") :\n";
 }
 
-void Client::accessors (const Members& members, const char* prefix)
+void Client::accessors (const Members& members)
 {
 	// Accessors
 	for (const Member* m : members) {
@@ -901,7 +879,7 @@ void Client::accessors (const Members& members, const char* prefix)
 		h_ << TypePrefix (*m) << "ConstRef " << m->name () << " () const\n"
 			"{\n";
 		h_.indent ();
-		h_ << "return " << prefix << m->name () << ";\n";
+		h_ << "return _" << m->name () << ";\n";
 		h_.unindent ();
 		h_ << "}\n";
 
@@ -909,7 +887,7 @@ void Client::accessors (const Members& members, const char* prefix)
 			h_ << Var (*m) << "& " << m->name () << " ()\n"
 				"{\n";
 			h_.indent ();
-			h_ << "return " << prefix << m->name () << ";\n";
+			h_ << "return _" << m->name () << ";\n";
 			h_.unindent ();
 			h_ << "}\n";
 		}
@@ -917,7 +895,7 @@ void Client::accessors (const Members& members, const char* prefix)
 		h_ << "void " << m->name () << " (" << TypePrefix (*m) << "ConstRef val)\n"
 			"{\n";
 		h_.indent ();
-		h_ << prefix << m->name () << " = val;\n";
+		h_ << '_' << m->name () << " = val;\n";
 		h_.unindent ();
 		h_ << "}\n";
 
@@ -926,7 +904,7 @@ void Client::accessors (const Members& members, const char* prefix)
 			h_ << "void " << m->name () << " (" << Var (*m) << "&& val)\n"
 				"{\n";
 			h_.indent ();
-			h_ << prefix << m->name () << " = std::move (val);\n";
+			h_ << '_' << m->name () << " = std::move (val);\n";
 			h_.unindent ();
 			h_ << "}\n";
 		}
@@ -935,9 +913,8 @@ void Client::accessors (const Members& members, const char* prefix)
 
 void Client::member_variables (const Members& members)
 {
-	h_.empty_line ();
 	for (const Member* m : members) {
-		h_ << TypePrefix (*m) << "Member _" << m->name () << ";\n";
+		h_ << TypePrefix (*m) << (is_boolean (*m) ? "ABI" : "Var") << " _" << m->name () << ";\n";
 	}
 }
 

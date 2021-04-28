@@ -320,7 +320,7 @@ void Servant::servant_param (const Type& t, const string& name, Parameter::Attri
 void Servant::catch_block ()
 {
 	h_.unindent ();
-	h_ << "} catch (const Exception& e) {\n";
+	h_ << "} catch (Exception& e) {\n";
 	h_.indent ();
 	h_ << "set_exception (_env, e);\n";
 	h_.unindent ();

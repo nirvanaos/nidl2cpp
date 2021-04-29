@@ -78,20 +78,24 @@ public:
 
 	struct MemberDefault
 	{
-		MemberDefault (const AST::Member& m) :
-			member (m)
+		MemberDefault (const AST::Member& m, const char* pref) :
+			member (m),
+			prefix (pref)
 		{}
 
 		const AST::Member& member;
+		const char* prefix;
 	};
 
 	struct MemberInit
 	{
-		MemberInit (const AST::Member& m) :
-			member (m)
+		MemberInit (const AST::Member& m, const char* pref) :
+			member (m),
+			prefix (pref)
 		{}
 
 		const AST::Member& member;
+		const char* prefix;
 	};
 
 protected:
@@ -126,10 +130,11 @@ private:
 	void rep_id_of (const AST::RepositoryId& rid);
 	void define_structured_type (const AST::RepositoryId& rid, const Members& members, const char* suffix = "");
 	void type_code_func (const AST::NamedItem& item);
-	void constructors_and_assignments (const AST::Identifier& name, const Members& members);
-	void explicit_constructor (const AST::Identifier& name, const Members& members);
+	void constructors (const AST::Identifier& name, const Members& members, const char* prefix);
 	void accessors (const Members& members);
 	void member_variables (const Members& members);
+	void member_variables_legacy (const Members& members);
+	void marshal (const Members& members, const char* prefix);
 	static bool nested (const AST::NamedItem& item);
 	void h_namespace_open (const AST::NamedItem& item);
 

@@ -137,39 +137,43 @@ void Client::leaf (const TypeDef& item)
 	type_code_decl (item);
 	type_code_def (item);
 
-	// <Type>_var
-	switch (item.tkind ()) {
-		case Type::Kind::STRING:
-		case Type::Kind::WSTRING:
-		case Type::Kind::FIXED:
-		case Type::Kind::SEQUENCE:
-		case Type::Kind::ARRAY:
-			backward_compat_var (item);
-			break;
+	if (options ().legacy) {
+		// <Type>_var
+		switch (item.tkind ()) {
+			case Type::Kind::STRING:
+			case Type::Kind::WSTRING:
+			case Type::Kind::FIXED:
+			case Type::Kind::SEQUENCE:
+			case Type::Kind::ARRAY:
+				backward_compat_var (item);
+				break;
 
-		case Type::Kind::NAMED_TYPE:
-			h_ <<
-				"#ifdef LEGACY_CORBA_CPP\n"
-				"typedef " << static_cast <const string&> (item.named_type ().name ()) << "_var "
-				<< static_cast <const string&> (item.name ()) << "_var;\n"
-				"typedef " << static_cast <const string&> (item.named_type ().name ()) << "_out "
-				<< static_cast <const string&> (item.name ()) << "_out;\n";
+			case Type::Kind::NAMED_TYPE:
+				h_ <<
+					"#ifdef LEGACY_CORBA_CPP\n"
+					"typedef " << static_cast <const string&> (item.named_type ().name ()) << "_var "
+					<< static_cast <const string&> (item.name ()) << "_var;\n"
+					"typedef " << static_cast <const string&> (item.named_type ().name ()) << "_out "
+					<< static_cast <const string&> (item.name ()) << "_out;\n";
 
-			if (is_ref_type (item))
-				h_ << "typedef " << static_cast <const string&> (item.named_type ().name ()) << "_ptr "
-				<< static_cast <const string&> (item.name ()) << "_ptr;\n";
-			h_ << "#endif\n";
+				if (is_ref_type (item))
+					h_ << "typedef " << static_cast <const string&> (item.named_type ().name ()) << "_ptr "
+					<< static_cast <const string&> (item.name ()) << "_ptr;\n";
+				h_ << "#endif\n";
+		}
 	}
 }
 
 void Client::backward_compat_var (const NamedItem& item)
 {
-	h_.namespace_open (item);
-	h_ <<
-		"#ifdef LEGACY_CORBA_CPP\n"
-		"typedef " << Namespace ("CORBA/Nirvana") << "Type <" << item.name () << ">::C_var " << static_cast <const string&> (item.name ()) << "_var;\n"
-		"typedef " << static_cast <const string&> (item.name ()) << "_var& " << static_cast <const string&> (item.name ()) << "_out;\n"
-		"#endif\n";
+	if (options ().legacy) {
+		h_.namespace_open (item);
+		h_ <<
+			"#ifdef LEGACY_CORBA_CPP\n"
+			"typedef " << Namespace ("CORBA/Nirvana") << "Type <" << item.name () << ">::C_var " << static_cast <const string&> (item.name ()) << "_var;\n"
+			"typedef " << static_cast <const string&> (item.name ()) << "_var& " << static_cast <const string&> (item.name ()) << "_out;\n"
+			"#endif\n";
+	}
 }
 
 void Client::forward_decl (const NamedItem& item)
@@ -212,15 +216,17 @@ void Client::forward_interface (const NamedItem& item, InterfaceKind kind)
 	}
 	h_ << "};\n";
 
-	h_.namespace_open (item);
-	h_ <<
-		"#ifdef LEGACY_CORBA_CPP\n"
-		"typedef " << Namespace ("CORBA/Nirvana") << "Type <" << item.name () << ">::C_ptr "
-		<< static_cast <const string&> (item.name ()) << "_ptr;\n"
-		"typedef " << Namespace ("CORBA/Nirvana") << "Type <" << item.name () << ">::C_var "
-		<< static_cast <const string&> (item.name ()) << "_var;\n"
-		"typedef " << static_cast <const string&> (item.name ()) << "_var& " << static_cast <const string&> (item.name ()) << "_out;\n"
-		"#endif\n";
+	if (options ().legacy) {
+		h_.namespace_open (item);
+		h_ <<
+			"#ifdef LEGACY_CORBA_CPP\n"
+			"typedef " << Namespace ("CORBA/Nirvana") << "Type <" << item.name () << ">::C_ptr "
+			<< static_cast <const string&> (item.name ()) << "_ptr;\n"
+			"typedef " << Namespace ("CORBA/Nirvana") << "Type <" << item.name () << ">::C_var "
+			<< static_cast <const string&> (item.name ()) << "_var;\n"
+			"typedef " << static_cast <const string&> (item.name ()) << "_var& " << static_cast <const string&> (item.name ()) << "_out;\n"
+			"#endif\n";
+	}
 }
 
 void Client::leaf (const InterfaceDecl& itf)
@@ -627,11 +633,9 @@ void Client::end (const Exception& item)
 	Members members = get_members (item);
 	if (!members.empty ()) {
 
-		constructors_and_assignments (item.name (), members);
-		accessors (members);
-
 		// Define struct _Data
-		h_ << "\n"
+		h_.empty_line ();
+		h_ <<
 			"struct _Data\n"
 			"{\n";
 
@@ -641,6 +645,20 @@ void Client::end (const Exception& item)
 
 		h_ << "};\n\n";
 
+		if (options ().legacy)
+			h_ << "#ifndef LEGACY_CORBA_CPP\n";
+
+		constructors (item.name (), members, "_");
+		accessors (members);
+		member_variables (members);
+
+		if (options ().legacy) {
+			h_ << "#else\n";
+			constructors (item.name (), members, "");
+			member_variables_legacy (members);
+			h_ << "#endif\n";
+		}
+
 		h_.unindent ();
 		h_ << "private:\n";
 		h_.indent ();
@@ -648,11 +666,17 @@ void Client::end (const Exception& item)
 		h_ << "virtual void* __data () NIRVANA_NOEXCEPT\n"
 			"{\n";
 		h_.indent ();
+		if (options ().legacy)
+			h_ << "#ifndef LEGACY_CORBA_CPP\n";
 		h_ << "return &_" << static_cast <const string&> (members.front ()->name ()) << ";\n";
+		if (options ().legacy) {
+			h_ <<
+				"#else\n"
+				"return &" << members.front ()->name () << ";\n"
+				"#endif\n";
+		}
 		h_.unindent ();
 		h_ << "}\n\n";
-
-		member_variables (members);
 	}
 	h_.unindent ();
 	h_ << "};\n";
@@ -747,36 +771,50 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 			type_code_func (item);
 		}
 
-		h_ << "\n"
-			"static void marshal_in (const Var& src, Marshal_ptr marshaler, ABI& dst)\n"
-			"{\n";
-		h_.indent ();
-		for (auto m : members) {
-			h_ << TypePrefix (*m) << "marshal_in (src._" << m->name () << ", marshaler, dst." << m->name () << ");\n";
+		if (!*suffix && options ().legacy)
+			h_ << "#ifndef LEGACY_CORBA_CPP\n";
+
+		marshal (members, "_");
+		if (!*suffix && options ().legacy) {
+			h_ << "#else\n";
+			marshal (members, "");
+			h_ << "#endif\n";
 		}
-		h_.unindent ();
-		h_ << "}\n\n"
-			"static void marshal_out (Var& src, Marshal_ptr marshaler, ABI& dst)\n"
-			"{\n";
-		h_.indent ();
-		for (auto m : members) {
-			h_ << TypePrefix (*m) << "marshal_out (src._" << m->name () << ", marshaler, dst." << m->name () << ");\n";
-		}
-		h_.unindent ();
-		h_ << "}\n\n"
-			"static void unmarshal (const ABI& src, Unmarshal_ptr unmarshaler, " << "Var& dst)\n"
-			"{\n";
-		h_.indent ();
-		for (auto m : members) {
-			h_ << TypePrefix (*m) << "unmarshal (src." << m->name () << ", unmarshaler, dst._" << m->name () << ");\n";
-		}
-		h_.unindent ();
-		h_ << "}\n";
+
 		h_.unindent ();
 		h_ << "};\n";
 	} else {
 		h_ << "TypeByRef < " << QName (item) << suffix << "> {};\n";
 	}
+}
+
+void Client::marshal (const Members& members, const char* prefix)
+{
+	h_ << "\n"
+		"static void marshal_in (const Var& src, Marshal::_ptr_type marshaler, ABI& dst)\n"
+		"{\n";
+	h_.indent ();
+	for (auto m : members) {
+		h_ << TypePrefix (*m) << "marshal_in (src." << prefix << m->name () << ", marshaler, dst." << m->name () << ");\n";
+	}
+	h_.unindent ();
+	h_ << "}\n\n"
+		"static void marshal_out (Var& src, Marshal::_ptr_type marshaler, ABI& dst)\n"
+		"{\n";
+	h_.indent ();
+	for (auto m : members) {
+		h_ << TypePrefix (*m) << "marshal_out (src." << prefix << m->name () << ", marshaler, dst." << m->name () << ");\n";
+	}
+	h_.unindent ();
+	h_ << "}\n\n"
+		"static void unmarshal (const ABI& src, Unmarshal::_ptr_type unmarshaler, " << "Var& dst)\n"
+		"{\n";
+	h_.indent ();
+	for (auto m : members) {
+		h_ << TypePrefix (*m) << "unmarshal (src." << m->name () << ", unmarshaler, dst." << prefix << m->name () << ");\n";
+	}
+	h_.unindent ();
+	h_ << "}\n";
 }
 
 void Client::leaf (const StructDecl& item)
@@ -798,8 +836,10 @@ void Client::end (const Struct& item)
 {
 	Members members = get_members (item);
 
-	constructors_and_assignments (item.name (), members);
+	if (options ().legacy)
+		h_ << "#ifndef LEGACY_CORBA_CPP\n";
 
+	constructors (item.name (), members, "_");
 	accessors (members);
 
 	// Member variables
@@ -809,6 +849,13 @@ void Client::end (const Struct& item)
 	h_.indent ();
 	h_ << "friend struct " << Namespace ("CORBA/Nirvana") << "Type <" << item.name () << ">;\n";
 	member_variables (members);
+
+	if (options ().legacy) {
+		h_ << "#else\n";
+		member_variables_legacy (members);
+		h_ << "#endif\n";
+	}
+
 	h_.unindent ();
 	h_ << "};\n";
 
@@ -828,46 +875,37 @@ void Client::implement (const Struct& item)
 	implement_nested_items (item);
 }
 
-void Client::constructors_and_assignments (const Identifier& name, const Members& members)
+void Client::constructors (const Identifier& name, const Members& members, const char* prefix)
 {
 	assert (!members.empty ());
 	// Default constructor
 	h_ << name << " () :\n";
 	h_.indent ();
 	auto it = members.begin ();
-	h_ << MemberDefault (**it);
+	h_ << MemberDefault (**it, prefix);
 	for (++it; it != members.end (); ++it) {
-		h_ << ",\n" << MemberDefault (**it);
+		h_ << ",\n" << MemberDefault (**it, prefix);
 	}
 	h_.unindent ();
-	h_ << "\n{}\n";
+	h_ << "\n{}\n"
 
-	// Constructors and assignments
-	h_ << name << " (const " << name << "&) = default;\n"
-		<< name << " (" << name << "&&) = default;\n"
-		<< name << "& operator = (const " << name << "&) = default;\n"
-		<< name << "& operator = (" << name << "&&) = default;\n";
-
-	explicit_constructor (name, members);
-	h_.indent ();
+	// Explicit constructor
+	"explicit " << name << " (";
 	it = members.begin ();
-	h_ << MemberInit (**it);
-	for (++it; it != members.end (); ++it) {
-		h_ << ",\n" << MemberInit (**it);
-	}
-	h_.unindent ();
-	h_ << "\n{}\n";
-}
-
-void Client::explicit_constructor (const AST::Identifier& name, const Members& members)
-{
-	h_ << "explicit " << name << " (";
-	auto it = members.begin ();
 	h_ << Var (**it) << ' ' << (*it)->name ();
 	for (++it; it != members.end (); ++it) {
 		h_ << ", " << Var (**it) << ' ' << (*it)->name ();
 	}
 	h_ << ") :\n";
+
+	h_.indent ();
+	it = members.begin ();
+	h_ << MemberInit (**it, prefix);
+	for (++it; it != members.end (); ++it) {
+		h_ << ",\n" << MemberInit (**it, prefix);
+	}
+	h_.unindent ();
+	h_ << "\n{}\n";
 }
 
 void Client::accessors (const Members& members)
@@ -914,13 +952,50 @@ void Client::accessors (const Members& members)
 void Client::member_variables (const Members& members)
 {
 	for (const Member* m : members) {
-		h_ << TypePrefix (*m) << (is_boolean (*m) ? "ABI" : "Var") << " _" << m->name () << ";\n";
+		if (is_boolean (*m))
+			h_ << TypePrefix (*m) << "ABI";
+		else if (is_ref_type (*m))
+			h_ << Var (*m);
+		else
+			h_ << static_cast <const Type&> (*m);
+		h_ << " _" << static_cast <const string&> (m->name ()) << ";\n";
+	}
+}
+
+void Client::member_variables_legacy (const Members& members)
+{
+	for (const Member* m : members) {
+		if (is_boolean (*m))
+			h_ << TypePrefix (*m) << "ABI";
+		else {
+			switch (m->tkind ()) {
+				case Type::Kind::STRING:
+					h_ << Namespace ("CORBA") << "String_var";
+					break;
+				case Type::Kind::WSTRING:
+					h_ << Namespace ("CORBA") << "WString_var";
+					break;
+				default:
+					h_ << static_cast <const Type&> (*m);
+					if (is_ref_type (*m))
+						h_ << "_var";
+					else {
+						switch (m->dereference_type ().tkind ()) {
+							case Type::Kind::STRING:
+							case Type::Kind::WSTRING:
+								h_ << "_var";
+								break;
+						}
+					}
+			}
+		}
+		h_ << ' ' << m->name () << ";\n";
 	}
 }
 
 Code& operator << (Code& stm, const Client::MemberDefault& m)
 {
-	stm << '_' << static_cast <const string&> (m.member.name ()) << " (";
+	stm << m.prefix << m.member.name () << " (";
 	const Type& td = m.member.dereference_type ();
 	switch (td.tkind ()) {
 		case Type::Kind::BASIC_TYPE:
@@ -943,7 +1018,7 @@ Code& operator << (Code& stm, const Client::MemberDefault& m)
 
 Code& operator << (Code& stm, const Client::MemberInit& m)
 {
-	stm << '_' << static_cast <const string&> (m.member.name ()) << " (std::move ("
+	stm << m.prefix << m.member.name () << " (std::move ("
 		<< m.member.name () << "))";
 	return stm;
 }

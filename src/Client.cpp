@@ -653,9 +653,11 @@ void Client::end (const Exception& item)
 		member_variables (members);
 
 		if (options ().legacy) {
+			h_ << endl;
 			h_ << "#else\n";
 			constructors (item.name (), members, "");
 			member_variables_legacy (members);
+			h_ << endl;
 			h_ << "#endif\n";
 		}
 
@@ -676,7 +678,7 @@ void Client::end (const Exception& item)
 				"#endif\n";
 		}
 		h_.unindent ();
-		h_ << "}\n\n";
+		h_ << "}\n";
 	}
 	h_.unindent ();
 	h_ << "};\n";
@@ -772,12 +774,14 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 		}
 
 		if (!*suffix && options ().legacy)
-			h_ << "#ifndef LEGACY_CORBA_CPP\n";
+			h_ << endl << "#ifndef LEGACY_CORBA_CPP\n";
 
 		marshal (members, "_");
 		if (!*suffix && options ().legacy) {
+			h_ << endl;
 			h_ << "#else\n";
 			marshal (members, "");
+			h_ << endl;
 			h_ << "#endif\n";
 		}
 
@@ -878,6 +882,7 @@ void Client::implement (const Struct& item)
 void Client::constructors (const Identifier& name, const Members& members, const char* prefix)
 {
 	assert (!members.empty ());
+	h_.empty_line ();
 	// Default constructor
 	h_ << name << " () :\n";
 	h_.indent ();

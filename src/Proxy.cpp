@@ -514,13 +514,13 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
 	cpp_ << "{ \"" << op.name << "\", { ";
 	if (!op.params_in.empty ()) {
 		string params = op.name + "_in_params_";
-		cpp_ << params << ", std::size (" << params << ')';
+		cpp_ << params << ", countof (" << params << ')';
 	} else
 		cpp_ << "0, 0";
 	cpp_ << " }, { ";
 	if (!op.params_out.empty ()) {
 		string params = op.name + "_out_params_";
-		cpp_ << params << ", std::size (" << params << ')';
+		cpp_ << params << ", countof (" << params << ')';
 	} else
 		cpp_ << "0, 0";
 	cpp_ << " }, Type <" << WithAlias (op.type ? *op.type : Type ()) << ">::type_code, RqProcWrapper <" << QName (itf) << ", " << op.name << "_request> }";

@@ -299,7 +299,7 @@ void Proxy::end (const Interface& itf)
 	cpp_.unindent ();
 	cpp_ << "public:\n";
 	cpp_.indent ();
-	cpp_ << "Proxy (IOReference_ptr proxy_manager, uint16_t interface_idx) :\n";
+	cpp_ << "Proxy (IOReference::_ptr_type proxy_manager, uint16_t interface_idx) :\n";
 	cpp_.indent ();
 	cpp_ << "Base (proxy_manager, interface_idx)\n";
 	cpp_.unindent ();

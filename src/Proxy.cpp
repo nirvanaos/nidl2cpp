@@ -45,7 +45,7 @@ void Proxy::end (const Root&)
 
 void Proxy::leaf (const TypeDef& item)
 {
-	string name = export_name (item) + "_TC";
+	string name = export_name (item);
 	cpp_.empty_line ();
 	cpp_ << "extern \"C\" NIRVANA_OLF_SECTION const Nirvana::ExportInterface " << name << ";\n\n";
 	cpp_.namespace_open ("CORBA/Nirvana");
@@ -505,7 +505,7 @@ void Proxy::end (const Interface& itf)
 	cpp_ << "};\n";
 
 	cpp_.namespace_close ();
-	cpp_ << "NIRVANA_EXPORT (" << export_name (itf) << "_ProxyFactory, " << QName (itf)
+	cpp_ << "NIRVANA_EXPORT (" << export_name (itf) << ", " << QName (itf)
 		<< "::repository_id_, CORBA::AbstractBase, CORBA::Nirvana::ProxyFactoryImpl <" << QName (itf) << ">)\n";
 }
 
@@ -576,7 +576,7 @@ void Proxy::type_code_members (const NamedItem& item, const Members& members)
 Code& Proxy::exp (const AST::NamedItem& item)
 {
 	return cpp_ <<
-		"NIRVANA_EXPORT (" << export_name (item) << "_TC, "
+		"NIRVANA_EXPORT (" << export_name (item) << ", "
 		"CORBA::Nirvana::RepIdOf <" << QName (item) << ">::repository_id_, CORBA::TypeCode, CORBA::Nirvana::";
 }
 

@@ -534,7 +534,7 @@ void Client::native_itf_template (const Operation& op)
 				else
 					h_ << (*it)->name ();
 			}
-			h_ << ").downcast <I> ();\n";
+			h_ << ").template downcast <I> ();\n";
 			h_.unindent ();
 			h_ << "}\n";
 		}

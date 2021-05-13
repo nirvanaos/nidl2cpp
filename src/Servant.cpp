@@ -45,7 +45,7 @@ void Servant::leaf (const Include& item)
 
 void Servant::begin (const Interface& itf)
 {
-	h_.namespace_open ("CORBA/Nirvana");
+	h_.namespace_open ("CORBA/Internal");
 	h_.empty_line ();
 
 	h_ << "template <class S>\n"
@@ -177,15 +177,15 @@ void Servant::end (const Interface& itf)
 				h_ << "namespace " << *it << " {\n";
 			}
 
-			h_ << "\ntypedef " << Namespace ("CORBA/Nirvana") << "ServantPOA <" << QName (itf) << "> " << itf.name () << ";\n"
-				"template <class T> using " << itf.name () << "_tie = " << Namespace ("CORBA/Nirvana") << "ServantTied <T, " << QName (itf) << ">;\n\n";
+			h_ << "\ntypedef " << Namespace ("CORBA/Internal") << "ServantPOA <" << QName (itf) << "> " << itf.name () << ";\n"
+				"template <class T> using " << itf.name () << "_tie = " << Namespace ("CORBA/Internal") << "ServantTied <T, " << QName (itf) << ">;\n\n";
 
 			for (size_t cnt = sn.size (); cnt; --cnt) {
 				h_ << "}\n";
 			}
 		} else {
-			h_ << "typedef " << Namespace ("CORBA/Nirvana") << "ServantPOA <" << QName (itf) << "> POA_" << static_cast <const string&> (itf.name ()) << ";\n"
-				"template <class T> using POA_" << static_cast <const string&> (itf.name ()) << "_tie = " << Namespace ("CORBA/Nirvana") << "ServantTied <T, " << QName (itf) << ">;\n\n";
+			h_ << "typedef " << Namespace ("CORBA/Internal") << "ServantPOA <" << QName (itf) << "> POA_" << static_cast <const string&> (itf.name ()) << ";\n"
+				"template <class T> using POA_" << static_cast <const string&> (itf.name ()) << "_tie = " << Namespace ("CORBA/Internal") << "ServantTied <T, " << QName (itf) << ">;\n\n";
 		}
 	}
 }

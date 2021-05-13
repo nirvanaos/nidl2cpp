@@ -264,26 +264,26 @@ Code& operator << (Code& stm, const Type& t)
 			stm << CodeGenBase::QName (t.named_type ());
 			break;
 		case Type::Kind::STRING:
-			stm.namespace_prefix ("CORBA/Nirvana");
+			stm.namespace_prefix ("CORBA/Internal");
 			if (t.string_bound ())
 				stm << "BoundedString <" << t.string_bound () << '>';
 			else
 				stm << "String";
 			break;
 		case Type::Kind::WSTRING:
-			stm.namespace_prefix ("CORBA/Nirvana");
+			stm.namespace_prefix ("CORBA/Internal");
 			if (t.string_bound ())
 				stm << "BoundedWString <" << t.string_bound () << '>';
 			else
 				stm << "WString";
 			break;
 		case Type::Kind::FIXED:
-			stm.namespace_prefix ("CORBA/Nirvana");
+			stm.namespace_prefix ("CORBA/Internal");
 			stm << "Fixed <" << t.fixed_digits () << ", " << t.fixed_scale () << '>';
 			break;
 		case Type::Kind::SEQUENCE: {
 			const Sequence& seq = t.sequence ();
-			stm.namespace_prefix ("CORBA/Nirvana");
+			stm.namespace_prefix ("CORBA/Internal");
 			if (seq.bound ())
 				stm << "BoundedSequence <" << static_cast <const Type&> (t.sequence ()) << ", " << seq.bound ();
 			else

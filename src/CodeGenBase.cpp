@@ -143,7 +143,7 @@ Code& operator << (Code& stm, const CodeGenBase::ParentName& qn)
 			stm.namespace_prefix (static_cast <const Module*> (parent));
 		} else {
 			if (Item::Kind::INTERFACE == pk || Item::Kind::VALUE_TYPE == pk) {
-				stm.namespace_prefix ("CORBA/Nirvana");
+				stm.namespace_prefix ("CORBA/Internal");
 				stm << "Definitions <" << CodeGenBase::QName (*parent) << '>';
 			} else {
 				stm << CodeGenBase::QName (*parent);
@@ -157,7 +157,7 @@ Code& operator << (Code& stm, const CodeGenBase::ParentName& qn)
 
 Code& operator << (Code& stm, const CodeGenBase::TypePrefix& t)
 {
-	stm.namespace_prefix ("CORBA/Nirvana");
+	stm.namespace_prefix ("CORBA/Internal");
 	stm << "Type";
 	return stm << " <" << t.type << ">::";
 }
@@ -394,7 +394,7 @@ bool CodeGenBase::is_native_interface (const NamedItem& type)
 	assert (type.kind () == Item::Kind::NATIVE);
 	if (type.name () == "Interface") {
 		const NamedItem* parent = type.parent ();
-		return parent && parent->kind () == Item::Kind::MODULE && parent->name () == "Nirvana";
+		return parent && parent->kind () == Item::Kind::MODULE && parent->name () == "Internal";
 	}
 	return false;
 }

@@ -48,7 +48,7 @@ void Proxy::leaf (const TypeDef& item)
 	string name = export_name (item);
 	cpp_.empty_line ();
 	cpp_ << "extern \"C\" NIRVANA_OLF_SECTION const Nirvana::ExportInterface " << name << ";\n\n";
-	cpp_.namespace_open ("CORBA/Nirvana");
+	cpp_.namespace_open ("CORBA/Internal");
 	cpp_ <<
 		"template <>\n"
 		"class TypeCodeTypeDef <&::" << name << "> :\n";
@@ -60,7 +60,7 @@ void Proxy::leaf (const TypeDef& item)
 		"template <>\n"
 		"const Char TypeCodeName <TypeCodeTypeDef <&::" << name << "> >::name_ [] = \"" << static_cast <const string&> (item.name ()) << "\";\n";
 	cpp_.namespace_close ();
-	cpp_ << "NIRVANA_EXPORT (" << name << ", \"" << item.repository_id () << "\", CORBA::TypeCode, CORBA::Nirvana::TypeCodeTypeDef <&" << name << ">)\n";
+	cpp_ << "NIRVANA_EXPORT (" << name << ", \"" << item.repository_id () << "\", CORBA::TypeCode, CORBA::Internal::TypeCodeTypeDef <&" << name << ">)\n";
 }
 
 void Proxy::get_parameters (const AST::Operation& op, Members& params_in, Members& params_out)
@@ -259,7 +259,7 @@ void Proxy::end (const Interface& itf)
 	if (itf.interface_kind () == InterfaceKind::PSEUDO)
 		return;
 
-	cpp_.namespace_open ("CORBA/Nirvana");
+	cpp_.namespace_open ("CORBA/Internal");
 	cpp_.empty_line ();
 	cpp_ << "IMPLEMENT_PROXY_FACTORY(" << ParentName (itf) << ", " << itf.name () << ");\n"
 		"\n"
@@ -506,7 +506,7 @@ void Proxy::end (const Interface& itf)
 
 	cpp_.namespace_close ();
 	cpp_ << "NIRVANA_EXPORT (" << export_name (itf) << ", " << QName (itf)
-		<< "::repository_id_, CORBA::AbstractBase, CORBA::Nirvana::ProxyFactoryImpl <" << QName (itf) << ">)\n";
+		<< "::repository_id_, CORBA::AbstractBase, CORBA::Internal::ProxyFactoryImpl <" << QName (itf) << ">)\n";
 }
 
 void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
@@ -577,12 +577,12 @@ Code& Proxy::exp (const AST::NamedItem& item)
 {
 	return cpp_ <<
 		"NIRVANA_EXPORT (" << export_name (item) << ", "
-		"CORBA::Nirvana::RepIdOf <" << QName (item) << ">::repository_id_, CORBA::TypeCode, CORBA::Nirvana::";
+		"CORBA::Internal::RepIdOf <" << QName (item) << ">::repository_id_, CORBA::TypeCode, CORBA::Internal::";
 }
 
 void Proxy::end (const Exception& item)
 {
-	cpp_.namespace_open ("CORBA/Nirvana");
+	cpp_.namespace_open ("CORBA/Internal");
 	Members members = get_members (item);
 
 	if (!members.empty ())
@@ -603,7 +603,7 @@ void Proxy::end (const Struct& item)
 	if (is_pseudo (item))
 		return;
 
-	cpp_.namespace_open ("CORBA/Nirvana");
+	cpp_.namespace_open ("CORBA/Internal");
 	type_code_name (item);
 	type_code_members (item, get_members (item));
 	cpp_.namespace_close ();
@@ -615,7 +615,7 @@ void Proxy::leaf (const Enum& item)
 	if (is_pseudo (item))
 		return;
 
-	cpp_.namespace_open ("CORBA/Nirvana");
+	cpp_.namespace_open ("CORBA/Internal");
 	cpp_.empty_line ();
 	type_code_name (item);
 	cpp_ << "\n"

@@ -37,7 +37,8 @@ public:
 		const std::filesystem::path& file_h, const std::filesystem::path& file_cpp) :
 		CodeGenBase (options),
 		h_ (file_h, root),
-		cpp_ (file_cpp, root)
+		cpp_ (file_cpp, root),
+		export_count_ (0)
 	{
 		cpp_ << "#include <CORBA/CORBA.h>\n"
 			"#include <Nirvana/OLF.h>\n"
@@ -129,7 +130,8 @@ private:
 	static bool constant (Code& stm, const AST::Constant& item);
 	void rep_id_of (const AST::RepositoryId& rid);
 	void define_structured_type (const AST::RepositoryId& rid, const Members& members, const char* suffix = "");
-	void type_code_func (const AST::NamedItem& item);
+	void type_code_func_decl (const AST::NamedItem& item);
+	void type_code_func_def (const AST::NamedItem& item);
 	void constructors (const AST::Identifier& name, const Members& members, const char* prefix);
 	void accessors (const Members& members);
 	void member_variables (const Members& members);
@@ -156,6 +158,7 @@ private:
 	Header h_; // .h file
 	Code cpp_; // .cpp file.
 	size_t initial_cpp_size_;
+	unsigned export_count_;
 };
 
 Code& operator << (Code& stm, const Client::Param& t);

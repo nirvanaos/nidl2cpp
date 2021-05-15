@@ -97,9 +97,10 @@ void Client::type_code_def (const RepositoryId& rid)
 		return;
 
 	cpp_.empty_line ();
-	cpp_ << "NIRVANA_OLF_SECTION ";
 	if (!nested (item))
-		cpp_ << "extern ";
+		cpp_ << "NIRVANA_OLF_SECTION_N (" << (export_count_++) << ") extern ";
+	else
+		cpp_ << "NIRVANA_OLF_SECTION ";
 	cpp_ << "const " << Namespace ("Nirvana") << "ImportInterfaceT <" << Namespace ("CORBA") << "TypeCode>\n"
 		<< TypeCodeName (item) << " = { Nirvana::OLF_IMPORT_INTERFACE, ";
 
@@ -211,7 +212,7 @@ void Client::forward_interface (const NamedItem& item, InterfaceKind kind)
 	if (kind.interface_kind () != InterfaceKind::PSEUDO) {
 		h_ << endl;
 		h_.indent ();
-		type_code_func (item);
+		type_code_func_decl (item);
 		h_.unindent ();
 	}
 	h_ << "};\n";
@@ -234,14 +235,20 @@ void Client::leaf (const InterfaceDecl& itf)
 	forward_interface (itf, itf);
 }
 
-void Client::type_code_func (const NamedItem& item)
+void Client::type_code_func_decl (const NamedItem& item)
 {
-	h_ << "static I_ptr <TypeCode> type_code ()\n"
+	h_ << "static I_ptr <TypeCode> type_code ();\n";
+}
+
+void Client::type_code_func_def (const NamedItem& item)
+{
+	cpp_.namespace_close ();
+	cpp_ << Namespace ("CORBA") << "TypeCode::_ptr_type " << Namespace ("CORBA/Internal") << "Type <" << QName (item) << ">::type_code ()\n"
 		"{\n";
-	h_.indent ();
-	h_ << "return " << TypeCodeName (item) << ";\n";
-	h_.unindent ();
-	h_ << "}\n";
+	cpp_.indent ();
+	cpp_ << "return " << TypeCodeName (item) << ";\n";
+	cpp_.unindent ();
+	cpp_ << "}\n\n";
 }
 
 void Client::begin (const Interface& itf)
@@ -249,8 +256,10 @@ void Client::begin (const Interface& itf)
 	if (!itf.has_forward_dcl ())
 		forward_interface (itf, itf);
 
-	if (itf.interface_kind () != InterfaceKind::PSEUDO)
+	if (itf.interface_kind () != InterfaceKind::PSEUDO) {
 		type_code_def (itf);
+		type_code_func_def (itf);
+	}
 
 	h_.namespace_open ("CORBA/Internal");
 	h_.empty_line ();
@@ -770,7 +779,7 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 
 		if (!*suffix) {
 			h_ << endl;
-			type_code_func (item);
+			type_code_func_decl (item);
 		}
 
 		if (!*suffix && options ().legacy)
@@ -876,6 +885,7 @@ void Client::implement (const Struct& item)
 	define_structured_type (item, members);
 	backward_compat_var (item);
 	type_code_def (item);
+	type_code_func_def (item);
 	implement_nested_items (item);
 }
 
@@ -1060,5 +1070,11 @@ void Client::implement (const Enum& item)
 	h_ << "template <>\n"
 		"struct Type <" << QName (item) << "> : public TypeEnum <" << QName (item)
 		<< ", " << QName (item) << "::" << item.back ()->name () << ">\n"
-		"{};\n";
+		"{\n";
+	h_.indent ();
+	type_code_func_decl (item);
+	h_.unindent ();
+	h_ << "};\n";
+	type_code_def (item);
+	type_code_func_def (item);
 }

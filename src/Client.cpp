@@ -222,7 +222,7 @@ void Client::forward_interface (const NamedItem& item, InterfaceKind kind)
 	if (has_type_code) {
 		h_ << endl;
 		h_.indent ();
-		type_code_func_decl (item);
+		type_code_func (item);
 		h_.unindent ();
 	}
 	h_ << "};\n";
@@ -245,20 +245,14 @@ void Client::leaf (const InterfaceDecl& itf)
 	forward_interface (itf, itf);
 }
 
-void Client::type_code_func_decl (const NamedItem& item)
+void Client::type_code_func (const NamedItem& item)
 {
-	h_ << "static I_ptr <TypeCode> type_code ();\n";
-}
-
-void Client::type_code_func_def (const NamedItem& item)
-{
-	cpp_.namespace_close ();
-	cpp_ << Namespace ("CORBA") << "TypeCode::_ptr_type " << Namespace ("CORBA/Internal") << "Type <" << QName (item) << ">::type_code ()\n"
+	h_ << "static I_ptr <TypeCode> type_code ()\n"
 		"{\n";
-	cpp_.indent ();
-	cpp_ << "return " << TypeCodeName (item) << ";\n";
-	cpp_.unindent ();
-	cpp_ << "}\n\n";
+	h_.indent ();
+	h_ << "return " << TypeCodeName (item) << ";\n";
+	h_.unindent ();
+	h_ << "}\n\n";
 }
 
 void Client::begin (const Interface& itf)
@@ -268,7 +262,6 @@ void Client::begin (const Interface& itf)
 
 	if (itf.interface_kind () != InterfaceKind::PSEUDO) {
 		type_code_def (itf);
-		type_code_func_def (itf);
 	}
 
 	h_.namespace_open ("CORBA/Internal");
@@ -789,7 +782,8 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 
 		if (!*suffix) {
 			h_ << endl;
-			type_code_func_decl (item);
+			if (!is_pseudo (item))
+				type_code_func (item);
 		}
 
 		if (!*suffix && options ().legacy)
@@ -895,7 +889,6 @@ void Client::implement (const Struct& item)
 	define_structured_type (item, members);
 	backward_compat_var (item);
 	type_code_def (item);
-	type_code_func_def (item);
 	implement_nested_items (item);
 }
 
@@ -1082,9 +1075,17 @@ void Client::implement (const Enum& item)
 		<< ", " << QName (item) << "::" << item.back ()->name () << ">\n"
 		"{\n";
 	h_.indent ();
-	type_code_func_decl (item);
+	if (!is_pseudo (item))
+		type_code_func (item);
 	h_.unindent ();
 	h_ << "};\n";
+
+	if (options ().legacy) {
+		h_.namespace_open (item);
+		h_ <<
+			"#ifdef LEGACY_CORBA_CPP\n"
+			"typedef " << item.name () << "& " << static_cast <const string&> (item.name ()) << "_out;\n"
+			"#endif\n";
+	}
 	type_code_def (item);
-	type_code_func_def (item);
 }

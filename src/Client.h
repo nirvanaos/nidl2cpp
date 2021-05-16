@@ -130,8 +130,7 @@ private:
 	static bool constant (Code& stm, const AST::Constant& item);
 	void rep_id_of (const AST::RepositoryId& rid);
 	void define_structured_type (const AST::RepositoryId& rid, const Members& members, const char* suffix = "");
-	void type_code_func_decl (const AST::NamedItem& item);
-	void type_code_func_def (const AST::NamedItem& item);
+	void type_code_func (const AST::NamedItem& item);
 	void constructors (const AST::Identifier& name, const Members& members, const char* prefix);
 	void accessors (const Members& members);
 	void member_variables (const Members& members);

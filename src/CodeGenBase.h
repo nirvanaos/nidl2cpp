@@ -168,6 +168,7 @@ public:
 	static bool is_var_len (const AST::Type& type);
 	static bool is_var_len (const Members& members);
 	static bool is_pseudo (const AST::NamedItem& item);
+	static bool is_pseudo_interface (const AST::Type& type);
 	static bool is_ref_type (const AST::Type& type);
 	static bool is_enum (const AST::Type& type);
 	static bool is_native_interface (const AST::Type& type);

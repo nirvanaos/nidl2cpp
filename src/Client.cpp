@@ -189,44 +189,46 @@ void Client::forward_interface (const NamedItem& item, InterfaceKind kind)
 {
 	forward_decl (item);
 
-	h_.namespace_open ("CORBA/Internal");
-	h_.empty_line ();
-	h_ << "template <>\n"
-		"struct Type <" << QName (item) << "> : ";
-	switch (kind.interface_kind ()) {
-		case InterfaceKind::LOCAL:
-			h_ << "TypeLocalObject";
-			break;
-		case InterfaceKind::ABSTRACT:
-			h_ << "TypeAbstractInterface";
-			break;
-		case InterfaceKind::UNCONSTRAINED:
-			h_ << "TypeObject";
-			break;
-		default:
-			h_ << "TypeItf";
-			break;
-	}
-	h_ << " <" << QName (item) << ">\n"
-		"{";
 	if (kind.interface_kind () != InterfaceKind::PSEUDO) {
-		h_ << endl;
-		h_.indent ();
-		type_code_func_decl (item);
-		h_.unindent ();
-	}
-	h_ << "};\n";
+		h_.namespace_open ("CORBA/Internal");
+		h_.empty_line ();
+		h_ << "template <>\n"
+			"struct Type <" << QName (item) << "> : ";
+		switch (kind.interface_kind ()) {
+			case InterfaceKind::LOCAL:
+				h_ << "TypeLocalObject";
+				break;
+			case InterfaceKind::ABSTRACT:
+				h_ << "TypeAbstractInterface";
+				break;
+			case InterfaceKind::UNCONSTRAINED:
+				h_ << "TypeObject";
+				break;
+			default:
+				h_ << "TypeItf";
+				break;
+		}
+		h_ << " <" << QName (item) << ">\n"
+			"{";
+		if (kind.interface_kind () != InterfaceKind::PSEUDO) {
+			h_ << endl;
+			h_.indent ();
+			type_code_func_decl (item);
+			h_.unindent ();
+		}
+		h_ << "};\n";
 
-	if (options ().legacy) {
-		h_.namespace_open (item);
-		h_ <<
-			"#ifdef LEGACY_CORBA_CPP\n"
-			"typedef " << Namespace ("CORBA/Internal") << "Type <" << item.name () << ">::C_ptr "
-			<< static_cast <const string&> (item.name ()) << "_ptr;\n"
-			"typedef " << Namespace ("CORBA/Internal") << "Type <" << item.name () << ">::C_var "
-			<< static_cast <const string&> (item.name ()) << "_var;\n"
-			"typedef " << static_cast <const string&> (item.name ()) << "_var& " << static_cast <const string&> (item.name ()) << "_out;\n"
-			"#endif\n";
+		if (options ().legacy) {
+			h_.namespace_open (item);
+			h_ <<
+				"#ifdef LEGACY_CORBA_CPP\n"
+				"typedef " << Namespace ("CORBA/Internal") << "Type <" << item.name () << ">::C_ptr "
+				<< static_cast <const string&> (item.name ()) << "_ptr;\n"
+				"typedef " << Namespace ("CORBA/Internal") << "Type <" << item.name () << ">::C_var "
+				<< static_cast <const string&> (item.name ()) << "_var;\n"
+				"typedef " << static_cast <const string&> (item.name ()) << "_var& " << static_cast <const string&> (item.name ()) << "_out;\n"
+				"#endif\n";
+		}
 	}
 }
 

@@ -155,26 +155,10 @@ Code& operator << (Code& stm, const CodeGenBase::ParentName& qn)
 	return stm;
 }
 
-bool CodeGenBase::is_pseudo_interface (const AST::Type& type)
-{
-	if (type.tkind () == Type::Kind::NAMED_TYPE) {
-		const NamedItem& item = type.named_type ();
-		switch (item.kind ()) {
-			case Item::Kind::INTERFACE:
-				return static_cast <const Interface&> (item).interface_kind () == InterfaceKind::PSEUDO;
-			case Item::Kind::INTERFACE_DECL:
-				return static_cast <const InterfaceDecl&> (item).interface_kind () == InterfaceKind::PSEUDO;
-		}
-	}
-	return false;
-}
-
 Code& operator << (Code& stm, const CodeGenBase::TypePrefix& t)
 {
 	stm.namespace_prefix ("CORBA/Internal");
 	stm << "Type";
-	if (CodeGenBase::is_pseudo_interface (t.type))
-		stm << "Itf";
 	return stm << " <" << t.type << ">::";
 }
 

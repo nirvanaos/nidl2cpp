@@ -189,46 +189,54 @@ void Client::forward_interface (const NamedItem& item, InterfaceKind kind)
 {
 	forward_decl (item);
 
-	if (kind.interface_kind () != InterfaceKind::PSEUDO) {
-		h_.namespace_open ("CORBA/Internal");
-		h_.empty_line ();
-		h_ << "template <>\n"
-			"struct Type <" << QName (item) << "> : ";
-		switch (kind.interface_kind ()) {
-			case InterfaceKind::LOCAL:
-				h_ << "TypeLocalObject";
-				break;
-			case InterfaceKind::ABSTRACT:
-				h_ << "TypeAbstractInterface";
-				break;
-			case InterfaceKind::UNCONSTRAINED:
-				h_ << "TypeObject";
-				break;
-			default:
-				h_ << "TypeItf";
-				break;
-		}
-		h_ << " <" << QName (item) << ">\n"
-			"{";
-		if (kind.interface_kind () != InterfaceKind::PSEUDO) {
-			h_ << endl;
-			h_.indent ();
-			type_code_func_decl (item);
-			h_.unindent ();
-		}
-		h_ << "};\n";
+	h_.namespace_open ("CORBA/Internal");
+	h_.empty_line ();
+	h_ << "template <>\n"
+		"struct Type <" << QName (item) << "> : ";
+	switch (kind.interface_kind ()) {
+		case InterfaceKind::LOCAL:
+			h_ << "TypeLocalObject";
+			break;
+		case InterfaceKind::ABSTRACT:
+			h_ << "TypeAbstractInterface";
+			break;
+		case InterfaceKind::UNCONSTRAINED:
+			h_ << "TypeObject";
+			break;
+		default:
+			h_ << "TypeItf";
+			break;
+	}
+	h_ << " <" << QName (item) << ">\n"
+		"{";
 
-		if (options ().legacy) {
-			h_.namespace_open (item);
-			h_ <<
-				"#ifdef LEGACY_CORBA_CPP\n"
-				"typedef " << Namespace ("CORBA/Internal") << "Type <" << item.name () << ">::C_ptr "
-				<< static_cast <const string&> (item.name ()) << "_ptr;\n"
-				"typedef " << Namespace ("CORBA/Internal") << "Type <" << item.name () << ">::C_var "
-				<< static_cast <const string&> (item.name ()) << "_var;\n"
-				"typedef " << static_cast <const string&> (item.name ()) << "_var& " << static_cast <const string&> (item.name ()) << "_out;\n"
-				"#endif\n";
+	bool has_type_code = kind.interface_kind () != InterfaceKind::PSEUDO;
+	if (!has_type_code) {
+		const NamedItem* parent = item.parent ();
+		if (parent && !parent->parent () && parent->name () == "CORBA") {
+			if (item.name () == "TypeCode")
+				has_type_code = true;
 		}
+	}
+
+	if (has_type_code) {
+		h_ << endl;
+		h_.indent ();
+		type_code_func_decl (item);
+		h_.unindent ();
+	}
+	h_ << "};\n";
+
+	if (options ().legacy) {
+		h_.namespace_open (item);
+		h_ <<
+			"#ifdef LEGACY_CORBA_CPP\n"
+			"typedef " << Namespace ("CORBA/Internal") << "Type <" << item.name () << ">::C_ptr "
+			<< static_cast <const string&> (item.name ()) << "_ptr;\n"
+			"typedef " << Namespace ("CORBA/Internal") << "Type <" << item.name () << ">::C_var "
+			<< static_cast <const string&> (item.name ()) << "_var;\n"
+			"typedef " << static_cast <const string&> (item.name ()) << "_var& " << static_cast <const string&> (item.name ()) << "_out;\n"
+			"#endif\n";
 	}
 }
 
@@ -514,7 +522,7 @@ void Client::native_itf_template (const Operation& op)
 		if (par_iid) {
 			// Generate template
 			h_ << "template <class I>\n"
-				"typename Type <I>::Var " << op.name () << " (";
+				"I_ref <I> " << op.name () << " (";
 
 			auto it = op.begin ();
 			if (par_iid == *it)

@@ -49,7 +49,7 @@ void Servant::begin (const Interface& itf)
 	h_.empty_line ();
 
 	h_ << "template <class S>\n"
-		"class Skeleton <S, " << QName (itf) << ">\n"
+		"class Skeleton <S, " << QName (itf) << "> : public Definitions <" << QName (itf) << ">\n"
 		"{\n"
 		"public:\n";
 	h_.indent ();

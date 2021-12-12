@@ -47,7 +47,7 @@ public:
 		if (file_h.parent_path () == cpp_dir)
 			cpp_ << file_h.filename ();
 		else
-			cpp_ << std::filesystem::relative (file_h, cpp_dir);
+			cpp_ << '"' << std::filesystem::relative (file_h, cpp_dir).generic_string () << '"';
 		cpp_  << std::endl;
 		initial_cpp_size_ = cpp_.size ();
 	}

@@ -25,6 +25,7 @@
 */
 #ifndef NIDL2CPP_CODEGENBASE_H_
 #define NIDL2CPP_CODEGENBASE_H_
+#pragma once
 
 #include "Code.h"
 #include "Options.h"

@@ -25,6 +25,7 @@
 */
 #ifndef NIDL2CPP_SERVANT_H_
 #define NIDL2CPP_SERVANT_H_
+#pragma once
 
 #include "CodeGenBase.h"
 #include "Header.h"

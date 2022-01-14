@@ -25,6 +25,7 @@
 */
 #ifndef NIDL2CPP_CODE_H_
 #define NIDL2CPP_CODE_H_
+#pragma once
 
 #include <BE/IndentedOut.h>
 #include <string_view>

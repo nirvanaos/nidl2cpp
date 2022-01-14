@@ -25,6 +25,7 @@
 */
 #ifndef NIDL2CPP_OPTIONS_H_
 #define NIDL2CPP_OPTIONS_H_
+#pragma once
 
 struct Options
 {

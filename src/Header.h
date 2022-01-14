@@ -25,6 +25,7 @@
 */
 #ifndef NIDL2CPP_HEADER_H_
 #define NIDL2CPP_HEADER_H_
+#pragma once
 
 #include "Code.h"
 

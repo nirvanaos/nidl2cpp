@@ -25,6 +25,7 @@
 */
 #ifndef NIDL2CPP_COMPILER_H_
 #define NIDL2CPP_COMPILER_H_
+#pragma once
 
 #include <IDL_FrontEnd.h>
 #include "Options.h"

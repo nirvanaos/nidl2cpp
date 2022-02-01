@@ -37,10 +37,12 @@ void Servant::end (const Root&)
 
 void Servant::leaf (const Include& item)
 {
-	h_ << "#include " << (item.system () ? '<' : '"')
-		<< path (path (item.file ()).replace_extension ("").string () + options ().servant_suffix).replace_extension ("h").string ()
-		<< (item.system () ? '>' : '"')
-		<< endl;
+	if (!options ().no_POA) {
+		h_ << "#include " << (item.system () ? '<' : '"')
+			<< path (path (item.file ()).replace_extension ("").string () + options ().servant_suffix).replace_extension ("h").string ()
+			<< (item.system () ? '>' : '"')
+			<< endl;
+	}
 }
 
 void Servant::begin (const Interface& itf)
@@ -126,33 +128,35 @@ void Servant::end (const Interface& itf)
 		implementation_parameters (itf, bases);
 		h_ << "{};\n";
 
-		// POA implementation
-		h_.empty_line ();
-		h_ << "template <>\n"
-			"class ServantPOA <" << QName (itf) << "> : public Implementation";
-		implementation_suffix (itf);
-		h_ << "POA <";
-		implementation_parameters (itf, bases);
-		h_ << "{\n"
-			"public:\n";
-		h_.indent ();
-		for (auto it = itf.begin (); it != itf.end (); ++it) {
-			const Item& item = **it;
-			switch (item.kind ()) {
-				case Item::Kind::OPERATION: {
-					const Operation& op = static_cast <const Operation&> (item);
-					h_ << "virtual " << ServantOp (op) << " = 0;\n";
-				} break;
-				case Item::Kind::ATTRIBUTE: {
-					const Attribute& att = static_cast <const Attribute&> (item);
-					h_ << "virtual " << Var (att) << ' ' << att.name () << " () = 0;\n";
-					if (!att.readonly ())
-						h_ << "virtual void " << att.name () << " (" << ServantParam (att) << ") = 0;\n";
-				} break;
+		if (!options ().no_POA) {
+			// POA implementation
+			h_.empty_line ();
+			h_ << "template <>\n"
+				"class ServantPOA <" << QName (itf) << "> : public Implementation";
+			implementation_suffix (itf);
+			h_ << "POA <";
+			implementation_parameters (itf, bases);
+			h_ << "{\n"
+				"public:\n";
+			h_.indent ();
+			for (auto it = itf.begin (); it != itf.end (); ++it) {
+				const Item& item = **it;
+				switch (item.kind ()) {
+					case Item::Kind::OPERATION: {
+						const Operation& op = static_cast <const Operation&> (item);
+						h_ << "virtual " << ServantOp (op) << " = 0;\n";
+					} break;
+					case Item::Kind::ATTRIBUTE: {
+						const Attribute& att = static_cast <const Attribute&> (item);
+						h_ << "virtual " << Var (att) << ' ' << att.name () << " () = 0;\n";
+						if (!att.readonly ())
+							h_ << "virtual void " << att.name () << " (" << ServantParam (att) << ") = 0;\n";
+					} break;
+				}
 			}
+			h_.unindent ();
+			h_ << "};\n";
 		}
-		h_.unindent ();
-		h_ << "};\n";
 
 		// Static implementation
 		h_.empty_line ();
@@ -165,27 +169,40 @@ void Servant::end (const Interface& itf)
 
 		h_.namespace_close ();
 
-		const NamedItem* ns = itf.parent ();
-		if (ns) {
-			ScopedName sn = ns->scoped_name ();
-			{
-				string s = "POA_";
-				s += sn.front ();
-				h_ << "namespace " << s << " {\n";
-			}
-			for (auto it = sn.cbegin () + 1; it != sn.cend (); ++it) {
-				h_ << "namespace " << *it << " {\n";
-			}
+		if (options ().legacy) {
+			h_ << endl << "#ifndef LEGACY_CORBA_CPP\n";
+			const NamedItem* ns = itf.parent ();
+			if (ns) {
+				ScopedName sn = ns->scoped_name ();
+				{
+					string s = "POA_";
+					s += sn.front ();
+					h_ << "namespace " << s << " {\n";
+				}
+				for (auto it = sn.cbegin () + 1; it != sn.cend (); ++it) {
+					h_ << "namespace " << *it << " {\n";
+				}
 
-			h_ << "\ntypedef " << Namespace ("CORBA/Internal") << "ServantPOA <" << QName (itf) << "> " << itf.name () << ";\n"
-				"template <class T> using " << itf.name () << "_tie = " << Namespace ("CORBA/Internal") << "ServantTied <T, " << QName (itf) << ">;\n\n";
+				if (!options ().no_POA)
+					h_ << "\ntypedef " << Namespace ("CORBA/Internal")
+					<< "ServantPOA <" << QName (itf) << "> " << itf.name () << ";\n";
 
-			for (size_t cnt = sn.size (); cnt; --cnt) {
-				h_ << "}\n";
+				h_ << "template <class T> using " << itf.name () << "_tie = "
+					<< Namespace ("CORBA/Internal") << "ServantTied <T, " << QName (itf) << ">;\n\n";
+
+				for (size_t cnt = sn.size (); cnt; --cnt) {
+					h_ << "}\n";
+				}
+			} else {
+				
+				if (!options ().no_POA)
+					h_ << "typedef " << Namespace ("CORBA/Internal") 
+					<< "ServantPOA <" << QName (itf) << "> POA_" << static_cast <const string&> (itf.name ()) << ";\n";
+
+				h_ << "template <class T> using POA_" << static_cast <const string&> (itf.name ()) << "_tie = "
+					<< Namespace ("CORBA/Internal") << "ServantTied <T, " << QName (itf) << ">;\n\n";
 			}
-		} else {
-			h_ << "typedef " << Namespace ("CORBA/Internal") << "ServantPOA <" << QName (itf) << "> POA_" << static_cast <const string&> (itf.name ()) << ";\n"
-				"template <class T> using POA_" << static_cast <const string&> (itf.name ()) << "_tie = " << Namespace ("CORBA/Internal") << "ServantTied <T, " << QName (itf) << ">;\n\n";
+			h_ << "#endif\n";
 		}
 	}
 }

@@ -36,7 +36,8 @@ public:
 		client (true),
 		server (true),
 		proxy (true),
-		legacy (false)
+		legacy (false),
+		no_POA (false)
 	{}
 
 	std::filesystem::path out_h, out_cpp;
@@ -45,6 +46,7 @@ public:
 	std::string proxy_suffix;
 	bool client, server, proxy;
 	bool legacy;
+	bool no_POA;
 };
 
 #endif

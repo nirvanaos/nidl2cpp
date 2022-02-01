@@ -39,19 +39,21 @@ void Compiler::print_usage_info (const char* exe_name)
 	cout << "Nirvana IDL compiler.\n";
 	IDL_FrontEnd::print_usage_info (exe_name);
 	cout << "Output options:\n"
-		"\t-out directory Directory for output files.\n"
-		"\t-out_h directory Directory for output *.h files.\n"
-		"\t-out_cpp directory Directory for output *.cpp files.\n"
-		"\t-no_client Do not generate the client code.\n"
-		"\t-client Generate the client code only.\n"
-		"\t-no_server Do not generate the server code.\n"
-		"\t-server Generate the server code only.\n"
-		"\t-no_proxy Do not generate the proxy code.\n"
-		"\t-proxy Generate the proxy code only.\n"
-		"\t-client_suffix suffix The suffix for client file names. Default is empty.\n"
-		"\t-server_suffix suffix The suffix for server file name. Default is _s.\n"
-		"\t-proxy_suffix suffix The suffix for proxy file name. Default is _p.\n"
-		"\t-legacy Generate old C++ language mapping 1.3.\n";
+		"\t-out <directory>        Directory for output files.\n"
+		"\t-out_h <directory>      Directory for output *.h files.\n"
+		"\t-out_cpp <directory>    Directory for output *.cpp files.\n"
+		"\t-no_client              Do not generate the client code.\n"
+		"\t-client                 Generate the client code only.\n"
+		"\t-no_server              Do not generate the server code.\n"
+		"\t-server                 Generate the server code only.\n"
+		"\t-no_proxy               Do not generate the proxy code.\n"
+		"\t-proxy                  Generate the proxy code only.\n"
+		"\t-client_suffix <suffix> The suffix for client file names. Default is empty.\n"
+		"\t-server_suffix <suffix> The suffix for server file name. Default is _s.\n"
+		"\t-proxy_suffix <suffix>  The suffix for proxy file name. Default is _p.\n"
+		"\t-legacy                 Generate code compatible with C++ language mapping 1.3.\n"
+		"                          To enable compatibility define macro LEGACY_CORBA_CPP\n"
+		"\t-no_POA                 Do not generate standard virtual servant implementation\n";
 }
 
 const char* Compiler::option (const char* arg, const char* opt)
@@ -99,6 +101,8 @@ bool Compiler::parse_command_line (CmdLine& args)
 		proxy_suffix = args.parameter (arg);
 	else if ((arg = option (args.arg (), "legacy")))
 		legacy = true;
+	else if ((arg = option (args.arg (), "no_POA")))
+		no_POA = true;
 
 	if (arg) {
 		args.next ();

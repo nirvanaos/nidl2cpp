@@ -595,40 +595,53 @@ void Client::leaf (const Constant& item)
 {
 	h_namespace_open (item);
 
+	bool outline = false;
+	const char* type = nullptr;
+	switch (item.dereference_type ().tkind ()) {
+		case Type::Kind::STRING:
+		case Type::Kind::FIXED:
+			outline = true;
+			type = "char* const";
+			break;
+		case Type::Kind::WSTRING:
+			outline = true;
+			type = "whar_t* const";
+			break;
+	}
+
 	if (nested (item))
 		h_ << "static ";
-	else
+	else if (outline)
 		h_ << "extern ";
-	bool outline = constant (h_, item);
+
+	h_ << "const ";
+	
+	if (type)
+		h_ << type;
+	else
+		h_ << static_cast <const Type&> (item);
+
 	h_ << ' ' << item.name ();
 	if (outline) {
 		cpp_.namespace_open (item);
-		constant (cpp_, item);
+
+		if (nested (item))
+			cpp_ << "static ";
+		else
+			cpp_ << "extern ";
+
+		cpp_ << "const ";
+
+		if (type)
+			cpp_ << type;
+		else
+			cpp_ << static_cast <const Type&> (item);
+
 		cpp_ << ' ' << QName (item) << " = " << static_cast <const Variant&> (item) << ";\n";
 	} else {
 		h_ << " = " << static_cast <const Variant&> (item);
 	}
 	h_ << ";\n";
-}
-
-bool Client::constant (Code& stm, const Constant& item)
-{
-	stm << "const ";
-	bool outline = false;
-	switch (item.dereference_type ().tkind ()) {
-		case Type::Kind::STRING:
-		case Type::Kind::FIXED:
-			outline = true;
-			stm << "char* const";
-			break;
-		case Type::Kind::WSTRING:
-			outline = true;
-			stm << "whar_t* const";
-			break;
-		default:
-			stm << static_cast <const Type&> (item);
-	}
-	return outline;
 }
 
 void Client::begin (const Exception& item)

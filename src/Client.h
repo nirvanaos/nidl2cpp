@@ -128,7 +128,6 @@ private:
 	void environment (const AST::Raises& raises);
 	void type_code_decl (const AST::NamedItem& item);
 	void type_code_def (const AST::RepositoryId& rid);
-	static bool constant (Code& stm, const AST::Constant& item);
 	void rep_id_of (const AST::RepositoryId& rid);
 	void define_structured_type (const AST::RepositoryId& rid, const Members& members, const char* suffix = "");
 	void type_code_func (const AST::NamedItem& item);

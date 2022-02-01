@@ -86,6 +86,8 @@ void Client::type_code_decl (const NamedItem& item)
 
 	if (!nested (item))
 		h_ << "extern ";
+	else
+		h_ << "static ";
 	h_ << "const " << Namespace ("Nirvana") << "ImportInterfaceT <" << Namespace ("CORBA") << "TypeCode> _tc_" << static_cast <const string&> (item.name ()) << ";\n";
 }
 

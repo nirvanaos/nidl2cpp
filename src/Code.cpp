@@ -237,7 +237,7 @@ Code& operator << (Code& stm, const Type& t)
 		"Boolean",
 		"Octet",
 		"Char",
-		"Wchar",
+		"WChar",
 		"UShort",
 		"ULong",
 		"ULongLong",

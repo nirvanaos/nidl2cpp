@@ -83,48 +83,25 @@ void Proxy::get_parameters (const AST::Operation& op, Members& params_in, Member
 
 void Proxy::implement (const Operation& op)
 {
+	cpp_.empty_line ();
+
 	const ItemScope& itf = *op.parent ();
 
 	Members params_in, params_out;
 	get_parameters (op, params_in, params_out);
 
-	string type_in, type_out;
-	if (!params_in.empty ()) {
-		cpp_.empty_line ();
+	if (!params_in.empty ())
+		cpp_ << "static const Parameter " << op.name () << "_in_params_ [" << params_in.size () << "];\n";
 
-		type_in = op.name ();
-		type_in += "_in";
-		cpp_ << "struct " << type_in << "\n{\n";
-		cpp_.indent ();
-		abi_members (params_in);
-		cpp_.unindent ();
-		cpp_ << "};\n";
-		cpp_ << "static const Parameter " << type_in << "_params_ [" << params_in.size () << "];\n";
-	}
-
-	if (!params_out.empty () || op.tkind () != Type::Kind::VOID) {
-		cpp_.empty_line ();
-
-		type_out = op.name ();
-		type_out += "_out";
-		cpp_ << "struct " << type_out << "\n{\n";
-		cpp_.indent ();
-		abi_members (params_out);
-		if (op.tkind () != Type::Kind::VOID)
-			abi_member (op) << " _ret;\n";
-		cpp_.unindent ();
-		cpp_ << "};\n";
-		if (!params_out.empty ())
-			cpp_ << "static const Parameter " << type_out << "_params_ [" << params_out.size () << "];\n";
-	}
+	if (!params_out.empty ())
+		cpp_ << "static const Parameter " << op.name () << "_out_params_ [" << params_out.size () << "];\n";
 
 	cpp_.empty_line ();
-	cpp_ << "static void " << static_cast <const string&> (op.name ()) << "_request (I_ptr <" << QName (itf) << "> _servant, "
-		" IORequest::_ptr_type _call, ::Nirvana::ConstPointer _in_ptr, Unmarshal::_ref_type& _u, ::Nirvana::Pointer _out_ptr)\n"
+	cpp_ << "static void " << static_cast <const string&> (op.name ())
+		<< "_request (I_ptr <" << QName (itf) << "> _servant, IORequest::_ptr_type _call)\n"
 		"{\n";
+
 	cpp_.indent ();
-	if (!params_in.empty ())
-		cpp_ << "const " << type_in << "& _in = *(const " << type_in << "*)_in_ptr;\n\n";
 
 	// out and inout params
 	for (auto p : params_out) {
@@ -144,12 +121,12 @@ void Proxy::implement (const Operation& op)
 	}
 
 	// Unmarshal in and inout
-	for (auto p : params_in) {
-		cpp_ << TypePrefix (*p) << "unmarshal (_in." << p->name () << ", _u, " << p->name () << ");\n";
+	if (!params_in.empty ()) {
+		for (auto p : params_in) {
+			cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";
+		}
+		cpp_ << "_call->unmarshal_end ();\n";
 	}
-
-	// Release resources
-	cpp_ << "_u = Unmarshal::_nil ();\n";
 
 	// Call
 	if (op.tkind () != Type::Kind::VOID)
@@ -166,38 +143,17 @@ void Proxy::implement (const Operation& op)
 	}
 	cpp_ << ");\n";
 	cpp_.unindent ();
-	// Input params out of scope here
-	cpp_ << "}\n";
+	cpp_ << "}\n"; // Input params are out of scope here
 
-	if (!type_out.empty ()) {
-		// Marshal output
-		bool marshal = is_var_len (params_out) || is_var_len (op);
-		const char* m_param = marshal ? "_m" : "Marshal::_nil ()";
-		if (marshal)
-			cpp_ << "Marshal_ptr _m = _call->marshaler ();\n";
-		
-		cpp_ << type_out << "& _out = *(" << type_out << "*)_out_ptr;\n";
-		for (auto p : params_out) {
-			cpp_ << TypePrefix (*p) << "marshal_out (" << p->name () << ", " << m_param << " , _out." << p->name () << ");\n";
-		}
-		if (op.tkind () != Type::Kind::VOID)
-			cpp_ << TypePrefix (op) << "marshal_out (_ret, " << m_param << " , _out._ret);\n";
+	// Marshal output
+	for (auto p : params_out) {
+		cpp_ << TypePrefix (*p) << "marshal_out (" << p->name () << ", _call);\n";
 	}
+	if (op.tkind () != Type::Kind::VOID)
+		cpp_ << TypePrefix (op) << "marshal_out (_ret, _call);\n";
 
 	cpp_.unindent ();
 	cpp_ << "}\n";
-}
-
-void Proxy::abi_members (const Members& members)
-{
-	for (auto p : members)
-		abi_member (*p) << ' ' << p->name () << ";\n";
-}
-
-ostream& Proxy::abi_member (const Type& t)
-{
-	cpp_ << TypePrefix (t) << "ABI";
-	return cpp_;
 }
 
 void Proxy::implement (const Attribute& att)
@@ -205,14 +161,8 @@ void Proxy::implement (const Attribute& att)
 	const ItemScope& itf = *att.parent ();
 
 	cpp_.empty_line ();
-	string att_abi = att.name ();
-	att_abi += "_att";
-	cpp_ << "typedef ";
-	abi_member (att) << ' ' << att_abi << ";\n";
-
-	cpp_.empty_line ();
-	cpp_ << "static void _get_" << static_cast <const string&> (att.name ()) << "_request (I_ptr < " << QName (itf) << "> _servant, "
-		" IORequest::_ptr_type _call, ::Nirvana::ConstPointer _in_ptr, Unmarshal::_ref_type& _u, ::Nirvana::Pointer _out_ptr)\n"
+	cpp_ << "static void _get_" << static_cast <const string&> (att.name ())
+		<< "_request (I_ptr < " << QName (itf) << "> _servant, IORequest::_ptr_type _call)\n"
 		"{\n";
 	cpp_.indent ();
 
@@ -222,29 +172,25 @@ void Proxy::implement (const Attribute& att)
 	// Call
 	cpp_ << "_ret = _servant->" << att.name () << " ();\n";
 
-	bool marshal = is_var_len (att);
-	if (marshal)
-		cpp_ << "Marshal_ptr _m = _call->marshaler ()";
-	cpp_ << ";\n";
-	cpp_ << TypePrefix (att) << "marshal_out (_ret, " << (marshal ? "_m" : "Marshal::_nil ()") << " , *(" << att_abi << "*)_out_ptr);\n";
+	// Marshal
+	cpp_ << TypePrefix (att) << "marshal_out (_ret, _call);\n";
 
 	cpp_.unindent ();
 	cpp_ << "}\n";
 
 	if (!att.readonly ()) {
 		cpp_.empty_line ();
+
 		cpp_ << "static const Parameter _set_" << static_cast <const string&> (att.name ()) << "_in_params_ [1];\n\n";
 
-		cpp_ << "static void _set_" << static_cast <const string&> (att.name ()) << "_request (I_ptr < " << QName (itf) << "> _servant, "
-			" IORequest::_ptr_type _call, ::Nirvana::ConstPointer _in_ptr, Unmarshal::_ref_type& _u, ::Nirvana::Pointer _out_ptr)\n"
+		cpp_ << "static void _set_" << static_cast <const string&> (att.name ())
+			<< "_request (I_ptr < " << QName (itf) << "> _servant, IORequest::_ptr_type _call)\n"
 			"{\n";
 		cpp_.indent ();
 
 		cpp_ << Var (att) << " val;\n";
-		cpp_ << TypePrefix (att) << "unmarshal (*(const " << att_abi << "*)_in_ptr, _u, val);\n";
-
-		// Release resources
-		cpp_ << "_u = Unmarshal::_nil ();\n";
+		cpp_ << TypePrefix (att) << "unmarshal (_call, val);\n";
+			"_call->unmarshal_end ();\n";
 
 		// Call
 		cpp_ << "_servant->" << att.name () << " (val);\n";
@@ -334,43 +280,28 @@ void Proxy::end (const Interface& itf)
 
 				get_parameters (op, op_md.params_in, op_md.params_out);
 
-				if (!op_md.params_in.empty ()) {
-					cpp_ << "Traits::" << static_cast <const string&> (op.name ()) << "_in _in;\n"
-						"Marshal::_ref_type _m";
+				// Create request
+				cpp_ << "IORequest::_ref_type _call = _target ()->create_request ();\n";
 
-					if (is_var_len (op_md.params_in))
-						cpp_ << " = _target ()->create_marshaler ()";
-					cpp_ << ";\n";
-
-					for (auto p : op_md.params_in) {
-						cpp_ << TypePrefix (*p) << "marshal_in (" << p->name () << ", _m, _in." << p->name () << ");\n";
-					}
-				} else
-					cpp_ << "Marshal::_ref_type _m;\n";
-
-				bool has_out = !op_md.params_out.empty () || op.tkind () != Type::Kind::VOID;
-
-				if (has_out)
-					cpp_ << "Traits::" << static_cast <const string&> (op.name ()) << "_out _out;\n";
-				cpp_ << "Unmarshal::_ref_type _u = _target ()->call (_make_op_idx (" << (metadata.size () - 1) << "), ";
-				if (!op_md.params_in.empty ())
-					cpp_ << "&_in, sizeof (_in)";
-				else
-					cpp_ << "0, 0";
-				cpp_ << ", _m, ";
-				if (has_out)
-					cpp_ << "&_out, sizeof (_out)";
-				else
-					cpp_ << "0, 0";
-				cpp_ << ");\n";
-
-				for (auto p : op_md.params_out) {
-					cpp_ << TypePrefix (*p) << "unmarshal (_out." << p->name () << ", _u, " << p->name () << ");\n";
+				// Marshal input
+				for (auto p : op_md.params_in) {
+					cpp_ << TypePrefix (*p) << "marshal_in (" << p->name () << ", _call);\n";
 				}
 
+				// Call
+				cpp_ << "_target ()->call";
+				if (op.oneway ())
+					cpp_ << "_oneway";
+				cpp_ << " (_call, _make_op_idx (" << (metadata.size () - 1) << "));\n";
+
+				assert (!op.oneway () || (op_md.params_out.empty () && op.tkind () == Type::Kind::VOID));
+				// Unmarshal output
+				for (auto p : op_md.params_out) {
+					cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";
+				}
 				if (op.tkind () != Type::Kind::VOID) {
 					cpp_ << Var (op) << " _ret;\n"
-						<< TypePrefix (op) << "unmarshal (_out._ret, _u, _ret);\n"
+						<< TypePrefix (op) << "unmarshal (_call, _ret);\n"
 						"return _ret;\n";
 				}
 
@@ -394,14 +325,11 @@ void Proxy::end (const Interface& itf)
 					"{\n";
 				cpp_.indent ();
 
-				cpp_ << "Traits::" << static_cast <const string&> (att.name ()) << "_att _out;\n"
-					"Marshal::_ref_type _m;\n";
-				cpp_ << "Unmarshal::_ref_type _u = _target ()->call (_make_op_idx (" << (metadata.size () - 1) << "), 0, 0, _m, ";
-				cpp_ << "&_out, sizeof (_out)";
-				cpp_ << ");\n";
+				cpp_ << "IORequest::_ref_type _call = _target ()->create_request ();\n"
+					"_target ()->call (_call, _make_op_idx (" << (metadata.size () - 1) << "));\n";
 
 				cpp_ << Var (att) << " _ret;\n"
-					<< TypePrefix (att) << "unmarshal (_out, _u, _ret);\n"
+					<< TypePrefix (att) << "unmarshal (_call, _ret);\n"
 					"return _ret;\n";
 
 				cpp_.unindent ();
@@ -422,17 +350,9 @@ void Proxy::end (const Interface& itf)
 						"{\n";
 					cpp_.indent ();
 
-					cpp_ << "Traits::" << static_cast <const string&> (att.name ()) << "_att _in;\n"
-						"Marshal::_ref_type _m";
-
-					if (is_var_len (att))
-						cpp_ << " = _target ()->create_marshaler ()";
-					cpp_ << ";\n";
-
-					cpp_ << TypePrefix (att) << "marshal_in (val, _m, _in);\n";
-
-					cpp_ << "Unmarshal::_ref_type _u = _target ()->call (_make_op_idx (" << (metadata.size () - 1)
-						<< "), &_in, sizeof (_in), _m, 0, 0);\n";
+					cpp_ << "IORequest::_ref_type _call = _target ()->create_request ();\n"
+						<< TypePrefix (att) << "marshal_in (val, _call);\n"
+						"_target ()->call (_call, _make_op_idx (" << (metadata.size () - 1) << "));\n";
 
 					cpp_.unindent ();
 					cpp_ << "}\n\n";

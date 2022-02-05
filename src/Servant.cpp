@@ -47,6 +47,8 @@ void Servant::leaf (const Include& item)
 
 void Servant::begin (const Interface& itf)
 {
+	attributes_by_ref_ = itf.interface_kind () == InterfaceKind::PSEUDO;
+
 	h_.namespace_open ("CORBA/Internal");
 	h_.empty_line ();
 
@@ -278,7 +280,7 @@ void Servant::leaf (const Attribute& att)
 {
 	const ItemScope& itf = *att.parent ();
 
-	h_ << "static " << ABI_ret (att);
+	h_ << "static " << ABI_ret (att, attributes_by_ref_);
 	{
 		string name = "__get_";
 		name += att.name ();

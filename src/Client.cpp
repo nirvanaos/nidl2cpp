@@ -331,7 +331,8 @@ void Client::end (const Interface& itf)
 
 			case Item::Kind::ATTRIBUTE: {
 				const Attribute& att = static_cast <const Attribute&> (item);
-				h_ << ABI_ret (att) << " (*_get_" << att.name () << ") (Bridge < " << QName (itf) << ">*, Interface*);\n";
+				h_ << ABI_ret (att, itf.interface_kind () == InterfaceKind::PSEUDO)
+					<< " (*_get_" << att.name () << ") (Bridge < " << QName (itf) << ">*, Interface*);\n";
 
 				if (!att.readonly ()) {
 					h_ << "void (*_set_" << att.name () << ") (Bridge < " << QName (itf) << ">* _b, " << ABI_param (att) << ", Interface* _env);\n";
@@ -372,7 +373,11 @@ void Client::end (const Interface& itf)
 			case Item::Kind::ATTRIBUTE: {
 				const Attribute& att = static_cast <const Attribute&> (item);
 
-				h_ << Var (att) << ' ' << att.name () << " ();\n";
+				if (itf.interface_kind () != InterfaceKind::PSEUDO)
+					h_ << Var (att);
+				else
+					h_ << ConstRef (att);
+				h_ << ' ' << att.name () << " ();\n";
 
 				if (!att.readonly ())
 					h_ << "void " << att.name () << " (" << Param (att) << ");\n";
@@ -425,15 +430,24 @@ void Client::end (const Interface& itf)
 				const Attribute& att = static_cast <const Attribute&> (item);
 
 				h_ << "\ntemplate <class T>\n";
+				if (itf.interface_kind () != InterfaceKind::PSEUDO)
+					h_ << Var (att);
+				else
+					h_ << ConstRef (att);
 
-				h_ << Var (att) << " Client <T, " << QName (itf) << ">::" << att.name () << " ()\n"
+				h_ << " Client <T, " << QName (itf) << ">::" << att.name () << " ()\n"
 					"{\n";
 
 				h_.indent ();
 
 				environment (att.getraises ());
 				h_ << "Bridge < " << QName (itf) << ">& _b (T::_get_bridge (_env));\n"
-					<< TypePrefix (att) << "C_ret _ret = (_b._epv ().epv._get_" << att.name () << ") (&_b, &_env);\n"
+					<< TypePrefix (att) << 'C';
+					
+				if (itf.interface_kind () == InterfaceKind::PSEUDO)
+					h_ << "_VT";
+
+				h_ << "_ret _ret = (_b._epv ().epv._get_" << att.name () << ") (&_b, &_env); \n"
 					"_env.check ();\n"
 					"return _ret;\n";
 
@@ -828,9 +842,9 @@ void Client::marshal (const Members& members, const char* prefix)
 		h_ << "false;\n\n"
 			"static void marshal_in (const Var& src, IORequest::_ptr_type rq)\n"
 			"{\n";
-		marshal_members (members, "marshal_in (src.", prefix);		
+		marshal_members (members, "marshal_in (src.", prefix);
 		h_ << "}\n\n"
-			"static void marshal_out (Var& src, IORequest::_ptr_type rq, ABI& dst)\n"
+			"static void marshal_out (Var& src, IORequest::_ptr_type rq)\n"
 			"{\n";
 		marshal_members (members, "marshal_out (src.", prefix);
 		h_ << "}\n\n"
@@ -1009,7 +1023,7 @@ void Client::accessors (const Members& members)
 	for (const Member* m : members) {
 		h_.empty_line ();
 
-		h_ << TypePrefix (*m) << "ConstRef " << m->name () << " () const\n"
+		h_ << ConstRef (*m) << ' ' << m->name () << " () const\n"
 			"{\n";
 		h_.indent ();
 		h_ << "return _" << m->name () << ";\n";

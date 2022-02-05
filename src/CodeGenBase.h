@@ -65,11 +65,13 @@ public:
 
 	struct ABI_ret
 	{
-		ABI_ret (const AST::Type& t) :
-			type (t)
+		ABI_ret (const AST::Type& t, bool _byref = false) :
+			type (t),
+			byref (_byref)
 		{}
 
 		const AST::Type& type;
+		bool byref;
 	};
 
 	struct ABI_param
@@ -91,6 +93,15 @@ public:
 	struct Var
 	{
 		Var (const AST::Type& t) :
+			type (t)
+		{}
+
+		const AST::Type& type;
+	};
+
+	struct ConstRef
+	{
+		ConstRef (const AST::Type& t) :
 			type (t)
 		{}
 
@@ -261,5 +272,6 @@ Code& operator << (Code& stm, const CodeGenBase::ServantParam& t);
 Code& operator << (Code& stm, const CodeGenBase::ServantOp& t);
 Code& operator << (Code& stm, const CodeGenBase::Namespace& ns);
 Code& operator << (Code& stm, const CodeGenBase::ItemNamespace& ns);
+Code& operator << (Code& stm, const CodeGenBase::ConstRef& t);
 
 #endif

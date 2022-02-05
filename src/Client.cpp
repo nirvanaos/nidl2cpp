@@ -823,30 +823,92 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 void Client::marshal (const Members& members, const char* prefix)
 {
 	h_ << "\n"
-		"static void marshal_in (const Var& src, Marshal::_ptr_type marshaler, ABI& dst)\n"
-		"{\n";
-	h_.indent ();
-	for (auto m : members) {
-		h_ << TypePrefix (*m) << "marshal_in (src." << prefix << m->name () << ", marshaler, dst." << m->name () << ");\n";
+		"static const bool fixed_len = ";
+	if (is_var_len (members)) {
+		h_ << "false;\n\n"
+			"static void marshal_in (const Var& src, IORequest::_ptr_type rq)\n"
+			"{\n";
+		marshal_members (members, "marshal_in (src.", prefix);		
+		h_ << "}\n\n"
+			"static void marshal_out (Var& src, IORequest::_ptr_type rq, ABI& dst)\n"
+			"{\n";
+		marshal_members (members, "marshal_out (src.", prefix);
+		h_ << "}\n\n"
+			"static void unmarshal (IORequest::_ptr_type rq, Var& dst)\n"
+			"{\n";
+		h_.indent ();
+		for (Members::const_iterator m = members.begin (); m != members.end ();) {
+			// Unmarshal variable-length members
+			while (is_var_len (**m)) {
+				h_ << TypePrefix (**m) << "unmarshal (rq, dst." << prefix << (*m)->name () << ");\n";
+				if (members.end () == ++m)
+					break;
+			}
+			if (m != members.end ()) {
+				// Unmarshal fixed-length members
+				auto begin = m;
+				do {
+					++m;
+				} while (m != members.end () && !is_var_len (**m));
+				auto end = m;
+
+				if (end == members.end ())
+					h_ << "if (unmarshal_members (rq, dst, &dst." << prefix << (*begin)->name ();
+				else
+					h_ << "if (unmarshal_members (rq, &dst." << prefix << (*begin)->name ()
+						<< ", &dst." << prefix << (*end)->name ();
+				h_ << ")) {\n";
+				h_.indent ();
+
+				// Swap bytes
+				m = begin;
+				do {
+					h_ << TypePrefix (**m) << "byteswap (dst." << prefix << (*m)->name () << ");\n";
+				} while (end != ++m);
+				h_.unindent ();
+				h_ << "}\n";
+
+				// If some members have check, check them
+				m = begin;
+				do {
+					h_ << TypePrefix (**m) << "check (dst." << prefix << (*m)->name () << ");\n";
+				} while (end != ++m);
+			}
+		}
+		h_.unindent ();
+		h_ << "}\n";
+	} else {
+		h_ << "true;\n";
 	}
-	h_.unindent ();
-	h_ << "}\n\n"
-		"static void marshal_out (Var& src, Marshal::_ptr_type marshaler, ABI& dst)\n"
-		"{\n";
+}
+
+void Client::marshal_members (const Members& members, const char* func, const char* prefix)
+{
 	h_.indent ();
-	for (auto m : members) {
-		h_ << TypePrefix (*m) << "marshal_out (src." << prefix << m->name () << ", marshaler, dst." << m->name () << ");\n";
+
+	for (Members::const_iterator m = members.begin (); m != members.end ();) {
+		// Marshal variable-length members
+		while (is_var_len (**m)) {
+			h_ << TypePrefix (**m) << func << prefix << (*m)->name () << ", rq);\n";
+			if (members.end () == ++m)
+				break;
+		}
+		if (m != members.end ()) {
+			// Marshal fixed-length members
+			auto begin = m;
+			do {
+				++m;
+			} while (m != members.end () && !is_var_len (**m));
+
+			if (m == members.end ())
+				h_ << "marshal_members (src, &src." << prefix << (*begin)->name () << ", rq);\n";
+			else
+				h_ << "marshal_members (&src." << prefix << (*begin)->name ()
+					<< ", &src." << prefix << (*m)->name () << ", rq);\n";
+		}
 	}
+
 	h_.unindent ();
-	h_ << "}\n\n"
-		"static void unmarshal (const ABI& src, Unmarshal::_ptr_type unmarshaler, " << "Var& dst)\n"
-		"{\n";
-	h_.indent ();
-	for (auto m : members) {
-		h_ << TypePrefix (*m) << "unmarshal (src." << m->name () << ", unmarshaler, dst." << prefix << m->name () << ");\n";
-	}
-	h_.unindent ();
-	h_ << "}\n";
 }
 
 void Client::leaf (const StructDecl& item)

@@ -192,8 +192,10 @@ void Client::forward_guard (const NamedItem& item)
 	const NamedItem* parent = item.parent ();
 	if (parent)
 		forward_guard (*parent);
-	else
+	else {
+		h_.empty_line ();
 		h_ << "#ifndef IDL_DECLARED";
+	}
 	h_ << '_' << item.name ();
 }
 
@@ -242,6 +244,7 @@ void Client::forward_interface (const NamedItem& item, InterfaceKind kind)
 	h_ << "};\n";
 
 	h_.namespace_close ();
+	h_.empty_line ();
 	h_ << "#endif\n"; // Close forward guard
 
 	if (options ().legacy) {

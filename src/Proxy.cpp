@@ -289,20 +289,27 @@ void Proxy::end (const Interface& itf)
 				}
 
 				// Call
+				assert (!op.oneway () || (op_md.params_out.empty () && op.tkind () == Type::Kind::VOID));
+
 				cpp_ << "_target ()->call";
 				if (op.oneway ())
 					cpp_ << "_oneway";
-				cpp_ << " (_call, _make_op_idx (" << (metadata.size () - 1) << "));\n";
+				cpp_ << " (_make_op_idx (" << (metadata.size () - 1) << "), _call);\n";
 
-				assert (!op.oneway () || (op_md.params_out.empty () && op.tkind () == Type::Kind::VOID));
-				// Unmarshal output
-				for (auto p : op_md.params_out) {
-					cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";
-				}
-				if (op.tkind () != Type::Kind::VOID) {
-					cpp_ << Var (op) << " _ret;\n"
-						<< TypePrefix (op) << "unmarshal (_call, _ret);\n"
-						"return _ret;\n";
+				if (!op.oneway ()) {
+					
+					// Unmarshal output
+
+					cpp_ << "check_request (_call);\n";
+
+					for (auto p : op_md.params_out) {
+						cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";
+					}
+					if (op.tkind () != Type::Kind::VOID) {
+						cpp_ << Var (op) << " _ret;\n"
+							<< TypePrefix (op) << "unmarshal (_call, _ret);\n"
+							"return _ret;\n";
+					}
 				}
 
 				cpp_.unindent ();
@@ -326,7 +333,8 @@ void Proxy::end (const Interface& itf)
 				cpp_.indent ();
 
 				cpp_ << "IORequest::_ref_type _call = _target ()->create_request ();\n"
-					"_target ()->call (_call, _make_op_idx (" << (metadata.size () - 1) << "));\n";
+					"_target ()->call (_make_op_idx (" << (metadata.size () - 1) << "), _call);\n"
+					"check_request (_call);\n";
 
 				cpp_ << Var (att) << " _ret;\n"
 					<< TypePrefix (att) << "unmarshal (_call, _ret);\n"
@@ -352,7 +360,8 @@ void Proxy::end (const Interface& itf)
 
 					cpp_ << "IORequest::_ref_type _call = _target ()->create_request ();\n"
 						<< TypePrefix (att) << "marshal_in (val, _call);\n"
-						"_target ()->call (_call, _make_op_idx (" << (metadata.size () - 1) << "));\n";
+						"_target ()->call (_make_op_idx (" << (metadata.size () - 1) << "), _call);\n"
+						"check_request (_call);\n";
 
 					cpp_.unindent ();
 					cpp_ << "}\n\n";

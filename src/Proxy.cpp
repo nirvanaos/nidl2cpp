@@ -98,7 +98,7 @@ void Proxy::implement (const Operation& op)
 
 	cpp_.empty_line ();
 	cpp_ << "static void " << static_cast <const string&> (op.name ())
-		<< "_request (I_ptr <" << QName (itf) << "> _servant, IORequest::_ptr_type _call)\n"
+		<< "_request (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)\n"
 		"{\n";
 
 	cpp_.indent ();
@@ -162,7 +162,7 @@ void Proxy::implement (const Attribute& att)
 
 	cpp_.empty_line ();
 	cpp_ << "static void _get_" << static_cast <const string&> (att.name ())
-		<< "_request (I_ptr < " << QName (itf) << "> _servant, IORequest::_ptr_type _call)\n"
+		<< "_request (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)\n"
 		"{\n";
 	cpp_.indent ();
 
@@ -184,7 +184,7 @@ void Proxy::implement (const Attribute& att)
 		cpp_ << "static const Parameter _set_" << static_cast <const string&> (att.name ()) << "_in_params_ [1];\n\n";
 
 		cpp_ << "static void _set_" << static_cast <const string&> (att.name ())
-			<< "_request (I_ptr < " << QName (itf) << "> _servant, IORequest::_ptr_type _call)\n"
+			<< "_request (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)\n"
 			"{\n";
 		cpp_.indent ();
 

@@ -187,10 +187,22 @@ void Client::forward_decl (const NamedItem& item)
 	type_code_decl (item);
 }
 
+void Client::forward_guard (const NamedItem& item)
+{
+	const NamedItem* parent = item.parent ();
+	if (parent)
+		forward_guard (*parent);
+	else
+		h_ << "#ifndef IDL_DECLARED";
+	h_ << '_' << item.name ();
+}
+
 void Client::forward_interface (const NamedItem& item, InterfaceKind kind)
 {
+	h_.namespace_close ();
+	forward_guard (item);
 	forward_decl (item);
-
+	h_ << endl;
 	h_.namespace_open ("CORBA/Internal");
 	h_.empty_line ();
 	h_ << "template <>\n"
@@ -228,6 +240,9 @@ void Client::forward_interface (const NamedItem& item, InterfaceKind kind)
 		h_.unindent ();
 	}
 	h_ << "};\n";
+
+	h_.namespace_close ();
+	h_ << "#endif\n"; // Close forward guard
 
 	if (options ().legacy) {
 		h_.namespace_open (item);

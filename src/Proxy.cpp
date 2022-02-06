@@ -63,7 +63,7 @@ void Proxy::leaf (const TypeDef& item)
 	cpp_ << "NIRVANA_EXPORT (" << name << ", \"" << item.repository_id () << "\", CORBA::TypeCode, CORBA::Internal::TypeCodeTypeDef <&" << name << ">)\n";
 }
 
-void Proxy::get_parameters (const AST::Operation& op, Members& params_in, Members& params_out)
+void Proxy::get_parameters (const Operation& op, Members& params_in, Members& params_out)
 {
 	for (auto it = op.begin (); it != op.end (); ++it) {
 		const Parameter* par = *it;
@@ -477,7 +477,7 @@ void Proxy::md_members (const Members& members)
 	cpp_ << endl;
 }
 
-void Proxy::md_member (const AST::Type& t, const std::string& name)
+void Proxy::md_member (const Type& t, const string& name)
 {
 	cpp_ << "{ \"" << name << "\", Type <" << WithAlias (t) << ">::type_code }";
 }
@@ -493,7 +493,7 @@ void Proxy::type_code_members (const NamedItem& item, const Members& members)
 	cpp_ << "};\n\n";
 }
 
-Code& Proxy::exp (const AST::NamedItem& item)
+Code& Proxy::exp (const NamedItem& item)
 {
 	return cpp_ <<
 		"NIRVANA_EXPORT (" << export_name (item) << ", "

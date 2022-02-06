@@ -909,6 +909,15 @@ void Client::marshal (const Members& members, const char* prefix)
 	} else {
 		h_ << "true;\n";
 	}
+
+	h_ << "\nstatic void byteswap (Var& v)\n"
+		"{\n";
+	h_.indent ();
+	for (auto m : members) {
+		h_ << TypePrefix (*m) << "byteswap (v." << prefix << m->name () << ");\n";
+	}
+	h_.unindent ();
+	h_ << "}\n";
 }
 
 void Client::marshal_members (const Members& members, const char* func, const char* prefix)

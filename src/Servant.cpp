@@ -37,7 +37,7 @@ void Servant::end (const Root&)
 
 void Servant::leaf (const Include& item)
 {
-	if (!options ().no_POA) {
+	if (!options ().no_POA && !options ().no_servant) {
 		h_ << "#include " << (item.system () ? '<' : '"')
 			<< path (path (item.file ()).replace_extension ("").string () + options ().servant_suffix).replace_extension ("h").string ()
 			<< (item.system () ? '>' : '"')

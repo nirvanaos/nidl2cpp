@@ -37,7 +37,8 @@ public:
 		server (true),
 		proxy (true),
 		legacy (false),
-		no_POA (false)
+		no_POA (false),
+		no_servant (false)
 	{}
 
 	std::filesystem::path out_h, out_cpp;
@@ -47,6 +48,7 @@ public:
 	bool client, server, proxy;
 	bool legacy;
 	bool no_POA;
+	bool no_servant;
 };
 
 #endif

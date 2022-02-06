@@ -117,7 +117,8 @@ void Servant::end (const Interface& itf)
 	h_.unindent ();
 	h_ << "\n};\n";
 
-	if (itf.interface_kind () != InterfaceKind::ABSTRACT) {
+	// Servant implementations
+	if (itf.interface_kind () != InterfaceKind::ABSTRACT && !options ().no_servant) {
 
 		Interfaces bases = itf.get_all_bases ();
 

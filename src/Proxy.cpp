@@ -121,11 +121,8 @@ void Proxy::implement (const Operation& op)
 	}
 
 	// Unmarshal in and inout
-	if (!params_in.empty ()) {
-		for (auto p : params_in) {
-			cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";
-		}
-		cpp_ << "_call->unmarshal_end ();\n";
+	for (auto p : params_in) {
+		cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";
 	}
 
 	// Call
@@ -190,7 +187,6 @@ void Proxy::implement (const Attribute& att)
 
 		cpp_ << Var (att) << " val;\n";
 		cpp_ << TypePrefix (att) << "unmarshal (_call, val);\n";
-			"_call->unmarshal_end ();\n";
 
 		// Call
 		cpp_ << "_servant->" << att.name () << " (val);\n";
@@ -281,7 +277,10 @@ void Proxy::end (const Interface& itf)
 				get_parameters (op, op_md.params_in, op_md.params_out);
 
 				// Create request
-				cpp_ << "IORequest::_ref_type _call = _target ()->create_request ();\n";
+				cpp_ << "IORequest::_ref_type _call = _target ()->create_request";
+				if (op.oneway ())
+					cpp_ << "_oneway";
+				cpp_ << " (); \n";
 
 				// Marshal input
 				for (auto p : op_md.params_in) {
@@ -291,10 +290,7 @@ void Proxy::end (const Interface& itf)
 				// Call
 				assert (!op.oneway () || (op_md.params_out.empty () && op.tkind () == Type::Kind::VOID));
 
-				cpp_ << "_target ()->call";
-				if (op.oneway ())
-					cpp_ << "_oneway";
-				cpp_ << " (_make_op_idx (" << (metadata.size () - 1) << "), _call);\n";
+				cpp_ << "_call->issue (_make_op_idx (" << (metadata.size () - 1) << "));\n";
 
 				if (!op.oneway ()) {
 					
@@ -333,7 +329,7 @@ void Proxy::end (const Interface& itf)
 				cpp_.indent ();
 
 				cpp_ << "IORequest::_ref_type _call = _target ()->create_request ();\n"
-					"_target ()->call (_make_op_idx (" << (metadata.size () - 1) << "), _call);\n"
+					"_call->issue (_make_op_idx (" << (metadata.size () - 1) << "));\n"
 					"check_request (_call);\n";
 
 				cpp_ << Var (att) << " _ret;\n"
@@ -360,7 +356,7 @@ void Proxy::end (const Interface& itf)
 
 					cpp_ << "IORequest::_ref_type _call = _target ()->create_request ();\n"
 						<< TypePrefix (att) << "marshal_in (val, _call);\n"
-						"_target ()->call (_make_op_idx (" << (metadata.size () - 1) << "), _call);\n"
+						"_call->issue (_make_op_idx (" << (metadata.size () - 1) << "));\n"
 						"check_request (_call);\n";
 
 					cpp_.unindent ();

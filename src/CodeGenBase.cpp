@@ -405,6 +405,15 @@ bool CodeGenBase::is_native_interface (const NamedItem& type)
 	return false;
 }
 
+bool CodeGenBase::is_native (const Type& type)
+{
+	const Type& t = type.dereference_type ();
+	if (t.tkind () == Type::Kind::NAMED_TYPE)
+		return t.named_type ().kind () == Item::Kind::NATIVE;
+	else
+		return false;
+}
+
 bool CodeGenBase::is_enum (const Type& type)
 {
 	const Type& t = type.dereference_type ();

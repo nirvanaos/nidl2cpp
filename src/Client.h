@@ -136,6 +136,7 @@ private:
 	void accessors (const Members& members);
 	void member_variables (const Members& members);
 	void member_variables_legacy (const Members& members);
+	void marshal (const Members& members, bool with_legacy);
 	void marshal (const Members& members, const char* prefix);
 	void marshal_members (const Members& members, const char* func, const char* prefix);
 	static bool nested (const AST::NamedItem& item);

@@ -782,6 +782,7 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 	rep_id_of (rid);
 
 	const NamedItem& item = rid.item ();
+	bool with_legacy = !*suffix && options ().legacy;
 
 	// ABI
 	h_ << "template <>\n"
@@ -802,6 +803,7 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 	// Type
 	h_ << "template <>\n"
 		"struct Type < " << QName (item) << suffix << "> : ";
+
 	if (vl_member != members.end ()) {
 		h_ << "TypeVarLen < " << QName (item) << suffix << ", \n";
 		h_.indent ();
@@ -833,31 +835,44 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 				type_code_func (item);
 		}
 
-		if (!*suffix && options ().legacy)
-			h_ << endl << "#ifndef LEGACY_CORBA_CPP\n";
-
-		marshal (members, "_");
-		if (!*suffix && options ().legacy) {
-			h_ << endl;
-			h_ << "#else\n";
-			marshal (members, "");
-			h_ << endl;
-			h_ << "#endif\n";
-		}
+		marshal (members, with_legacy);
 
 		h_.unindent ();
 		h_ << "};\n";
 	} else {
-		h_ << "TypeByRef < " << QName (item) << suffix << "> {};\n";
+		h_ << "TypeFixLen < " << QName (item) << suffix << ">\n"
+		"{";
+		h_.indent ();
+		marshal (members, with_legacy);
+		h_.unindent ();
+		h_ << "};\n";
+	}
+}
+
+void Client::marshal (const Members& members, bool with_legacy)
+{
+	for (auto m : members) {
+		if (is_native (*m))
+			return;
+	}
+
+	if (with_legacy)
+		h_ << "\n#ifndef LEGACY_CORBA_CPP\n";
+
+	marshal (members, "_");
+	if (with_legacy) {
+		h_ << endl;
+		h_ << "#else\n";
+		marshal (members, "");
+		h_ << endl;
+		h_ << "#endif\n";
 	}
 }
 
 void Client::marshal (const Members& members, const char* prefix)
 {
-	h_ << "\n"
-		"static const bool fixed_len = ";
 	if (is_var_len (members)) {
-		h_ << "false;\n\n"
+		h_ << "\n"
 			"static void marshal_in (const Var& src, IORequest::_ptr_type rq)\n"
 			"{\n";
 		marshal_members (members, "marshal_in (src.", prefix);
@@ -909,11 +924,9 @@ void Client::marshal (const Members& members, const char* prefix)
 		}
 		h_.unindent ();
 		h_ << "}\n";
-	} else {
-		h_ << "true;\n";
 	}
 
-	h_ << "\nstatic void byteswap (Var& v)\n"
+	h_ << "\nstatic void byteswap (Var& v) NIRVANA_NOEXCEPT\n"
 		"{\n";
 	h_.indent ();
 	for (auto m : members) {

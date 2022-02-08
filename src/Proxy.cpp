@@ -121,8 +121,11 @@ void Proxy::implement (const Operation& op)
 	}
 
 	// Unmarshal in and inout
-	for (auto p : params_in) {
-		cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";
+	if (!params_in.empty ()) {
+		for (auto p : params_in) {
+			cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";
+		}
+		cpp_ << "_call->unmarshal_end ();\n";
 	}
 
 	// Call
@@ -186,10 +189,9 @@ void Proxy::implement (const Attribute& att)
 		cpp_.indent ();
 
 		cpp_ << Var (att) << " val;\n";
-		cpp_ << TypePrefix (att) << "unmarshal (_call, val);\n";
-
-		// Call
-		cpp_ << "_servant->" << att.name () << " (val);\n";
+		cpp_ << TypePrefix (att) << "unmarshal (_call, val);\n"
+			"_call->unmarshal_end ();\n"
+			"_servant->" << att.name () << " (val);\n";
 
 		cpp_.unindent ();
 		cpp_ << "}\n";

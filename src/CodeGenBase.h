@@ -183,6 +183,7 @@ public:
 	static bool is_ref_type (const AST::Type& type);
 	static bool is_enum (const AST::Type& type);
 	static bool is_native_interface (const AST::Type& type);
+	static bool is_native (const AST::Type& type);
 
 	const Options& options () const
 	{

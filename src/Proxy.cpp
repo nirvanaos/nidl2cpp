@@ -292,7 +292,9 @@ void Proxy::end (const Interface& itf)
 				// Call
 				assert (!op.oneway () || (op_md.params_out.empty () && op.tkind () == Type::Kind::VOID));
 
-				cpp_ << "_call->issue (_make_op_idx (" << (metadata.size () - 1) << "));\n";
+				cpp_ << "_call->issue (_make_op_idx (" << (metadata.size () - 1) << "), "
+					<< (op.oneway () ? "::Nirvana::INFINITE_DEADLINE" : "0")
+					<< ");\n";
 
 				if (!op.oneway ()) {
 					
@@ -331,7 +333,7 @@ void Proxy::end (const Interface& itf)
 				cpp_.indent ();
 
 				cpp_ << "IORequest::_ref_type _call = _target ()->create_request ();\n"
-					"_call->issue (_make_op_idx (" << (metadata.size () - 1) << "));\n"
+					"_call->issue (_make_op_idx (" << (metadata.size () - 1) << "), 0);\n"
 					"check_request (_call);\n";
 
 				cpp_ << Var (att) << " _ret;\n"
@@ -358,7 +360,7 @@ void Proxy::end (const Interface& itf)
 
 					cpp_ << "IORequest::_ref_type _call = _target ()->create_request ();\n"
 						<< TypePrefix (att) << "marshal_in (val, _call);\n"
-						"_call->issue (_make_op_idx (" << (metadata.size () - 1) << "));\n"
+						"_call->issue (_make_op_idx (" << (metadata.size () - 1) << "), 0);\n"
 						"check_request (_call);\n";
 
 					cpp_.unindent ();

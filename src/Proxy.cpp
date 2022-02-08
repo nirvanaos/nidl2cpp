@@ -279,10 +279,8 @@ void Proxy::end (const Interface& itf)
 				get_parameters (op, op_md.params_in, op_md.params_out);
 
 				// Create request
-				cpp_ << "IORequest::_ref_type _call = _target ()->create_request";
-				if (op.oneway ())
-					cpp_ << "_oneway";
-				cpp_ << " (); \n";
+				cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
+					<< (metadata.size () - 1) << "));\n";
 
 				// Marshal input
 				for (auto p : op_md.params_in) {
@@ -292,15 +290,14 @@ void Proxy::end (const Interface& itf)
 				// Call
 				assert (!op.oneway () || (op_md.params_out.empty () && op.tkind () == Type::Kind::VOID));
 
-				cpp_ << "_call->issue (_make_op_idx (" << (metadata.size () - 1) << "), "
-					<< (op.oneway () ? "::Nirvana::INFINITE_DEADLINE" : "0")
-					<< ");\n";
-
-				if (!op.oneway ()) {
+				if (op.oneway ())
+					cpp_ << "_call->send (::Nirvana::INFINITE_DEADLINE);\n";
+				else {
 					
 					// Unmarshal output
 
-					cpp_ << "check_request (_call);\n";
+					cpp_ << "_call->invoke ();\n"
+						"check_request (_call);\n";
 
 					for (auto p : op_md.params_out) {
 						cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";
@@ -332,8 +329,9 @@ void Proxy::end (const Interface& itf)
 					"{\n";
 				cpp_.indent ();
 
-				cpp_ << "IORequest::_ref_type _call = _target ()->create_request ();\n"
-					"_call->issue (_make_op_idx (" << (metadata.size () - 1) << "), 0);\n"
+				cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
+					<< (metadata.size () - 1) << "));\n"
+					"_call->invoke ();\n"
 					"check_request (_call);\n";
 
 				cpp_ << Var (att) << " _ret;\n"
@@ -358,9 +356,10 @@ void Proxy::end (const Interface& itf)
 						"{\n";
 					cpp_.indent ();
 
-					cpp_ << "IORequest::_ref_type _call = _target ()->create_request ();\n"
+					cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
+						<< (metadata.size () - 1) << "));\n"
 						<< TypePrefix (att) << "marshal_in (val, _call);\n"
-						"_call->issue (_make_op_idx (" << (metadata.size () - 1) << "), 0);\n"
+						"_call->invoke ();\n"
 						"check_request (_call);\n";
 
 					cpp_.unindent ();

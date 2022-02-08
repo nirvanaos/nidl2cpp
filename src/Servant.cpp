@@ -292,9 +292,15 @@ void Servant::leaf (const Attribute& att)
 	h_.indent ();
 	h_ << "try {\n";
 	h_.indent ();
-	h_ << "return " << TypePrefix (att) << "ret (S::_implementation (_b)." << att.name () << " ());\n";
+	h_ << "return " << TypePrefix (att);
+	if (attributes_by_ref_)
+		h_ << "VT_";
+	h_ << "ret (S::_implementation (_b)." << att.name () << " ());\n";
 	catch_block ();
-	h_ << "return " << TypePrefix (att) << "ret ();\n";
+	h_ << "return " << TypePrefix (att);
+	if (attributes_by_ref_)
+		h_ << "VT_";
+	h_ << "ret ();\n";
 	h_.unindent ();
 	h_ << "}\n";
 

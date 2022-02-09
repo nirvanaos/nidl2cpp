@@ -134,6 +134,7 @@ private:
 	void type_code_func (const AST::NamedItem& item);
 	void constructors (const AST::Identifier& name, const Members& members, const char* prefix);
 	void accessors (const Members& members);
+	void member_type (const AST::Member& member);
 	void member_variables (const Members& members);
 	void member_variables_legacy (const Members& members);
 	void marshal (const Members& members, bool with_legacy);

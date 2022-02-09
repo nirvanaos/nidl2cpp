@@ -1063,6 +1063,7 @@ void Client::accessors (const Members& members)
 	for (const Member* m : members) {
 		h_.empty_line ();
 
+		// const getter
 		h_ << ConstRef (*m) << ' ' << m->name () << " () const\n"
 			"{\n";
 		h_.indent ();
@@ -1070,15 +1071,16 @@ void Client::accessors (const Members& members)
 		h_.unindent ();
 		h_ << "}\n";
 
-		if (is_var_len (*m)) {
-			h_ << Var (*m) << "& " << m->name () << " ()\n"
-				"{\n";
-			h_.indent ();
-			h_ << "return _" << m->name () << ";\n";
-			h_.unindent ();
-			h_ << "}\n";
-		}
+		// reference getter
+		member_type (*m);
+		h_ << "& " << m->name () << " ()\n"
+			"{\n";
+		h_.indent ();
+		h_ << "return _" << m->name () << ";\n";
+		h_.unindent ();
+		h_ << "}\n";
 
+		// setter
 		h_ << "void " << m->name () << " (" << TypePrefix (*m) << "ConstRef val)\n"
 			"{\n";
 		h_.indent ();
@@ -1101,14 +1103,19 @@ void Client::accessors (const Members& members)
 void Client::member_variables (const Members& members)
 {
 	for (const Member* m : members) {
-		if (is_boolean (*m))
-			h_ << TypePrefix (*m) << "ABI";
-		else if (is_ref_type (*m))
-			h_ << Var (*m);
-		else
-			h_ << static_cast <const Type&> (*m);
+		member_type (*m);
 		h_ << " _" << static_cast <const string&> (m->name ()) << ";\n";
 	}
+}
+
+void Client::member_type (const AST::Member& member)
+{
+	if (is_boolean (member))
+		h_ << TypePrefix (member) << "ABI";
+	else if (is_ref_type (member))
+		h_ << Var (member);
+	else
+		h_ << static_cast <const Type&> (member);
 }
 
 void Client::member_variables_legacy (const Members& members)

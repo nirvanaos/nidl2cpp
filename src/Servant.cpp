@@ -173,7 +173,7 @@ void Servant::end (const Interface& itf)
 		h_.namespace_close ();
 
 		if (options ().legacy) {
-			h_ << endl << "#ifndef LEGACY_CORBA_CPP\n";
+			h_ << endl << "#ifdef LEGACY_CORBA_CPP\n";
 			const NamedItem* ns = itf.parent ();
 			if (ns) {
 				ScopedName sn = ns->scoped_name ();

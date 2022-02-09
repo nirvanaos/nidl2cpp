@@ -37,7 +37,7 @@ void Servant::end (const Root&)
 
 void Servant::leaf (const Include& item)
 {
-	if (!options ().no_POA) {
+	if (!options ().no_POA && !options ().no_servant) {
 		h_ << "#include " << (item.system () ? '<' : '"')
 			<< path (path (item.file ()).replace_extension ("").string () + options ().servant_suffix).replace_extension ("h").string ()
 			<< (item.system () ? '>' : '"')
@@ -47,6 +47,8 @@ void Servant::leaf (const Include& item)
 
 void Servant::begin (const Interface& itf)
 {
+	attributes_by_ref_ = itf.interface_kind () == InterfaceKind::PSEUDO;
+
 	h_.namespace_open ("CORBA/Internal");
 	h_.empty_line ();
 
@@ -115,7 +117,8 @@ void Servant::end (const Interface& itf)
 	h_.unindent ();
 	h_ << "\n};\n";
 
-	if (itf.interface_kind () != InterfaceKind::ABSTRACT) {
+	// Servant implementations
+	if (itf.interface_kind () != InterfaceKind::ABSTRACT && !options ().no_servant) {
 
 		Interfaces bases = itf.get_all_bases ();
 
@@ -278,7 +281,7 @@ void Servant::leaf (const Attribute& att)
 {
 	const ItemScope& itf = *att.parent ();
 
-	h_ << "static " << ABI_ret (att);
+	h_ << "static " << ABI_ret (att, attributes_by_ref_);
 	{
 		string name = "__get_";
 		name += att.name ();
@@ -289,9 +292,15 @@ void Servant::leaf (const Attribute& att)
 	h_.indent ();
 	h_ << "try {\n";
 	h_.indent ();
-	h_ << "return " << TypePrefix (att) << "ret (S::_implementation (_b)." << att.name () << " ());\n";
+	h_ << "return " << TypePrefix (att);
+	if (attributes_by_ref_)
+		h_ << "VT_";
+	h_ << "ret (S::_implementation (_b)." << att.name () << " ());\n";
 	catch_block ();
-	h_ << "return " << TypePrefix (att) << "ret ();\n";
+	h_ << "return " << TypePrefix (att);
+	if (attributes_by_ref_)
+		h_ << "VT_";
+	h_ << "ret ();\n";
 	h_.unindent ();
 	h_ << "}\n";
 

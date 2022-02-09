@@ -37,7 +37,8 @@ public:
 	Servant (const Options& options, const AST::Root& root,
 		const std::filesystem::path& file, const std::filesystem::path& client) :
 		CodeGenBase (options),
-		h_ (file, root)
+		h_ (file, root),
+		attributes_by_ref_ (false)
 	{
 		h_ << "#include " << client.filename () << std::endl << std::endl;
 	}
@@ -66,6 +67,7 @@ private:
 private:
 	Header h_;
 	std::vector<std::string> epv_;
+	bool attributes_by_ref_;
 };
 
 #endif

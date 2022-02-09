@@ -171,7 +171,7 @@ Code& operator << (Code& stm, const CodeGenBase::ABI_ret& t)
 	else if (CodeGenBase::is_enum (t.type))
 		stm << "ABI_enum";
 	else
-		stm << CodeGenBase::TypePrefix (t.type) << "ABI_ret";
+		stm << CodeGenBase::TypePrefix (t.type) << (t.byref ? "ABI_VT_ret" : "ABI_ret");
 	return stm;
 }
 
@@ -218,6 +218,12 @@ Code& operator << (Code& stm, const CodeGenBase::Var& t)
 		return stm << CodeGenBase::TypePrefix (t.type) << "Var";
 	else
 		return stm << "void";
+}
+
+Code& operator << (Code& stm, const CodeGenBase::ConstRef& t)
+{
+	assert (t.type.tkind () != Type::Kind::VOID);
+	return stm << CodeGenBase::TypePrefix (t.type) << "ConstRef";
 }
 
 Code& operator << (Code& stm, const CodeGenBase::TypeCodeName& t)
@@ -397,6 +403,15 @@ bool CodeGenBase::is_native_interface (const NamedItem& type)
 		return parent && parent->kind () == Item::Kind::MODULE && parent->name () == "Internal";
 	}
 	return false;
+}
+
+bool CodeGenBase::is_native (const Type& type)
+{
+	const Type& t = type.dereference_type ();
+	if (t.tkind () == Type::Kind::NAMED_TYPE)
+		return t.named_type ().kind () == Item::Kind::NATIVE;
+	else
+		return false;
 }
 
 bool CodeGenBase::is_enum (const Type& type)

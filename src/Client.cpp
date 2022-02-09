@@ -187,10 +187,24 @@ void Client::forward_decl (const NamedItem& item)
 	type_code_decl (item);
 }
 
+void Client::forward_guard (const NamedItem& item)
+{
+	const NamedItem* parent = item.parent ();
+	if (parent)
+		forward_guard (*parent);
+	else {
+		h_.empty_line ();
+		h_ << "#ifndef IDL_DECLARED";
+	}
+	h_ << '_' << item.name ();
+}
+
 void Client::forward_interface (const NamedItem& item, InterfaceKind kind)
 {
+	h_.namespace_close ();
+	forward_guard (item);
 	forward_decl (item);
-
+	h_ << endl;
 	h_.namespace_open ("CORBA/Internal");
 	h_.empty_line ();
 	h_ << "template <>\n"
@@ -228,6 +242,10 @@ void Client::forward_interface (const NamedItem& item, InterfaceKind kind)
 		h_.unindent ();
 	}
 	h_ << "};\n";
+
+	h_.namespace_close ();
+	h_.empty_line ();
+	h_ << "#endif\n"; // Close forward guard
 
 	if (options ().legacy) {
 		h_.namespace_open (item);
@@ -331,7 +349,8 @@ void Client::end (const Interface& itf)
 
 			case Item::Kind::ATTRIBUTE: {
 				const Attribute& att = static_cast <const Attribute&> (item);
-				h_ << ABI_ret (att) << " (*_get_" << att.name () << ") (Bridge < " << QName (itf) << ">*, Interface*);\n";
+				h_ << ABI_ret (att, itf.interface_kind () == InterfaceKind::PSEUDO)
+					<< " (*_get_" << att.name () << ") (Bridge < " << QName (itf) << ">*, Interface*);\n";
 
 				if (!att.readonly ()) {
 					h_ << "void (*_set_" << att.name () << ") (Bridge < " << QName (itf) << ">* _b, " << ABI_param (att) << ", Interface* _env);\n";
@@ -372,7 +391,11 @@ void Client::end (const Interface& itf)
 			case Item::Kind::ATTRIBUTE: {
 				const Attribute& att = static_cast <const Attribute&> (item);
 
-				h_ << Var (att) << ' ' << att.name () << " ();\n";
+				if (itf.interface_kind () != InterfaceKind::PSEUDO)
+					h_ << Var (att);
+				else
+					h_ << ConstRef (att);
+				h_ << ' ' << att.name () << " ();\n";
 
 				if (!att.readonly ())
 					h_ << "void " << att.name () << " (" << Param (att) << ");\n";
@@ -425,15 +448,24 @@ void Client::end (const Interface& itf)
 				const Attribute& att = static_cast <const Attribute&> (item);
 
 				h_ << "\ntemplate <class T>\n";
+				if (itf.interface_kind () != InterfaceKind::PSEUDO)
+					h_ << Var (att);
+				else
+					h_ << ConstRef (att);
 
-				h_ << Var (att) << " Client <T, " << QName (itf) << ">::" << att.name () << " ()\n"
+				h_ << " Client <T, " << QName (itf) << ">::" << att.name () << " ()\n"
 					"{\n";
 
 				h_.indent ();
 
 				environment (att.getraises ());
 				h_ << "Bridge < " << QName (itf) << ">& _b (T::_get_bridge (_env));\n"
-					<< TypePrefix (att) << "C_ret _ret = (_b._epv ().epv._get_" << att.name () << ") (&_b, &_env);\n"
+					<< TypePrefix (att) << 'C';
+					
+				if (itf.interface_kind () == InterfaceKind::PSEUDO)
+					h_ << "_VT";
+
+				h_ << "_ret _ret = (_b._epv ().epv._get_" << att.name () << ") (&_b, &_env); \n"
 					"_env.check ();\n"
 					"return _ret;\n";
 
@@ -750,6 +782,7 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 	rep_id_of (rid);
 
 	const NamedItem& item = rid.item ();
+	bool with_legacy = !*suffix && options ().legacy;
 
 	// ABI
 	h_ << "template <>\n"
@@ -770,6 +803,7 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 	// Type
 	h_ << "template <>\n"
 		"struct Type < " << QName (item) << suffix << "> : ";
+
 	if (vl_member != members.end ()) {
 		h_ << "TypeVarLen < " << QName (item) << suffix << ", \n";
 		h_.indent ();
@@ -801,52 +835,134 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 				type_code_func (item);
 		}
 
-		if (!*suffix && options ().legacy)
-			h_ << endl << "#ifndef LEGACY_CORBA_CPP\n";
-
-		marshal (members, "_");
-		if (!*suffix && options ().legacy) {
-			h_ << endl;
-			h_ << "#else\n";
-			marshal (members, "");
-			h_ << endl;
-			h_ << "#endif\n";
-		}
+		marshal (members, with_legacy);
 
 		h_.unindent ();
 		h_ << "};\n";
 	} else {
-		h_ << "TypeByRef < " << QName (item) << suffix << "> {};\n";
+		h_ << "TypeFixLen < " << QName (item) << suffix << ">\n"
+		"{";
+		h_.indent ();
+		marshal (members, with_legacy);
+		h_.unindent ();
+		h_ << "};\n";
+	}
+}
+
+void Client::marshal (const Members& members, bool with_legacy)
+{
+	for (auto m : members) {
+		if (is_native (*m))
+			return;
+	}
+
+	if (with_legacy)
+		h_ << "\n#ifndef LEGACY_CORBA_CPP\n";
+
+	marshal (members, "_");
+	if (with_legacy) {
+		h_ << endl;
+		h_ << "#else\n";
+		marshal (members, "");
+		h_ << endl;
+		h_ << "#endif\n";
 	}
 }
 
 void Client::marshal (const Members& members, const char* prefix)
 {
-	h_ << "\n"
-		"static void marshal_in (const Var& src, Marshal::_ptr_type marshaler, ABI& dst)\n"
-		"{\n";
-	h_.indent ();
-	for (auto m : members) {
-		h_ << TypePrefix (*m) << "marshal_in (src." << prefix << m->name () << ", marshaler, dst." << m->name () << ");\n";
+	if (is_var_len (members)) {
+		h_ << "\n"
+			"static void marshal_in (const Var& src, IORequest::_ptr_type rq)\n"
+			"{\n";
+		marshal_members (members, "marshal_in (src.", prefix);
+		h_ << "}\n\n"
+			"static void marshal_out (Var& src, IORequest::_ptr_type rq)\n"
+			"{\n";
+		marshal_members (members, "marshal_out (src.", prefix);
+		h_ << "}\n\n"
+			"static void unmarshal (IORequest::_ptr_type rq, Var& dst)\n"
+			"{\n";
+		h_.indent ();
+		for (Members::const_iterator m = members.begin (); m != members.end ();) {
+			// Unmarshal variable-length members
+			while (is_var_len (**m)) {
+				h_ << TypePrefix (**m) << "unmarshal (rq, dst." << prefix << (*m)->name () << ");\n";
+				if (members.end () == ++m)
+					break;
+			}
+			if (m != members.end ()) {
+				// Unmarshal fixed-length members
+				auto begin = m;
+				do {
+					++m;
+				} while (m != members.end () && !is_var_len (**m));
+				auto end = m;
+
+				if (end == members.end ())
+					h_ << "if (unmarshal_members (rq, dst, &dst." << prefix << (*begin)->name ();
+				else
+					h_ << "if (unmarshal_members (rq, &dst." << prefix << (*begin)->name ()
+						<< ", &dst." << prefix << (*end)->name ();
+				h_ << ")) {\n";
+				h_.indent ();
+
+				// Swap bytes
+				m = begin;
+				do {
+					h_ << TypePrefix (**m) << "byteswap (dst." << prefix << (*m)->name () << ");\n";
+				} while (end != ++m);
+				h_.unindent ();
+				h_ << "}\n";
+
+				// If some members have check, check them
+				m = begin;
+				do {
+					h_ << TypePrefix (**m) << "check (dst." << prefix << (*m)->name () << ");\n";
+				} while (end != ++m);
+			}
+		}
+		h_.unindent ();
+		h_ << "}\n";
 	}
-	h_.unindent ();
-	h_ << "}\n\n"
-		"static void marshal_out (Var& src, Marshal::_ptr_type marshaler, ABI& dst)\n"
+
+	h_ << "\nstatic void byteswap (Var& v) NIRVANA_NOEXCEPT\n"
 		"{\n";
 	h_.indent ();
 	for (auto m : members) {
-		h_ << TypePrefix (*m) << "marshal_out (src." << prefix << m->name () << ", marshaler, dst." << m->name () << ");\n";
-	}
-	h_.unindent ();
-	h_ << "}\n\n"
-		"static void unmarshal (const ABI& src, Unmarshal::_ptr_type unmarshaler, " << "Var& dst)\n"
-		"{\n";
-	h_.indent ();
-	for (auto m : members) {
-		h_ << TypePrefix (*m) << "unmarshal (src." << m->name () << ", unmarshaler, dst." << prefix << m->name () << ");\n";
+		h_ << TypePrefix (*m) << "byteswap (v." << prefix << m->name () << ");\n";
 	}
 	h_.unindent ();
 	h_ << "}\n";
+}
+
+void Client::marshal_members (const Members& members, const char* func, const char* prefix)
+{
+	h_.indent ();
+
+	for (Members::const_iterator m = members.begin (); m != members.end ();) {
+		// Marshal variable-length members
+		while (is_var_len (**m)) {
+			h_ << TypePrefix (**m) << func << prefix << (*m)->name () << ", rq);\n";
+			if (members.end () == ++m)
+				break;
+		}
+		if (m != members.end ()) {
+			// Marshal fixed-length members
+			auto begin = m;
+			do {
+				++m;
+			} while (m != members.end () && !is_var_len (**m));
+
+			if (m == members.end ())
+				h_ << "marshal_members (src, &src." << prefix << (*begin)->name () << ", rq);\n";
+			else
+				h_ << "marshal_members (&src." << prefix << (*begin)->name ()
+					<< ", &src." << prefix << (*m)->name () << ", rq);\n";
+		}
+	}
+
+	h_.unindent ();
 }
 
 void Client::leaf (const StructDecl& item)
@@ -947,7 +1063,7 @@ void Client::accessors (const Members& members)
 	for (const Member* m : members) {
 		h_.empty_line ();
 
-		h_ << TypePrefix (*m) << "ConstRef " << m->name () << " () const\n"
+		h_ << ConstRef (*m) << ' ' << m->name () << " () const\n"
 			"{\n";
 		h_.indent ();
 		h_ << "return _" << m->name () << ";\n";

@@ -26,6 +26,10 @@
 #include "pch.h"
 #include "Proxy.h"
 
+#define PREFIX_OP_PROC "__rq_"
+#define PREFIX_OP_PARAM_IN "__par_in_"
+#define PREFIX_OP_PARAM_OUT "__par_out_"
+
 using namespace std;
 using namespace AST;
 
@@ -91,14 +95,14 @@ void Proxy::implement (const Operation& op)
 	get_parameters (op, params_in, params_out);
 
 	if (!params_in.empty ())
-		cpp_ << "static const Parameter " << op.name () << "_in_params_ [" << params_in.size () << "];\n";
+		cpp_ << "static const Parameter " PREFIX_OP_PARAM_IN << op.name () << " [" << params_in.size () << "];\n";
 
 	if (!params_out.empty ())
-		cpp_ << "static const Parameter " << op.name () << "_out_params_ [" << params_out.size () << "];\n";
+		cpp_ << "static const Parameter " PREFIX_OP_PARAM_OUT << op.name () << "[" << params_out.size () << "];\n";
 
 	cpp_.empty_line ();
-	cpp_ << "static void " << static_cast <const string&> (op.name ())
-		<< "_request (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)\n"
+	cpp_ << "static void " PREFIX_OP_PROC << static_cast <const string&> (op.name ())
+		<< " (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)\n"
 		"{\n";
 
 	cpp_.indent ();
@@ -161,8 +165,8 @@ void Proxy::implement (const Attribute& att)
 	const ItemScope& itf = *att.parent ();
 
 	cpp_.empty_line ();
-	cpp_ << "static void _get_" << static_cast <const string&> (att.name ())
-		<< "_request (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)\n"
+	cpp_ << "static void " PREFIX_OP_PROC "_get_" << static_cast <const string&> (att.name ())
+		<< " (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)\n"
 		"{\n";
 	cpp_.indent ();
 
@@ -181,10 +185,10 @@ void Proxy::implement (const Attribute& att)
 	if (!att.readonly ()) {
 		cpp_.empty_line ();
 
-		cpp_ << "static const Parameter _set_" << static_cast <const string&> (att.name ()) << "_in_params_ [1];\n\n";
+		cpp_ << "static const Parameter " PREFIX_OP_PARAM_IN "_set_" << static_cast <const string&> (att.name ()) << " [1];\n\n";
 
-		cpp_ << "static void _set_" << static_cast <const string&> (att.name ())
-			<< "_request (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)\n"
+		cpp_ << "static void " PREFIX_OP_PROC "_set_" << static_cast <const string&> (att.name ())
+			<< " (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)\n"
 			"{\n";
 		cpp_.indent ();
 
@@ -208,26 +212,6 @@ void Proxy::end (const Interface& itf)
 	cpp_ << "IMPLEMENT_PROXY_FACTORY(" << ParentName (itf) << ", " << itf.name () << ");\n"
 		"\n"
 		"template <>\n"
-		"struct ProxyTraits < " << QName (itf) << ">\n"
-		"{\n";
-	cpp_.indent ();
-	cpp_ << "static const Operation operations_ [];\n"
-		"static const char* const interfaces_ [];\n\n";
-
-	for (auto it = itf.begin (); it != itf.end (); ++it) {
-		const Item& item = **it;
-		switch (item.kind ()) {
-			case Item::Kind::OPERATION:
-				implement (static_cast <const Operation&> (item));
-				break;
-			case Item::Kind::ATTRIBUTE:
-				implement (static_cast <const Attribute&> (item));
-				break;
-		}
-	}
-	cpp_.unindent ();
-	cpp_ << "};\n\n"
-		"template <>\n"
 		"class Proxy <" << QName (itf) << "> : public ProxyBase <" << QName (itf) << '>';
 
 	Interfaces bases = itf.get_all_bases ();
@@ -238,11 +222,12 @@ void Proxy::end (const Interface& itf)
 	cpp_.unindent ();
 	cpp_ << "\n{\n";
 	cpp_.indent ();
-	cpp_ << "typedef ProxyBase <" << QName (itf) << "> Base;\n"
-		"typedef ProxyTraits <" << QName (itf) << "> Traits;\n";
+	cpp_ << "typedef ProxyBase <" << QName (itf) << "> Base;\n";
 	cpp_.unindent ();
 	cpp_ << "public:\n";
 	cpp_.indent ();
+
+	// Constructor
 	cpp_ << "Proxy (IOReference::_ptr_type proxy_manager, uint16_t interface_idx) :\n";
 	cpp_.indent ();
 	cpp_ << "Base (proxy_manager, interface_idx)\n";
@@ -259,6 +244,7 @@ void Proxy::end (const Interface& itf)
 	}
 	cpp_ << "}\n";
 
+	// Operations
 	Metadata metadata;
 	for (auto it = itf.begin (); it != itf.end (); ++it) {
 		const Item& item = **it;
@@ -266,6 +252,8 @@ void Proxy::end (const Interface& itf)
 
 			case Item::Kind::OPERATION: {
 				const Operation& op = static_cast <const Operation&> (item);
+				
+				implement (op);
 
 				metadata.emplace_back ();
 				OpMetadata& op_md = metadata.back ();
@@ -316,6 +304,8 @@ void Proxy::end (const Interface& itf)
 
 			case Item::Kind::ATTRIBUTE: {
 				const Attribute& att = static_cast <const Attribute&> (item);
+
+				implement (att);
 
 				metadata.emplace_back ();
 				{
@@ -370,6 +360,10 @@ void Proxy::end (const Interface& itf)
 		}
 	}
 
+	cpp_ << "static const char* const __interfaces [];";
+	if (!metadata.empty ())
+		cpp_ << "static const Operation __operations [];";
+
 	cpp_.unindent ();
 	cpp_ << "};\n\n";
 
@@ -377,7 +371,7 @@ void Proxy::end (const Interface& itf)
 
 		for (const auto& op : metadata) {
 			if (!op.params_in.empty ()) {
-				cpp_ << "const Parameter ProxyTraits <" << QName (itf) << ">::" << op.name << "_in_params_ [" << op.params_in.size () << "] = {\n";
+				cpp_ << "const Parameter Proxy <" << QName (itf) << ">::" PREFIX_OP_PARAM_IN << op.name << " [" << op.params_in.size () << "] = {\n";
 				if (op.type) {
 					md_members (op.params_in);
 				} else {
@@ -391,13 +385,13 @@ void Proxy::end (const Interface& itf)
 				cpp_ << "};\n";
 			}
 			if (!op.params_out.empty ()) {
-				cpp_ << "const Parameter ProxyTraits <" << QName (itf) << ">::" << op.name << "_out_params_ [" << op.params_out.size () << "] = {\n";
+				cpp_ << "const Parameter Proxy <" << QName (itf) << ">::" PREFIX_OP_PARAM_OUT << op.name << " [" << op.params_out.size () << "] = {\n";
 				md_members (op.params_out);
 				cpp_ << "};\n";
 			}
 		}
 
-		cpp_ << "const Operation ProxyTraits <" << QName (itf) << ">::operations_ [" << metadata.size () << "] = {\n";
+		cpp_ << "const Operation Proxy <" << QName (itf) << ">::__operations [" << metadata.size () << "] = {\n";
 		cpp_.indent ();
 
 		auto it = metadata.cbegin ();
@@ -411,7 +405,7 @@ void Proxy::end (const Interface& itf)
 		cpp_ << "\n};\n";
 	}
 
-	cpp_ << "const Char* const ProxyTraits <" << QName (itf) << ">::interfaces_ [] = {\n";
+	cpp_ << "const Char* const Proxy <" << QName (itf) << ">::__interfaces [] = {\n";
 	cpp_.indent ();
 	cpp_ << QName (itf) << "::repository_id_";
 	for (auto p : bases) {
@@ -424,11 +418,11 @@ void Proxy::end (const Interface& itf)
 		"template <>\n"
 		"const InterfaceMetadata ProxyFactoryImpl <" << QName (itf) << ">::metadata_ = {\n";
 	cpp_.indent ();
-	cpp_ << "{ProxyTraits <" << QName (itf) << ">::interfaces_, countof (ProxyTraits <" << QName (itf) << ">::interfaces_)},\n";
+	cpp_ << "{Proxy <" << QName (itf) << ">::__interfaces, countof (Proxy <" << QName (itf) << ">::__interfaces)},\n";
 	if (metadata.empty ())
 		cpp_ << "{nullptr, 0}";
 	else
-		cpp_ << "{ProxyTraits <" << QName (itf) << ">::operations_, countof (ProxyTraits <" << QName (itf) << ">::operations_)}\n";
+		cpp_ << "{Proxy <" << QName (itf) << ">::__operations, countof (Proxy <" << QName (itf) << ">::__operations)}\n";
 	cpp_.unindent ();
 	cpp_ << "};\n";
 
@@ -441,17 +435,20 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
 {
 	cpp_ << "{ \"" << op.name << "\", { ";
 	if (!op.params_in.empty ()) {
-		string params = op.name + "_in_params_";
+		string params = PREFIX_OP_PARAM_IN;
+		params += op.name;
 		cpp_ << params << ", countof (" << params << ')';
 	} else
 		cpp_ << "0, 0";
 	cpp_ << " }, { ";
 	if (!op.params_out.empty ()) {
-		string params = op.name + "_out_params_";
+		string params = PREFIX_OP_PARAM_OUT;
+		params += op.name;
 		cpp_ << params << ", countof (" << params << ')';
 	} else
 		cpp_ << "0, 0";
-	cpp_ << " }, Type <" << WithAlias (op.type ? *op.type : Type ()) << ">::type_code, RqProcWrapper <" << QName (itf) << ", " << op.name << "_request> }";
+	cpp_ << " }, Type <" << WithAlias (op.type ? *op.type : Type ())
+		<< ">::type_code, RqProcWrapper <" << QName (itf) << ", " PREFIX_OP_PROC << op.name << "> }";
 }
 
 string Proxy::export_name (const NamedItem& item)

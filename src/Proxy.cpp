@@ -448,7 +448,7 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
 	} else
 		cpp_ << "0, 0";
 	cpp_ << " }, Type <" << WithAlias (op.type ? *op.type : Type ())
-		<< ">::type_code, RqProcWrapper <" << QName (itf) << ", " PREFIX_OP_PROC << op.name << "> }";
+		<< ">::type_code, RqProcWrapper <" PREFIX_OP_PROC << op.name << "> }";
 }
 
 string Proxy::export_name (const NamedItem& item)

@@ -184,6 +184,7 @@ public:
 	static bool is_enum (const AST::Type& type);
 	static bool is_native_interface (const AST::Type& type);
 	static bool is_native (const AST::Type& type);
+	static bool may_have_check (const AST::Type& type);
 
 	const Options& options () const
 	{

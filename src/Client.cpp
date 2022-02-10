@@ -267,6 +267,7 @@ void Client::leaf (const InterfaceDecl& itf)
 
 void Client::type_code_func (const NamedItem& item)
 {
+	h_.empty_line ();
 	h_ << "static I_ptr <TypeCode> type_code ()\n"
 		"{\n";
 	h_.indent ();
@@ -782,94 +783,125 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 	rep_id_of (rid);
 
 	const NamedItem& item = rid.item ();
+
+	// suffix is not empty for exception data structure
 	bool with_legacy = !*suffix && options ().legacy;
-
-	// ABI
-	h_ << "template <>\n"
-		"struct ABI < " << QName(item) << suffix << ">\n"
-		"{\n";
-	h_.indent ();
-	for (auto member : members) {
-		h_ << TypePrefix (*member) << "ABI " << member->name () << ";\n";
+	
+	bool var_len = is_var_len (members);
+	if (var_len) {
+		// ABI
+		h_ << "template <>\n"
+			"struct ABI < " << QName (item) << suffix << ">\n"
+			"{\n";
+		h_.indent ();
+		for (auto member : members) {
+			h_ << TypePrefix (*member) << "ABI " << member->name () << ";\n";
+		}
+		h_.unindent ();
+		h_ << "};\n\n";
 	}
-	h_.unindent ();
-	h_ << "};\n\n";
 
-	auto vl_member = members.begin ();
-	for (; vl_member != members.end (); ++vl_member) {
-		if (is_var_len (**vl_member))
-			break;
-	}
 	// Type
 	h_ << "template <>\n"
 		"struct Type < " << QName (item) << suffix << "> : ";
 
-	if (vl_member != members.end ()) {
-		h_ << "TypeVarLen < " << QName (item) << suffix << ", \n";
-		h_.indent ();
-
-		h_ << TypePrefix (**vl_member) << "has_check";
-
-		while (++vl_member != members.end ()) {
-			if (is_var_len (**vl_member)) {
-				h_ << "\n| " << TypePrefix (**vl_member) << "has_check";
-			}
-		}
-
-		h_ << ">\n";
-		h_.unindent ();
-		h_ << "{\n";
-		h_.indent ();
-		h_ << "static void check (const ABI& val)\n"
+	if (var_len) {
+		h_ << "TypeVarLen < " << QName (item) << suffix << ", ";
+		has_check (members);
+		h_ << ">\n"
 			"{\n";
 		h_.indent ();
-		for (auto member : members) {
-			h_ << TypePrefix (*member) << "check (val." << member->name () << ");\n";
-		}
-		h_.unindent ();
-		h_ << "}\n";
 
-		if (!*suffix) {
-			h_ << endl;
-			if (!is_pseudo (item))
-				type_code_func (item);
-		}
-
-		marshal (members, with_legacy);
+		implement_type (members, with_legacy);
+		
+		if (!*suffix && !is_pseudo (item))
+			type_code_func (item);
 
 		h_.unindent ();
 		h_ << "};\n";
 	} else {
 		h_ << "TypeFixLen < " << QName (item) << suffix << ">\n"
-		"{";
+		"{\n";
 		h_.indent ();
-		marshal (members, with_legacy);
+
+		h_ << "static const bool has_check = ";
+		has_check (members);
+		h_ << ";\n";
+
+		implement_type (members, with_legacy);
+		
+		if (!*suffix && !is_pseudo (item))
+			type_code_func (item);
+
 		h_.unindent ();
 		h_ << "};\n";
 	}
 }
 
-void Client::marshal (const Members& members, bool with_legacy)
+void Client::implement_type (const Members& members, bool with_legacy)
 {
 	for (auto m : members) {
 		if (is_native (*m))
 			return;
 	}
 
+	// Implement check()
+
+	h_ << "static void check (const ABI& val)\n"
+		"{\n";
+	h_.indent ();
+	for (auto member : members) {
+		if (may_have_check (*member))
+			h_ << TypePrefix (*member) << "check (val." << member->name () << ");\n";
+	}
+	h_.unindent ();
+	h_ << "}\n";
+
+	// Implement marshaling
+
 	if (with_legacy)
 		h_ << "\n#ifndef LEGACY_CORBA_CPP\n";
 
-	marshal (members, "_");
+	implement_marshaling (members, "_");
 	if (with_legacy) {
 		h_ << endl;
 		h_ << "#else\n";
-		marshal (members, "");
+		implement_marshaling (members, "");
 		h_ << endl;
 		h_ << "#endif\n";
 	}
 }
 
-void Client::marshal (const Members& members, const char* prefix)
+void Client::has_check (const Members& members)
+{
+	auto check_member = members.begin ();
+	for (; check_member != members.end (); ++check_member) {
+		if (may_have_check (**check_member))
+			break;
+	}
+	if (check_member != members.end ()) {
+		h_ << TypePrefix (**(check_member++)) << "has_check";
+		for (; check_member != members.end (); ++check_member) {
+			if (may_have_check (**check_member))
+				break;
+		}
+		if (check_member != members.end ()) {
+			h_ << '\n';
+			h_.indent ();
+			do {
+				h_ << "| " << TypePrefix (**(check_member++)) << "has_check";
+				for (; check_member != members.end (); ++check_member) {
+					if (may_have_check (**check_member))
+						break;
+				}
+			} while (check_member != members.end ());
+			h_.unindent ();
+		}
+	} else
+		h_ << "false";
+}
+
+void Client::implement_marshaling (const Members& members, const char* prefix)
 {
 	if (is_var_len (members)) {
 		h_ << "\n"

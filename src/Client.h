@@ -137,8 +137,9 @@ private:
 	void member_type (const AST::Member& member);
 	void member_variables (const Members& members);
 	void member_variables_legacy (const Members& members);
-	void marshal (const Members& members, bool with_legacy);
-	void marshal (const Members& members, const char* prefix);
+	void implement_type (const Members& members, bool with_legacy);
+	void has_check (const Members& members);
+	void implement_marshaling (const Members& members, const char* prefix);
 	void marshal_members (const Members& members, const char* func, const char* prefix);
 	static bool nested (const AST::NamedItem& item);
 	void h_namespace_open (const AST::NamedItem& item);

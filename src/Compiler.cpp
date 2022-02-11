@@ -42,12 +42,13 @@ void Compiler::print_usage_info (const char* exe_name)
 		"\t-out <directory>        Directory for output files.\n"
 		"\t-out_h <directory>      Directory for output *.h files.\n"
 		"\t-out_cpp <directory>    Directory for output *.cpp files.\n"
-		"\t-no_client              Do not generate the client code.\n"
 		"\t-client                 Generate the client code only.\n"
-		"\t-no_server              Do not generate the server code.\n"
+		"\t-no_client              Do not generate the client code.\n"
+		"\t-no_client_cpp          Generate only header for client code.\n"
 		"\t-server                 Generate the server code only.\n"
-		"\t-no_proxy               Do not generate the proxy code.\n"
+		"\t-no_server              Do not generate the server code.\n"
 		"\t-proxy                  Generate the proxy code only.\n"
+		"\t-no_proxy               Do not generate the proxy code.\n"
 		"\t-client_suffix <suffix> The suffix for client file names. Default is empty.\n"
 		"\t-server_suffix <suffix> The suffix for server file name. Default is _s.\n"
 		"\t-proxy_suffix <suffix>  The suffix for proxy file name. Default is _p.\n"
@@ -61,7 +62,7 @@ const char* Compiler::option (const char* arg, const char* opt)
 {
 	++arg;
 	size_t cc = strlen (opt);
-	if (!strncmp (arg, opt, cc))
+	if (equal (arg, arg + cc + 1, opt))
 		return arg + cc;
 	else
 		return nullptr;
@@ -81,6 +82,8 @@ bool Compiler::parse_command_line (CmdLine& args)
 		out_h = out_cpp = args.parameter (arg);
 	else if ((arg = option (args.arg (), "no_client")))
 		client = false;
+	else if ((arg = option (args.arg (), "no_client_cpp")))
+		no_client_cpp = true;
 	else if ((arg = option (args.arg (), "no_server")))
 		server = false;
 	else if ((arg = option (args.arg (), "no_proxy")))
@@ -128,7 +131,9 @@ void Compiler::generate_code (const Root& tree)
 {
 	path client_h = out_file (tree, out_h, client_suffix, "h");
 	if (client) {
-		path client_cpp = out_file (tree, out_cpp, client_suffix, "cpp");
+		path client_cpp;
+		if (!no_client_cpp)
+			client_cpp = out_file (tree, out_cpp, client_suffix, "cpp");
 		Client client (*this, tree, client_h, client_cpp);
 		tree.visit (client);
 	}

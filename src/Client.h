@@ -44,12 +44,7 @@ public:
 		cpp_ << "#include <CORBA/CORBA.h>\n"
 			"#include <Nirvana/OLF.h>\n"
 			"#include ";
-		std::filesystem::path cpp_dir = file_cpp.parent_path ();
-		if (file_h.parent_path () == cpp_dir)
-			cpp_ << file_h.filename ();
-		else
-			cpp_ << '"' << std::filesystem::relative (file_h, cpp_dir).generic_string () << '"';
-		cpp_  << std::endl;
+		cpp_.include_header (file_h);
 		initial_cpp_size_ = cpp_.size ();
 	}
 

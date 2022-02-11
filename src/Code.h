@@ -42,6 +42,8 @@ public:
 	void open (const std::filesystem::path& file, const AST::Root& root);
 	void close ();
 
+	void include_header (const std::filesystem::path& file_h);
+
 	void namespace_open (const AST::NamedItem& item);
 	void namespace_open (const char* ns);
 	void namespace_close ();

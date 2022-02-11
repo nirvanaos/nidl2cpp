@@ -40,7 +40,8 @@ public:
 		cpp_ (file, root)
 	{
 		cpp_ << "#include <CORBA/Proxy/Proxy.h>\n"
-			"#include " << servant.filename () << std::endl;
+			"#include ";
+		cpp_.include_header (servant);
 	}
 
 	struct WithAlias
@@ -65,8 +66,7 @@ protected:
 	virtual void leaf (const AST::Enum& item);
 
 private:
-	void abi_members (const Members& members);
-	std::ostream& abi_member (const AST::Type& t);
+	static bool is_custom (const AST::Operation& op);
 
 	static void get_parameters (const AST::Operation& op, Members& params_in, Members& params_out);
 

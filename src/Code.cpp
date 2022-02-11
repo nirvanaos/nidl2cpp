@@ -31,6 +31,12 @@ using namespace std;
 using namespace std::filesystem;
 using namespace AST;
 
+#ifdef _WIN32
+#define DEVNULL ".\\nul"
+#else
+#define DEVNULL "/dev/null"
+#endif
+
 Code::Code ()
 {}
 
@@ -43,13 +49,14 @@ Code::~Code ()
 {
 	if (is_open ()) {
 		Base::close ();
-		remove (file_);
+		if (!file_.empty ())
+			remove (file_);
 	}
 }
 
 void Code::open (const std::filesystem::path& file, const Root& root)
 {
-	Base::open (file);
+	Base::open (file.empty () ? DEVNULL : file);
 	cur_namespace_.clear ();
 	file_ = file;
 	*this << "// This file was generated from " << root.file ().filename () << endl;
@@ -60,6 +67,16 @@ void Code::close ()
 {
 	namespace_close ();
 	Base::close ();
+}
+
+void Code::include_header (const std::filesystem::path& file_h)
+{
+	filesystem::path cpp_dir = file_.parent_path ();
+	if (file_h.parent_path () == cpp_dir)
+		*this << file_h.filename ();
+	else
+		*this << '"' << std::filesystem::relative (file_h, cpp_dir).generic_string () << '"';
+	*this << std::endl;
 }
 
 void Code::namespace_open (const char* ns)

@@ -102,8 +102,14 @@ void Proxy::implement (const Operation& op)
 
 	cpp_.empty_line ();
 	cpp_ << "static void " PREFIX_OP_PROC << static_cast <const string&> (op.name ())
-		<< " (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)\n"
-		"{\n";
+		<< " (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)";
+
+	if (is_custom (op)) {
+		cpp_ << ";\n\n";
+		return;
+	}
+
+	cpp_ << "\n{\n";
 
 	cpp_.indent ();
 
@@ -166,8 +172,14 @@ void Proxy::implement (const Attribute& att)
 
 	cpp_.empty_line ();
 	cpp_ << "static void " PREFIX_OP_PROC "_get_" << static_cast <const string&> (att.name ())
-		<< " (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)\n"
-		"{\n";
+		<< " (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)";
+
+	if (is_native (att)) {
+		cpp_ << ";\n\n";
+		return;
+	}
+
+	cpp_ << "\n{\n";
 	cpp_.indent ();
 
 	// ret
@@ -200,6 +212,20 @@ void Proxy::implement (const Attribute& att)
 		cpp_.unindent ();
 		cpp_ << "}\n";
 	}
+}
+
+bool Proxy::is_custom (const AST::Operation& op)
+{
+	bool custom = is_native (op);
+	if (!custom) {
+		for (auto par : op) {
+			if (is_native (*par)) {
+				custom = true;
+				break;
+			}
+		}
+	}
+	return custom;
 }
 
 void Proxy::end (const Interface& itf)
@@ -259,47 +285,51 @@ void Proxy::end (const Interface& itf)
 				OpMetadata& op_md = metadata.back ();
 				op_md.name = op.name ();
 				op_md.type = &op;
-
-				cpp_ << ServantOp (op) << " const\n"
-					"{\n";
-				cpp_.indent ();
-
 				get_parameters (op, op_md.params_in, op_md.params_out);
 
-				// Create request
-				cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
-					<< (metadata.size () - 1) << "));\n";
-
-				// Marshal input
-				for (auto p : op_md.params_in) {
-					cpp_ << TypePrefix (*p) << "marshal_in (" << p->name () << ", _call);\n";
-				}
-
-				// Call
-				assert (!op.oneway () || (op_md.params_out.empty () && op.tkind () == Type::Kind::VOID));
-
-				if (op.oneway ())
-					cpp_ << "_call->send (::Nirvana::INFINITE_DEADLINE);\n";
+				cpp_ << ServantOp (op) << " const";
+				if (is_custom (op))
+					cpp_ << ";\n\n";
 				else {
-					
-					// Unmarshal output
 
-					cpp_ << "_call->invoke ();\n"
-						"check_request (_call);\n";
+					cpp_ << "\n"
+						"{\n";
+					cpp_.indent ();
 
-					for (auto p : op_md.params_out) {
-						cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";
+					// Create request
+					cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
+						<< (metadata.size () - 1) << "));\n";
+
+					// Marshal input
+					for (auto p : op_md.params_in) {
+						cpp_ << TypePrefix (*p) << "marshal_in (" << p->name () << ", _call);\n";
 					}
-					if (op.tkind () != Type::Kind::VOID) {
-						cpp_ << Var (op) << " _ret;\n"
-							<< TypePrefix (op) << "unmarshal (_call, _ret);\n"
-							"return _ret;\n";
+
+					// Call
+					assert (!op.oneway () || (op_md.params_out.empty () && op.tkind () == Type::Kind::VOID));
+
+					if (op.oneway ())
+						cpp_ << "_call->send (::Nirvana::INFINITE_DEADLINE);\n";
+					else {
+
+						// Unmarshal output
+
+						cpp_ << "_call->invoke ();\n"
+							"check_request (_call);\n";
+
+						for (auto p : op_md.params_out) {
+							cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";
+						}
+						if (op.tkind () != Type::Kind::VOID) {
+							cpp_ << Var (op) << " _ret;\n"
+								<< TypePrefix (op) << "unmarshal (_call, _ret);\n"
+								"return _ret;\n";
+						}
 					}
+
+					cpp_.unindent ();
+					cpp_ << "}\n\n";
 				}
-
-				cpp_.unindent ();
-				cpp_ << "}\n\n";
-
 			} break;
 
 			case Item::Kind::ATTRIBUTE: {
@@ -315,47 +345,59 @@ void Proxy::end (const Interface& itf)
 					op_md.type = &att;
 				}
 
-				cpp_ << Var (att) << ' ' << att.name () << " () const\n"
-					"{\n";
-				cpp_.indent ();
+				bool custom = is_native (att);
 
-				cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
-					<< (metadata.size () - 1) << "));\n"
-					"_call->invoke ();\n"
-					"check_request (_call);\n";
+				cpp_ << Var (att) << ' ' << att.name () << " () const";
 
-				cpp_ << Var (att) << " _ret;\n"
-					<< TypePrefix (att) << "unmarshal (_call, _ret);\n"
-					"return _ret;\n";
-
-				cpp_.unindent ();
-				cpp_ << "}\n";
-
-				if (!att.readonly ()) {
-
-					metadata.emplace_back ();
-					{
-						OpMetadata& op_md = metadata.back ();
-						op_md.name = "_set_";
-						op_md.name += att.name ();
-						op_md.type = nullptr;
-						op_md.params_in.push_back (&att);
-					}
-
-					cpp_ << "void " << att.name () << " (" << ServantParam (att) << " val) const\n"
-						"{\n";
+				if (custom)
+					cpp_ << ";\n";
+				else {
+					cpp_ << "\n{\n";
 					cpp_.indent ();
 
 					cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
 						<< (metadata.size () - 1) << "));\n"
-						<< TypePrefix (att) << "marshal_in (val, _call);\n"
 						"_call->invoke ();\n"
 						"check_request (_call);\n";
 
-					cpp_.unindent ();
-					cpp_ << "}\n\n";
-				}
+					cpp_ << Var (att) << " _ret;\n"
+						<< TypePrefix (att) << "unmarshal (_call, _ret);\n"
+						"return _ret;\n";
 
+					cpp_.unindent ();
+					cpp_ << "}\n";
+
+					if (!att.readonly ()) {
+
+						metadata.emplace_back ();
+						{
+							OpMetadata& op_md = metadata.back ();
+							op_md.name = "_set_";
+							op_md.name += att.name ();
+							op_md.type = nullptr;
+							op_md.params_in.push_back (&att);
+						}
+
+						cpp_ << "void " << att.name () << " (" << ServantParam (att) << " val) const";
+
+						if (custom)
+							cpp_ << ";\n";
+						else {
+							cpp_ << "\n{\n";
+							cpp_.indent ();
+
+							cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
+								<< (metadata.size () - 1) << "));\n"
+								<< TypePrefix (att) << "marshal_in (val, _call);\n"
+								"_call->invoke ();\n"
+								"check_request (_call);\n";
+
+							cpp_.unindent ();
+							cpp_ << "}\n\n";
+						}
+					}
+				}
+				cpp_ << endl;
 			} break;
 		}
 	}

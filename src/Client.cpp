@@ -99,11 +99,10 @@ void Client::type_code_def (const RepositoryId& rid)
 		return;
 
 	cpp_.empty_line ();
+	cpp_ << "NIRVANA_OLF_SECTION_N (" << (export_count_++) << ')';
 	if (!nested (item))
-		cpp_ << "NIRVANA_OLF_SECTION_N (" << (export_count_++) << ") extern ";
-	else
-		cpp_ << "NIRVANA_OLF_SECTION ";
-	cpp_ << "const " << Namespace ("Nirvana") << "ImportInterfaceT <" << Namespace ("CORBA") << "TypeCode>\n"
+		 cpp_ << " extern";
+	cpp_ << " const " << Namespace ("Nirvana") << "ImportInterfaceT <" << Namespace ("CORBA") << "TypeCode>\n"
 		<< TypeCodeName (item) << " = { Nirvana::OLF_IMPORT_INTERFACE, ";
 
 	switch (item.kind ()) {

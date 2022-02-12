@@ -37,7 +37,8 @@ public:
 	Proxy (const Options& options, const AST::Root& root,
 		const std::filesystem::path& file, const std::filesystem::path& servant) :
 		CodeGenBase (options),
-		cpp_ (file, root)
+		cpp_ (file, root),
+		custom_ (false)
 	{
 		cpp_ << "#include <CORBA/Proxy/Proxy.h>\n"
 			"#include ";
@@ -98,6 +99,7 @@ private:
 
 private:
 	Code cpp_;
+	bool custom_;
 };
 
 Code& operator << (Code& stm, const Proxy::WithAlias& t);

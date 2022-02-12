@@ -29,6 +29,7 @@
 #define PREFIX_OP_PROC "__rq_"
 #define PREFIX_OP_PARAM_IN "__par_in_"
 #define PREFIX_OP_PARAM_OUT "__par_out_"
+#define PREFIX_OP_IDX "__OPIDX_"
 
 using namespace std;
 using namespace AST;
@@ -44,6 +45,10 @@ Code& operator << (Code& stm, const Proxy::WithAlias& t)
 
 void Proxy::end (const Root&)
 {
+	if (custom_) {
+		cpp_.empty_line ();
+		cpp_ << "#include \"" << cpp_.file ().stem ().generic_string () << "_native.h\"\n";
+	}
 	cpp_.close ();
 }
 
@@ -105,6 +110,7 @@ void Proxy::implement (const Operation& op)
 		<< " (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)";
 
 	if (is_custom (op)) {
+		custom_ = true;
 		cpp_ << ";\n\n";
 		return;
 	}
@@ -175,6 +181,7 @@ void Proxy::implement (const Attribute& att)
 		<< " (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)";
 
 	if (is_native (att)) {
+		custom_ = true;
 		cpp_ << ";\n\n";
 		return;
 	}
@@ -288,12 +295,12 @@ void Proxy::end (const Interface& itf)
 				get_parameters (op, op_md.params_in, op_md.params_out);
 
 				cpp_ << ServantOp (op) << " const";
-				if (is_custom (op))
-					cpp_ << ";\n\n";
-				else {
-
-					cpp_ << "\n"
-						"{\n";
+				if (is_custom (op)) {
+					cpp_ << ";\n"
+						"static const UShort " PREFIX_OP_IDX << op.name () << " = " << (metadata.size () - 1) << ";\n";
+				} else {
+					
+					cpp_ << "\n{\n";
 					cpp_.indent ();
 
 					// Create request
@@ -348,10 +355,11 @@ void Proxy::end (const Interface& itf)
 				bool custom = is_native (att);
 
 				cpp_ << Var (att) << ' ' << att.name () << " () const";
+				if (custom) {
+					cpp_ << ";\n"
+						"static const UShort " PREFIX_OP_IDX "_get_" << att.name () << " = " << (metadata.size () - 1) << ";\n";
+				} else {
 
-				if (custom)
-					cpp_ << ";\n";
-				else {
 					cpp_ << "\n{\n";
 					cpp_.indent ();
 
@@ -366,35 +374,36 @@ void Proxy::end (const Interface& itf)
 
 					cpp_.unindent ();
 					cpp_ << "}\n";
+				}
 
-					if (!att.readonly ()) {
+				if (!att.readonly ()) {
 
-						metadata.emplace_back ();
-						{
-							OpMetadata& op_md = metadata.back ();
-							op_md.name = "_set_";
-							op_md.name += att.name ();
-							op_md.type = nullptr;
-							op_md.params_in.push_back (&att);
-						}
+					metadata.emplace_back ();
+					{
+						OpMetadata& op_md = metadata.back ();
+						op_md.name = "_set_";
+						op_md.name += att.name ();
+						op_md.type = nullptr;
+						op_md.params_in.push_back (&att);
+					}
 
-						cpp_ << "void " << att.name () << " (" << ServantParam (att) << " val) const";
+					cpp_ << "void " << att.name () << " (" << ServantParam (att) << " val) const";
+					if (custom) {
+						cpp_ << ";\n"
+							"static const UShort " PREFIX_OP_IDX "_set_" << att.name () << " = " << (metadata.size () - 1) << ";\n";
+					} else {
 
-						if (custom)
-							cpp_ << ";\n";
-						else {
-							cpp_ << "\n{\n";
-							cpp_.indent ();
+						cpp_ << "\n{\n";
+						cpp_.indent ();
 
-							cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
-								<< (metadata.size () - 1) << "));\n"
-								<< TypePrefix (att) << "marshal_in (val, _call);\n"
-								"_call->invoke ();\n"
-								"check_request (_call);\n";
+						cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
+							<< (metadata.size () - 1) << "));\n"
+							<< TypePrefix (att) << "marshal_in (val, _call);\n"
+							"_call->invoke ();\n"
+							"check_request (_call);\n";
 
-							cpp_.unindent ();
-							cpp_ << "}\n\n";
-						}
+						cpp_.unindent ();
+						cpp_ << "}\n\n";
 					}
 				}
 				cpp_ << endl;
@@ -549,11 +558,12 @@ Code& Proxy::exp (const NamedItem& item)
 
 void Proxy::end (const Exception& item)
 {
-	cpp_.namespace_open ("CORBA/Internal");
 	Members members = get_members (item);
 
-	if (!members.empty ())
+	if (!members.empty ()) {
+		cpp_.namespace_open ("CORBA/Internal");
 		type_code_members (item, members);
+	}
 
 	cpp_.namespace_close ();
 	exp (item) << "TypeCodeException <" << QName (item) << ", " << (members.empty () ? "false" : "true") << ">)\n";

@@ -338,23 +338,23 @@ void Client::end (const Interface& itf)
 
 			case Item::Kind::OPERATION: {
 				const Operation& op = static_cast <const Operation&> (item);
-				h_ << ABI_ret (op) << " (*" << op.name () << ") (Bridge < " << QName (itf) << ">* _b";
+				h_ << ABI_ret (op) << " (*" << op.name () << ") (Bridge <" << QName (itf) << ">*";
 
 				for (auto it = op.begin (); it != op.end (); ++it) {
 					h_ << ", " << ABI_param (**it);
 				}
 
-				h_ << ", Interface* _env);\n";
+				h_ << ", Interface*);\n";
 
 			} break;
 
 			case Item::Kind::ATTRIBUTE: {
 				const Attribute& att = static_cast <const Attribute&> (item);
 				h_ << ABI_ret (att, itf.interface_kind () == InterfaceKind::PSEUDO)
-					<< " (*_get_" << att.name () << ") (Bridge < " << QName (itf) << ">*, Interface*);\n";
+					<< " (*_get_" << att.name () << ") (Bridge <" << QName (itf) << ">*, Interface*);\n";
 
 				if (!att.readonly ()) {
-					h_ << "void (*_set_" << att.name () << ") (Bridge < " << QName (itf) << ">* _b, " << ABI_param (att) << ", Interface* _env);\n";
+					h_ << "void (*_set_" << att.name () << ") (Bridge <" << QName (itf) << ">*, " << ABI_param (att) << ", Interface*);\n";
 				}
 
 			} break;

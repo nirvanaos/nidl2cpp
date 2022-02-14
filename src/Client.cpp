@@ -287,7 +287,7 @@ void Client::begin (const Interface& itf)
 	h_.namespace_open ("CORBA/Internal");
 	h_.empty_line ();
 	h_ << "template <>\n"
-		"struct Definitions < " << QName (itf) << ">\n"
+		"struct Definitions <" << QName (itf) << ">\n"
 		"{\n";
 	h_.indent ();
 }

@@ -198,10 +198,21 @@ void Client::forward_guard (const NamedItem& item)
 	h_ << '_' << item.name ();
 }
 
+void Client::forward_define (const AST::NamedItem& item)
+{
+	const NamedItem* parent = item.parent ();
+	if (parent)
+		forward_define (*parent);
+	else
+		h_ << "\n#define IDL_DECLARED";
+	h_ << '_' << item.name ();
+}
+
 void Client::forward_interface (const NamedItem& item, InterfaceKind kind)
 {
 	h_.namespace_close ();
 	forward_guard (item);
+	forward_define (item);
 	forward_decl (item);
 	h_ << endl;
 	h_.namespace_open ("CORBA/Internal");

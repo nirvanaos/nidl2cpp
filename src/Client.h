@@ -118,6 +118,7 @@ protected:
 
 private:
 	void forward_guard (const AST::NamedItem& item);
+	void forward_define (const AST::NamedItem& item);
 	void forward_decl (const AST::NamedItem& item);
 	void forward_interface (const AST::NamedItem& item, AST::InterfaceKind kind);
 	void backward_compat_var (const AST::NamedItem& item);

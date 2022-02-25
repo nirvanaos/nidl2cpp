@@ -304,7 +304,14 @@ void Proxy::end (const Interface& itf)
 					cpp_.indent ();
 
 					// Create request
-					cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
+					cpp_ << "IORequest::_ref_type _call = _target ()->create_";
+
+					if (op.oneway ())
+						cpp_ << "oneway";
+					else
+						cpp_ << "request";
+						
+					cpp_ << " (_make_op_idx ("
 						<< (metadata.size () - 1) << "));\n";
 
 					// Marshal input
@@ -316,13 +323,13 @@ void Proxy::end (const Interface& itf)
 					assert (!op.oneway () || (op_md.params_out.empty () && op.tkind () == Type::Kind::VOID));
 
 					if (op.oneway ())
-						cpp_ << "_call->send (::Nirvana::INFINITE_DEADLINE);\n";
+						cpp_ << "_target ()->send (_call, ::Nirvana::INFINITE_DEADLINE);\n";
 					else {
-
-						// Unmarshal output
 
 						cpp_ << "_call->invoke ();\n"
 							"check_request (_call);\n";
+
+						// Unmarshal output
 
 						for (auto p : op_md.params_out) {
 							cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";

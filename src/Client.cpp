@@ -393,7 +393,7 @@ void Client::end (const Interface& itf)
 			case Item::Kind::OPERATION: {
 				const Operation& op = static_cast <const Operation&> (item);
 
-				h_ << Var (op) << ' ' << Signature (op) << ";\n";
+				h_ << VRet (op) << ' ' << Signature (op) << ";\n";
 
 				native_itf_template (op);
 
@@ -403,7 +403,7 @@ void Client::end (const Interface& itf)
 				const Attribute& att = static_cast <const Attribute&> (item);
 
 				if (itf.interface_kind () != InterfaceKind::PSEUDO)
-					h_ << Var (att);
+					h_ << VRet (att);
 				else
 					h_ << ConstRef (att);
 				h_ << ' ' << att.name () << " ();\n";
@@ -429,7 +429,7 @@ void Client::end (const Interface& itf)
 
 				h_ << "\ntemplate <class T>\n";
 
-				h_ << Var (op) << " Client <T, " << QName (itf) << ">::" << Signature (op) << "\n"
+				h_ << VRet (op) << " Client <T, " << QName (itf) << ">::" << Signature (op) << "\n"
 					"{\n";
 
 				h_.indent ();
@@ -460,7 +460,7 @@ void Client::end (const Interface& itf)
 
 				h_ << "\ntemplate <class T>\n";
 				if (itf.interface_kind () != InterfaceKind::PSEUDO)
-					h_ << Var (att);
+					h_ << VRet (att);
 				else
 					h_ << ConstRef (att);
 

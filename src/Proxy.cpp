@@ -361,7 +361,7 @@ void Proxy::end (const Interface& itf)
 
 				bool custom = is_native (att);
 
-				cpp_ << Var (att) << ' ' << att.name () << " () const";
+				cpp_ << VRet (att) << ' ' << att.name () << " () const";
 				if (custom) {
 					cpp_ << ";\n"
 						"static const UShort " PREFIX_OP_IDX "_get_" << att.name () << " = " << (metadata.size () - 1) << ";\n";

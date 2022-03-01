@@ -99,6 +99,15 @@ public:
 		const AST::Type& type;
 	};
 
+	struct VRet
+	{
+		VRet (const AST::Type& t) :
+			type (t)
+		{}
+
+		const AST::Type& type;
+	};
+
 	struct ConstRef
 	{
 		ConstRef (const AST::Type& t) :
@@ -269,6 +278,7 @@ Code& operator << (Code& stm, const CodeGenBase::TypePrefix& t);
 Code& operator << (Code& stm, const CodeGenBase::ABI_ret& t);
 Code& operator << (Code& stm, const CodeGenBase::ABI_param& t);
 Code& operator << (Code& stm, const CodeGenBase::Var& t);
+Code& operator << (Code& stm, const CodeGenBase::VRet& t);
 Code& operator << (Code& stm, const CodeGenBase::TypeCodeName& t);
 Code& operator << (Code& stm, const CodeGenBase::ServantParam& t);
 Code& operator << (Code& stm, const CodeGenBase::ServantOp& t);

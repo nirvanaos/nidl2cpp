@@ -214,8 +214,14 @@ Code& operator << (Code& stm, const CodeGenBase::ABI_param& t)
 
 Code& operator << (Code& stm, const CodeGenBase::Var& t)
 {
+	assert (t.type.tkind () != Type::Kind::VOID);
+	return stm << CodeGenBase::TypePrefix (t.type) << "Var";
+}
+
+Code& operator << (Code& stm, const CodeGenBase::VRet& t)
+{
 	if (t.type.tkind () != Type::Kind::VOID)
-		return stm << CodeGenBase::TypePrefix (t.type) << "Var";
+		return stm << CodeGenBase::TypePrefix (t.type) << "VRet";
 	else
 		return stm << "void";
 }
@@ -243,7 +249,7 @@ Code& operator << (Code& stm, const CodeGenBase::ServantParam& t)
 
 Code& operator << (Code& stm, const CodeGenBase::ServantOp& op)
 {
-	stm << CodeGenBase::Var (op.op) << ' ' << op.op.name () << " (";
+	stm << CodeGenBase::VRet (op.op) << ' ' << op.op.name () << " (";
 	auto it = op.op.begin ();
 	if (it != op.op.end ()) {
 		stm << CodeGenBase::ServantParam (**it) << ' ' << (*it)->name ();

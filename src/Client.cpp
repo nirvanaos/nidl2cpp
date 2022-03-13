@@ -595,6 +595,9 @@ void Client::end_interface (const ItemContainer& container)
 
 void Client::begin (const Interface& itf)
 {
+	if (!itf.has_forward_dcl ())
+		forward_interface (itf);
+
 	begin_interface (itf);
 }
 
@@ -605,6 +608,9 @@ void Client::end (const Interface& itf)
 
 void Client::begin (const ValueType& itf)
 {
+	if (!itf.has_forward_dcl ())
+		forward_interface (itf);
+
 	begin_interface (itf);
 }
 

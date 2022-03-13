@@ -454,21 +454,6 @@ void CodeGenBase::leaf (const UnionElement&)
 	throw runtime_error ("Not yet implemented");
 }
 
-void CodeGenBase::leaf (const ValueTypeDecl&)
-{
-	throw runtime_error ("Not yet implemented");
-}
-
-void CodeGenBase::begin (const ValueType&)
-{
-	throw runtime_error ("Not yet implemented");
-}
-
-void CodeGenBase::end (const ValueType&)
-{
-	throw runtime_error ("Not yet implemented");
-}
-
 void CodeGenBase::leaf (const StateMember&)
 {
 	throw runtime_error ("Not yet implemented");

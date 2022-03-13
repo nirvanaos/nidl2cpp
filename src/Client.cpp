@@ -208,7 +208,7 @@ void Client::forward_define (const AST::NamedItem& item)
 	h_ << '_' << item.name ();
 }
 
-void Client::forward_interface (const NamedItem& item, InterfaceKind kind)
+void Client::forward_interface (const NamedItem& item)
 {
 	h_.namespace_close ();
 	forward_guard (item);
@@ -219,31 +219,45 @@ void Client::forward_interface (const NamedItem& item, InterfaceKind kind)
 	h_.empty_line ();
 	h_ << "template <>\n"
 		"struct Type <" << QName (item) << "> : ";
-	switch (kind.interface_kind ()) {
-		case InterfaceKind::LOCAL:
-			h_ << "TypeLocalObject";
-			break;
-		case InterfaceKind::ABSTRACT:
-			h_ << "TypeAbstractInterface";
-			break;
-		case InterfaceKind::UNCONSTRAINED:
-			h_ << "TypeObject";
-			break;
-		default:
-			h_ << "TypeItf";
-			break;
+
+	bool has_type_code = true;
+	if (item.kind () == Item::Kind::INTERFACE_DECL || item.kind () == Item::Kind::INTERFACE) {
+		InterfaceKind::Kind ikind;
+		if (item.kind () == Item::Kind::INTERFACE_DECL)
+			ikind = static_cast <const InterfaceDecl&> (item).interface_kind ();
+		else
+			ikind = static_cast <const Interface&> (item).interface_kind ();
+		switch (ikind) {
+			case InterfaceKind::LOCAL:
+				h_ << "TypeLocalObject";
+				break;
+			case InterfaceKind::ABSTRACT:
+				h_ << "TypeAbstractInterface";
+				break;
+			case InterfaceKind::UNCONSTRAINED:
+				h_ << "TypeObject";
+				break;
+			default:
+				h_ << "TypeItf";
+				break;
+		}
+
+		has_type_code = ikind != InterfaceKind::PSEUDO;
+		if (!has_type_code) {
+			const NamedItem* parent = item.parent ();
+			if (parent && !parent->parent () && parent->name () == "CORBA") {
+				if (item.name () == "TypeCode")
+					has_type_code = true;
+			}
+		}
+
+	} else {
+		assert (item.kind () == Item::Kind::VALUE_TYPE_DECL || item.kind () == Item::Kind::VALUE_TYPE);
+		h_ << "TypeValue";
 	}
+
 	h_ << " <" << QName (item) << ">\n"
 		"{";
-
-	bool has_type_code = kind.interface_kind () != InterfaceKind::PSEUDO;
-	if (!has_type_code) {
-		const NamedItem* parent = item.parent ();
-		if (parent && !parent->parent () && parent->name () == "CORBA") {
-			if (item.name () == "TypeCode")
-				has_type_code = true;
-		}
-	}
 
 	if (has_type_code) {
 		h_ << endl;
@@ -272,7 +286,12 @@ void Client::forward_interface (const NamedItem& item, InterfaceKind kind)
 
 void Client::leaf (const InterfaceDecl& itf)
 {
-	forward_interface (itf, itf);
+	forward_interface (itf);
+}
+
+void Client::leaf (const ValueTypeDecl& vt)
+{
+	forward_interface (vt);
 }
 
 void Client::type_code_func (const NamedItem& item)
@@ -286,69 +305,83 @@ void Client::type_code_func (const NamedItem& item)
 	h_ << "}\n\n";
 }
 
-void Client::begin (const Interface& itf)
+void Client::begin_interface (const ItemContainer& container)
 {
-	if (!itf.has_forward_dcl ())
-		forward_interface (itf, itf);
-
-	if (itf.interface_kind () != InterfaceKind::PSEUDO) {
-		type_code_def (itf);
-	}
+	if (!is_pseudo (container))
+		type_code_def (container);
 
 	h_.namespace_open ("CORBA/Internal");
 	h_.empty_line ();
 	h_ << "template <>\n"
-		"struct Definitions <" << QName (itf) << ">\n"
+		"struct Definitions <" << QName (container) << ">\n"
 		"{\n";
 	h_.indent ();
 }
 
-void Client::end (const Interface& itf)
+void Client::end_interface (const ItemContainer& container)
 {
 	// Close struct Definitions
 	h_.unindent ();
 	h_ << "};\n";
 
-	implement_nested_items (itf);
+	implement_nested_items (container);
 
 	// Bridge
 	h_.namespace_open ("CORBA/Internal");
 	h_.empty_line ();
-	h_ << "NIRVANA_BRIDGE_BEGIN (" << QName (itf) << ", \"" << itf.repository_id () << "\")\n";
+	h_ << "NIRVANA_BRIDGE_BEGIN (" << QName (container) << ", \"" << container.repository_id () << "\")\n";
 
-	switch (itf.interface_kind ()) {
-		case InterfaceKind::UNCONSTRAINED:
-		case InterfaceKind::LOCAL:
-			h_ << "NIRVANA_BASE_ENTRY (Object, CORBA_Object)\n";
-			break;
-		case InterfaceKind::ABSTRACT:
-			h_ << "NIRVANA_BASE_ENTRY (AbstractBase, CORBA_AbstractBase)\n";
-			break;
-	}
+	bool att_byref = false;
+	bool pseudo_interface = false;
+	vector <const ItemContainer*> bases;
+	if (container.kind () == Item::Kind::INTERFACE) {
 
-	Interfaces bases = itf.get_all_bases ();
-	for (auto b : bases) {
-		string proc_name;
-		{
-			ScopedName sn = b->scoped_name ();
-			for (ScopedName::const_iterator it = sn.begin (); it != sn.end (); ++it) {
-				proc_name += '_';
-				proc_name += *it;
-			}
+		const Interface& itf = static_cast <const Interface&> (container);
+
+		switch (itf.interface_kind ()) {
+			case InterfaceKind::UNCONSTRAINED:
+			case InterfaceKind::LOCAL:
+				h_ << "NIRVANA_BASE_ENTRY (Object, CORBA_Object)\n";
+				break;
+			case InterfaceKind::ABSTRACT:
+				h_ << "NIRVANA_BASE_ENTRY (AbstractBase, CORBA_AbstractBase)\n";
+				break;
+
+			case InterfaceKind::PSEUDO:
+				att_byref = true;
+				pseudo_interface = true;
+				break;
 		}
-		h_ << "NIRVANA_BASE_ENTRY (" << QName (*b) << ", " << proc_name << ")\n";
+
+		const Interfaces itf_bases = itf.get_all_bases ();
+		bases.assign (itf_bases.begin (), itf_bases.end ());
+		for (auto b : bases) {
+			string proc_name;
+			{
+				ScopedName sn = b->scoped_name ();
+				for (ScopedName::const_iterator it = sn.begin (); it != sn.end (); ++it) {
+					proc_name += '_';
+					proc_name += *it;
+				}
+			}
+			h_ << "NIRVANA_BASE_ENTRY (" << QName (*b) << ", " << proc_name << ")\n";
+		}
+
+		if (itf.interface_kind () != InterfaceKind::PSEUDO || !bases.empty ())
+			h_ << "NIRVANA_BRIDGE_EPV\n";
+	} else {
+		att_byref = true;
+		h_ << "NIRVANA_BASE_ENTRY (ValueBase, CORBA_ValueBase)\n";
 	}
 
-	if (itf.interface_kind () != InterfaceKind::PSEUDO || !bases.empty ())
-		h_ << "NIRVANA_BRIDGE_EPV\n";
-
-	for (auto it = itf.begin (); it != itf.end (); ++it) {
+	for (auto it = container.begin (); it != container.end (); ++it) {
 		const Item& item = **it;
 		switch (item.kind ()) {
 
 			case Item::Kind::OPERATION: {
 				const Operation& op = static_cast <const Operation&> (item);
-				h_ << ABI_ret (op) << " (*" << op.name () << ") (Bridge <" << QName (itf) << ">*";
+				h_ << ABI_ret (op) << " (*" << op.name () << ") (Bridge <"
+					<< QName (container) << ">*";
 
 				for (auto it = op.begin (); it != op.end (); ++it) {
 					h_ << ", " << ABI_param (**it);
@@ -360,11 +393,13 @@ void Client::end (const Interface& itf)
 
 			case Item::Kind::ATTRIBUTE: {
 				const Attribute& att = static_cast <const Attribute&> (item);
-				h_ << ABI_ret (att, itf.interface_kind () == InterfaceKind::PSEUDO)
-					<< " (*_get_" << att.name () << ") (Bridge <" << QName (itf) << ">*, Interface*);\n";
+				h_ << ABI_ret (att, att_byref)
+					<< " (*_get_" << att.name () << ") (Bridge <" << QName (container)
+					<< ">*, Interface*);\n";
 
 				if (!att.readonly ()) {
-					h_ << "void (*_set_" << att.name () << ") (Bridge <" << QName (itf) << ">*, " << ABI_param (att) << ", Interface*);\n";
+					h_ << "void (*_set_" << att.name () << ") (Bridge <" << QName (container)
+						<< ">*, " << ABI_param (att) << ", Interface*);\n";
 				}
 
 			} break;
@@ -375,10 +410,10 @@ void Client::end (const Interface& itf)
 		"\n"
 		// Client interface
 		"template <class T>\n"
-		"class Client <T, " << QName (itf) << "> :\n"
+		"class Client <T, " << QName (container) << "> :\n"
 		<< indent
 		<< "public T,\n"
-		"public Definitions <" << QName (itf) << ">\n"
+		"public Definitions <" << QName (container) << ">\n"
 		<< unindent
 		<<
 		"{\n"
@@ -386,7 +421,7 @@ void Client::end (const Interface& itf)
 
 	h_.indent ();
 
-	for (auto it = itf.begin (); it != itf.end (); ++it) {
+	for (auto it = container.begin (); it != container.end (); ++it) {
 		const Item& item = **it;
 		switch (item.kind ()) {
 
@@ -402,7 +437,7 @@ void Client::end (const Interface& itf)
 			case Item::Kind::ATTRIBUTE: {
 				const Attribute& att = static_cast <const Attribute&> (item);
 
-				if (itf.interface_kind () != InterfaceKind::PSEUDO)
+				if (!att_byref)
 					h_ << VRet (att);
 				else
 					h_ << ConstRef (att);
@@ -420,7 +455,7 @@ void Client::end (const Interface& itf)
 
 	// Client operations
 
-	for (auto it = itf.begin (); it != itf.end (); ++it) {
+	for (auto it = container.begin (); it != container.end (); ++it) {
 		const Item& item = **it;
 		switch (item.kind ()) {
 
@@ -429,13 +464,13 @@ void Client::end (const Interface& itf)
 
 				h_ << "\ntemplate <class T>\n";
 
-				h_ << VRet (op) << " Client <T, " << QName (itf) << ">::" << Signature (op) << "\n"
+				h_ << VRet (op) << " Client <T, " << QName (container) << ">::" << Signature (op) << "\n"
 					"{\n";
 
 				h_.indent ();
 
 				environment (op.raises ());
-				h_ << "Bridge < " << QName (itf) << ">& _b (T::_get_bridge (_env));\n";
+				h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n";
 
 				if (op.tkind () != Type::Kind::VOID)
 					h_ << TypePrefix (op) << "C_ret _ret = ";
@@ -459,21 +494,21 @@ void Client::end (const Interface& itf)
 				const Attribute& att = static_cast <const Attribute&> (item);
 
 				h_ << "\ntemplate <class T>\n";
-				if (itf.interface_kind () != InterfaceKind::PSEUDO)
+				if (!att_byref)
 					h_ << VRet (att);
 				else
 					h_ << ConstRef (att);
 
-				h_ << " Client <T, " << QName (itf) << ">::" << att.name () << " ()\n"
+				h_ << " Client <T, " << QName (container) << ">::" << att.name () << " ()\n"
 					"{\n";
 
 				h_.indent ();
 
 				environment (att.getraises ());
-				h_ << "Bridge < " << QName (itf) << ">& _b (T::_get_bridge (_env));\n"
+				h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n"
 					<< TypePrefix (att) << 'C';
-					
-				if (itf.interface_kind () == InterfaceKind::PSEUDO)
+
+				if (att_byref)
 					h_ << "_VT";
 
 				h_ << "_ret _ret = (_b._epv ().epv._get_" << att.name () << ") (&_b, &_env); \n"
@@ -486,13 +521,13 @@ void Client::end (const Interface& itf)
 				if (!att.readonly ()) {
 					h_ << "\ntemplate <class T>\n";
 
-					h_ << "void Client <T, " << QName (itf) << ">::" << att.name () << " (" << Param (att) << " val)\n"
+					h_ << "void Client <T, " << QName (container) << ">::" << att.name () << " (" << Param (att) << " val)\n"
 						"{\n";
 
 					h_.indent ();
 
 					environment (att.setraises ());
-					h_ << "Bridge < " << QName (itf) << ">& _b (T::_get_bridge (_env));\n";
+					h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n";
 
 					h_ << "(_b._epv ().epv._set_" << att.name () << ") (&_b, &val, &_env);\n"
 						"_env.check ();\n";
@@ -506,26 +541,41 @@ void Client::end (const Interface& itf)
 	}
 
 	// Interface definition
-	h_.namespace_open (itf);
+	h_.namespace_open (container);
 	h_.empty_line ();
-	h_ << "class " << itf.name () << " : public " << Namespace ("CORBA/Internal") << "ClientInterface <" << itf.name ();
+	h_ << "class " << container.name () << " : public " << Namespace ("CORBA/Internal") << "ClientInterface <" << container.name ();
 	for (auto b : bases) {
 		h_ << ", " << QName (*b);
 	}
-	switch (itf.interface_kind ()) {
-		case InterfaceKind::UNCONSTRAINED:
-		case InterfaceKind::LOCAL:
-			h_ << ", " << Namespace ("CORBA") << "Object";
-			break;
-		case InterfaceKind::ABSTRACT:
-			h_ << ", " << Namespace ("CORBA") << "AbstractBase";
-			break;
+	if (container.kind () == Item::Kind::INTERFACE) {
+		const Interface& itf = static_cast <const Interface&> (container);
+		switch (itf.interface_kind ()) {
+			case InterfaceKind::UNCONSTRAINED:
+			case InterfaceKind::LOCAL:
+				h_ << ", " << Namespace ("CORBA") << "Object";
+				break;
+			case InterfaceKind::ABSTRACT:
+				h_ << ", " << Namespace ("CORBA") << "AbstractBase";
+				break;
+		}
+	} else {
+		const ValueType& vt = static_cast <const ValueType&> (container);
+		h_ << ", " << Namespace ("CORBA") << "ValueType";
+		for (auto itf : vt.supports ()) {
+			if (
+				itf->interface_kind () == InterfaceKind::UNCONSTRAINED
+				||
+				itf->interface_kind () == InterfaceKind::LOCAL
+				) {
+				h_ << ", " << Namespace ("CORBA") << "Object";
+			}
+		}
 	}
 	h_ << ">\n"
 		"{\n"
 		"public:\n";
 	h_.indent ();
-	for (auto it = itf.begin (); it != itf.end (); ++it) {
+	for (auto it = container.begin (); it != container.end (); ++it) {
 		const Item& item = **it;
 		switch (item.kind ()) {
 			case Item::Kind::OPERATION:
@@ -533,14 +583,34 @@ void Client::end (const Interface& itf)
 				break;
 			default: {
 				const NamedItem& def = static_cast <const NamedItem&> (item);
-				h_ << "using " << Namespace ("CORBA/Internal") << "Definitions <" << itf.name () << ">::" << def.name () << ";\n";
-				if (itf.interface_kind () != InterfaceKind::PSEUDO && RepositoryId::cast (&def))
-					h_ << "using " << Namespace ("CORBA/Internal") << "Definitions <" << itf.name () << ">::_tc_" << def.name () << ";\n";
+				h_ << "using " << Namespace ("CORBA/Internal") << "Definitions <" << container.name () << ">::" << def.name () << ";\n";
+				if (!pseudo_interface && RepositoryId::cast (&def))
+					h_ << "using " << Namespace ("CORBA/Internal") << "Definitions <" << container.name () << ">::_tc_" << def.name () << ";\n";
 			}
 		}
 	}
 	h_.unindent ();
 	h_ << "};\n";
+}
+
+void Client::begin (const Interface& itf)
+{
+	begin_interface (itf);
+}
+
+void Client::end (const Interface& itf)
+{
+	end_interface (itf);
+}
+
+void Client::begin (const ValueType& itf)
+{
+	begin_interface (itf);
+}
+
+void Client::end (const ValueType& itf)
+{
+	end_interface (itf);
 }
 
 inline

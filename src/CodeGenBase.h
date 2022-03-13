@@ -249,9 +249,10 @@ protected:
 	virtual void end (const AST::Union&);
 	virtual void leaf (const AST::UnionElement&);
 
-	virtual void leaf (const AST::ValueTypeDecl&);
-	virtual void begin (const AST::ValueType&);
-	virtual void end (const AST::ValueType&);
+	virtual void leaf (const AST::ValueTypeDecl&) {}
+	virtual void begin (const AST::ValueType&) {}
+	virtual void end (const AST::ValueType&) {}
+
 	virtual void leaf (const AST::StateMember&);
 	virtual void leaf (const AST::ValueFactory&);
 	virtual void leaf (const AST::ValueBox&);

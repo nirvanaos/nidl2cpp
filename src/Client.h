@@ -116,11 +116,17 @@ protected:
 
 	virtual void leaf (const AST::Enum& item);
 
+	virtual void leaf (const AST::ValueTypeDecl& item);
+	virtual void begin (const AST::ValueType& item);
+	virtual void end (const AST::ValueType& item);
+
 private:
 	void forward_guard (const AST::NamedItem& item);
 	void forward_define (const AST::NamedItem& item);
 	void forward_decl (const AST::NamedItem& item);
-	void forward_interface (const AST::NamedItem& item, AST::InterfaceKind kind);
+	void forward_interface (const AST::NamedItem& item);
+	void begin_interface (const AST::ItemContainer& item);
+	void end_interface (const AST::ItemContainer& item);
 	void backward_compat_var (const AST::NamedItem& item);
 	void environment (const AST::Raises& raises);
 	void type_code_decl (const AST::NamedItem& item);

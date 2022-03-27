@@ -119,6 +119,8 @@ protected:
 	virtual void leaf (const AST::ValueTypeDecl& item);
 	virtual void begin (const AST::ValueType& item);
 	virtual void end (const AST::ValueType& item);
+	
+	virtual void leaf (const AST::ValueBox& item);
 
 private:
 	void forward_guard (const AST::NamedItem& item);

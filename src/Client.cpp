@@ -560,7 +560,7 @@ void Client::end_interface (const ItemContainer& container)
 		}
 	} else {
 		const ValueType& vt = static_cast <const ValueType&> (container);
-		h_ << ", " << Namespace ("CORBA") << "ValueType";
+		h_ << ", " << Namespace ("CORBA") << "ValueBase";
 		for (auto itf : vt.supports ()) {
 			if (
 				itf->interface_kind () == InterfaceKind::UNCONSTRAINED
@@ -1345,3 +1345,6 @@ void Client::implement (const Enum& item)
 	}
 	type_code_def (item);
 }
+
+void Client::leaf (const AST::ValueBox& item)
+{}

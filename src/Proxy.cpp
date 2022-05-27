@@ -269,9 +269,9 @@ void Proxy::end (const Interface& itf)
 	if (!bases.empty ()) {
 		cpp_ << endl;
 		cpp_.indent ();
-		cpp_ << "AbstractBase::_ptr_type ab = proxy_manager->object ();\n";
+		cpp_ << "Object::_ptr_type obj = proxy_manager->object ();\n";
 		for (auto p : bases) {
-			cpp_ << "ProxyBaseInterface <" << QName (*p) << ">::init (ab);\n";
+			cpp_ << "ProxyBaseInterface <" << QName (*p) << ">::init (obj);\n";
 		}
 		cpp_.unindent ();
 	}
@@ -486,7 +486,7 @@ void Proxy::end (const Interface& itf)
 
 	cpp_.namespace_close ();
 	cpp_ << "NIRVANA_EXPORT (" << export_name (itf) << ", " << QName (itf)
-		<< "::repository_id_, CORBA::AbstractBase, CORBA::Internal::ProxyFactoryImpl <" << QName (itf) << ">)\n";
+		<< "::repository_id_, CORBA::Internal::PseudoBase, CORBA::Internal::ProxyFactoryImpl <" << QName (itf) << ">)\n";
 }
 
 void Proxy::md_operation (const Interface& itf, const OpMetadata& op)

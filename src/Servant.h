@@ -47,11 +47,17 @@ protected:
 	virtual void end (const AST::Root&);
 	virtual void leaf (const AST::Include& item);
 	virtual void begin (const AST::Interface& itf);
+	virtual void end (const AST::Interface& itf);
+	virtual void begin (const AST::ValueType& vt);
+	virtual void end (const AST::ValueType& vt);
 	virtual void leaf (const AST::Operation& op);
 	virtual void leaf (const AST::Attribute& att);
-	virtual void end (const AST::Interface& itf);
 
 private:
+	void skeleton_begin (const AST::ItemContainer& item);
+	void skeleton_end (const AST::ItemContainer& item);
+	void epv ();
+
 	void servant_param (const AST::Parameter& param)
 	{
 		servant_param (param, param.name (), param.attribute ());

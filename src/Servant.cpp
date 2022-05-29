@@ -48,16 +48,26 @@ void Servant::leaf (const Include& item)
 void Servant::begin (const Interface& itf)
 {
 	attributes_by_ref_ = itf.interface_kind () == InterfaceKind::PSEUDO;
+	skeleton_begin (itf);
+}
 
+void Servant::begin (const ValueType& vt)
+{
+	attributes_by_ref_ = true;
+	skeleton_begin (vt);
+}
+
+void Servant::skeleton_begin (const ItemContainer& item)
+{
 	h_.namespace_open ("CORBA/Internal");
 	h_.empty_line ();
 
 	h_ << "template <class S>\n"
-		"class Skeleton <S, " << QName (itf) << "> : public Definitions <" << QName (itf) << ">\n"
+		"class Skeleton <S, " << QName (item) << "> : public Definitions <" << QName (item) << ">\n"
 		"{\n"
 		"public:\n";
 	h_.indent ();
-	h_ << "static const typename Bridge <" << QName (itf) << ">::EPV epv_;\n\n";
+	h_ << "static const typename Bridge <" << QName (item) << ">::EPV epv_;\n\n";
 	h_.unindent ();
 	h_ << "protected:\n";
 	h_.indent ();
@@ -65,62 +75,43 @@ void Servant::begin (const Interface& itf)
 
 void Servant::end (const Interface& itf)
 {
-	h_.unindent ();
-	h_ << "};\n"
-		"\ntemplate <class S>\n"
-		"const Bridge <" << QName (itf) << ">::EPV Skeleton <S, " << QName (itf) << ">::epv_ = {\n";
-	h_.indent ();
-	h_ << "{ // header\n";
-	h_.indent ();
-	h_ << "Bridge <" << QName (itf) << ">::repository_id_,\n"
-		"S::template __duplicate <" << QName (itf) << ">,\n"
-		"S::template __release <" << QName (itf) << ">\n";
-	h_.unindent ();
-	h_ << "}";
-	
+	skeleton_end (itf);
+
 	// Bases
-	if (itf.interface_kind () != InterfaceKind::PSEUDO) {
+	const Interfaces bases = itf.get_all_bases ();
+
+	if (itf.interface_kind () != InterfaceKind::PSEUDO || !bases.empty ()) {
 		h_ << ",\n"
 			"{ // base\n";
 		h_.indent ();
 
 		if (itf.interface_kind () == InterfaceKind::ABSTRACT)
-			h_ << "S::template _wide <AbstractBase, ";
-		else
+			h_ << "S::template _wide_abstract <";
+		else if (itf.interface_kind () != InterfaceKind::PSEUDO)
 			h_ << "S::template _wide_object <";
-		h_ << QName (itf) << ">\n";
+		h_ << QName (itf) << ">";
 
-		for (auto b : itf.bases ()) {
-			h_ << ",\n"
-				"S::template _wide <" << QName (*b) << ", " << QName (itf) << ">\n";
+		auto b = bases.begin ();
+		if (itf.interface_kind () == InterfaceKind::PSEUDO) {
+			h_ << "S::template _wide <" << QName (**b) << ", " << QName (itf) << ">";
+			++b;
 		}
 
+		for (; b != bases.end (); ++b) {
+			h_ << ",\n"
+				"S::template _wide <" << QName (**b) << ", " << QName (itf) << ">";
+		}
+
+		h_ << endl;
 		h_.unindent ();
 		h_ << "}";
 	}
 
 	// EPV
-	if (!epv_.empty ()) {
-		h_ << ",\n"
-			"{ // EPV\n";
-		h_.indent ();
-		auto n = epv_.begin ();
-		h_ << "S::" << *n;
-		for (++n; n != epv_.end (); ++n) {
-			h_ << ",\nS::" << *n;
-		}
-		h_.unindent ();
-		h_ << "\n}";
-		epv_.clear ();
-	}
-
-	h_.unindent ();
-	h_ << "\n};\n";
+	epv ();
 
 	// Servant implementations
 	if (itf.interface_kind () != InterfaceKind::ABSTRACT && !options ().no_servant) {
-
-		Interfaces bases = itf.get_all_bases ();
 
 		// Standard implementation
 		h_.empty_line ();
@@ -197,9 +188,9 @@ void Servant::end (const Interface& itf)
 					h_ << "}\n";
 				}
 			} else {
-				
+
 				if (!options ().no_POA)
-					h_ << "typedef " << Namespace ("CORBA/Internal") 
+					h_ << "typedef " << Namespace ("CORBA/Internal")
 					<< "ServantPOA <" << QName (itf) << "> POA_" << static_cast <const string&> (itf.name ()) << ";\n";
 
 				h_ << "template <class T> using POA_" << static_cast <const string&> (itf.name ()) << "_tie = "
@@ -208,6 +199,49 @@ void Servant::end (const Interface& itf)
 			h_ << "#endif\n";
 		}
 	}
+}
+
+void Servant::end (const ValueType& vt)
+{
+	skeleton_end (vt);
+	epv ();
+}
+
+void Servant::skeleton_end (const ItemContainer& item)
+{
+	h_.unindent ();
+	h_ << "};\n"
+		"\ntemplate <class S>\n"
+		"const Bridge <" << QName (item) << ">::EPV Skeleton <S, " << QName (item) << ">::epv_ = {\n";
+	h_.indent ();
+	h_ << "{ // header\n";
+	h_.indent ();
+	h_ << "Bridge <" << QName (item) << ">::repository_id_,\n"
+		"S::template __duplicate <" << QName (item) << ">,\n"
+		"S::template __release <" << QName (item) << ">\n";
+	h_.unindent ();
+	h_ << "}";
+
+}
+
+void Servant::epv ()
+{
+	if (!epv_.empty ()) {
+		h_ << ",\n"
+			"{ // EPV\n";
+		h_.indent ();
+		auto n = epv_.begin ();
+		h_ << "S::" << *n;
+		for (++n; n != epv_.end (); ++n) {
+			h_ << ",\nS::" << *n;
+		}
+		h_.unindent ();
+		h_ << "\n}";
+		epv_.clear ();
+	}
+
+	h_.unindent ();
+	h_ << "\n};\n";
 }
 
 void Servant::implementation_suffix (const InterfaceKind ik)

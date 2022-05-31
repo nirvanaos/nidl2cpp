@@ -111,16 +111,28 @@ void Servant::end (const Interface& itf)
 	epv ();
 
 	// Servant implementations
-	if (itf.interface_kind () != InterfaceKind::ABSTRACT && !options ().no_servant) {
+	if (!options ().no_servant) {
 
-		// Standard implementation
-		h_.empty_line ();
-		h_ << "template <class S>\n"
-			"class Servant <S, " << QName (itf) << "> : public Implementation";
-		implementation_suffix (itf);
-		h_ << " <S, ";
-		implementation_parameters (itf, all_bases);
-		h_ << "{};\n";
+		if (itf.interface_kind () != InterfaceKind::ABSTRACT) {
+			
+			// Standard implementation
+			h_.empty_line ();
+			h_ << "template <class S>\n"
+				"class Servant <S, " << QName (itf) << "> : public Implementation";
+			implementation_suffix (itf);
+			h_ << " <S, ";
+			implementation_parameters (itf, all_bases);
+			h_ << "{};\n";
+
+			// Static implementation
+			h_.empty_line ();
+			h_ << "template <class S>\n"
+				"class ServantStatic <S, " << QName (itf) << "> : public Implementation";
+			implementation_suffix (itf);
+			h_ << "Static <S, ";
+			implementation_parameters (itf, all_bases);
+			h_ << "{};\n";
+		}
 
 		if (!options ().no_POA && itf.interface_kind () != InterfaceKind::PSEUDO) {
 			// POA implementation
@@ -128,6 +140,7 @@ void Servant::end (const Interface& itf)
 			h_ << "template <>\n"
 				"class NIRVANA_NOVTABLE ServantPOA <" << QName (itf) << "> :\n";
 			h_.indent ();
+
 			bool has_base = false;
 			for (auto b : all_bases) {
 				if (b->interface_kind () == itf.interface_kind ()) {
@@ -135,18 +148,10 @@ void Servant::end (const Interface& itf)
 					break;
 				}
 			}
-			if (!has_base) {
-				const char* base;
-				switch (itf.interface_kind ()) {
-					case InterfaceKind::ABSTRACT:
-						base = "AbstractBase";
-						break;
-					case InterfaceKind::LOCAL:
-						base = "LocalObject";
-						break;
-					default:
-						base = "PortableServer::ServantBase";
-				}
+
+			if (itf.interface_kind () != InterfaceKind::ABSTRACT && !has_base) {
+				const char* base = itf.interface_kind () == InterfaceKind::LOCAL ?
+					"LocalObject" : "PortableServer::ServantBase";
 				h_ << "public virtual ServantPOA <" << base << ">,\n";
 			}
 
@@ -161,39 +166,45 @@ void Servant::end (const Interface& itf)
 			h_.indent ();
 			h_ << "typedef " << QName (itf) << " PrimaryInterface;\n\n";
 
-			switch (itf.interface_kind ()) {
-				case InterfaceKind::UNCONSTRAINED:
-				case InterfaceKind::LOCAL:
-					h_ << "virtual Interface* _query_interface (const String& id) override\n"
-						"{\n";
-					h_.indent ();
-					h_ << "return FindInterface <" << QName (itf);
-					for (auto b : all_bases) {
-						h_ << ", " << QName (*b);
-					}
-					h_ << ">::find (*this, id);\n";
-					h_.unindent ();
-					h_ << "}\n\n";
-					h_ << "I_ref <" << QName (itf) << "> _this ()\n"
-						"{\n";
-					h_.indent ();
-					h_ << "return this->_get_proxy ().template downcast <" << QName (itf)
-						<< "> ();\n";
-					h_.unindent ();
-					h_ << "}\n\n";
-					break;
+			if (itf.interface_kind () != InterfaceKind::ABSTRACT) {
+				h_ << "virtual Interface* _query_interface (const String& id) override\n"
+					"{\n";
+				h_.indent ();
+				h_ << "return FindInterface <" << QName (itf);
+				for (auto b : all_bases) {
+					h_ << ", " << QName (*b);
+				}
+				h_ << ">::find (*this, id);\n";
+				h_.unindent ();
+				h_ << "}\n\n";
+				h_ << "I_ref <" << QName (itf) << "> _this ()\n"
+					"{\n";
+				h_.indent ();
+				h_ << "return this->_get_proxy ().template downcast <" << QName (itf)
+					<< "> ();\n";
+				h_.unindent ();
+				h_ << "}\n";
 
-				case InterfaceKind::PSEUDO:
-					h_ << "I_ptr <" << QName (itf) << "> _get_ptr () NIRVANA_NOEXCEPT\n"
-						"{\n";
+				bool has_direct_abstract_base = false;
+				for (auto b : itf.bases ()) {
+					if (b->interface_kind () == InterfaceKind::ABSTRACT) {
+						has_direct_abstract_base = true;
+						break;
+					}
+				}
+				if (has_direct_abstract_base) {
+					h_ << "\n"
+						"virtual Bridge <AbstractBase>*_to_abstract () override\n";
 					h_.indent ();
-					h_ << "return I_ptr <" << QName (itf) << "> (&static_cast <"
-						<< QName (itf) << "&> (static_cast <Bridge <" << QName (itf)
-						<< ">&> (*this)));\n";
+					h_ << "return nullptr;\n";
 					h_.unindent ();
-					h_ << "}\n\n";
-					break;
+					h_ << "}\n";
+				}
+			} else if (!has_base) {
+				h_ << "virtual Bridge <AbstractBase>* _to_abstract () = 0;\n";
 			}
+
+			h_.empty_line ();
 
 			for (auto it = itf.begin (); it != itf.end (); ++it) {
 				const Item& item = **it;
@@ -222,18 +233,10 @@ void Servant::end (const Interface& itf)
 			h_ << "};\n";
 		}
 
-		// Static implementation
-		h_.empty_line ();
-		h_ << "template <class S>\n"
-			"class ServantStatic <S, " << QName (itf) << "> : public Implementation";
-		implementation_suffix (itf);
-		h_ << "Static <S, ";
-		implementation_parameters (itf, all_bases);
-		h_ << "{};\n";
-
 		h_.namespace_close ();
 
-		if (options ().legacy) {
+		if (options ().legacy && itf.interface_kind () != InterfaceKind::PSEUDO
+			&& (!options ().no_POA || itf.interface_kind () != InterfaceKind::ABSTRACT)) {
 			h_ << endl << "#ifdef LEGACY_CORBA_CPP\n";
 			const NamedItem* ns = itf.parent ();
 			if (ns) {
@@ -249,10 +252,11 @@ void Servant::end (const Interface& itf)
 
 				if (!options ().no_POA)
 					h_ << "\ntypedef " << Namespace ("CORBA/Internal")
-					<< "ServantPOA <" << QName (itf) << "> " << itf.name () << ";\n";
+						<< "ServantPOA <" << QName (itf) << "> " << itf.name () << ";\n";
 
-				h_ << "template <class T> using " << itf.name () << "_tie = "
-					<< Namespace ("CORBA/Internal") << "ServantTied <T, " << QName (itf) << ">;\n\n";
+				if (itf.interface_kind () != InterfaceKind::ABSTRACT)
+					h_ << "template <class T> using " << itf.name () << "_tie = "
+						<< Namespace ("CORBA/Internal") << "ServantTied <T, " << QName (itf) << ">;\n\n";
 
 				for (size_t cnt = sn.size (); cnt; --cnt) {
 					h_ << "}\n";
@@ -263,8 +267,9 @@ void Servant::end (const Interface& itf)
 					h_ << "typedef " << Namespace ("CORBA/Internal")
 					<< "ServantPOA <" << QName (itf) << "> POA_" << static_cast <const string&> (itf.name ()) << ";\n";
 
-				h_ << "template <class T> using POA_" << static_cast <const string&> (itf.name ()) << "_tie = "
-					<< Namespace ("CORBA/Internal") << "ServantTied <T, " << QName (itf) << ">;\n\n";
+				if (itf.interface_kind () != InterfaceKind::ABSTRACT)
+					h_ << "template <class T> using POA_" << static_cast <const string&> (itf.name ()) << "_tie = "
+						<< Namespace ("CORBA/Internal") << "ServantTied <T, " << QName (itf) << ">;\n\n";
 			}
 			h_ << "#endif\n";
 		}

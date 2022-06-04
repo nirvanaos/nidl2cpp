@@ -269,7 +269,7 @@ void Proxy::end (const Interface& itf)
 	if (!bases.empty ()) {
 		cpp_ << endl;
 		cpp_.indent ();
-		cpp_ << "Object::_ptr_type obj = proxy_manager->object ();\n";
+		cpp_ << "Object::_ptr_type obj = static_cast <Object*> (proxy_manager->get_object (Object::repository_id_));\n";
 		for (auto p : bases) {
 			cpp_ << "ProxyBaseInterface <" << QName (*p) << ">::init (obj);\n";
 		}

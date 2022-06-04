@@ -194,14 +194,14 @@ void Servant::end (const Interface& itf)
 				}
 				if (has_direct_abstract_base) {
 					h_ << "\n"
-						"virtual Bridge <AbstractBase>*_to_abstract () override\n";
+						"virtual Bridge <AbstractBase>*_get_abstract_base () override\n";
 					h_.indent ();
 					h_ << "return nullptr;\n";
 					h_.unindent ();
 					h_ << "}\n";
 				}
 			} else if (!has_base) {
-				h_ << "virtual Bridge <AbstractBase>* _to_abstract () = 0;\n";
+				h_ << "virtual Bridge <AbstractBase>* _get_abstract_base () = 0;\n";
 			}
 
 			h_.empty_line ();

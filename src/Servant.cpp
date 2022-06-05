@@ -149,9 +149,18 @@ void Servant::end (const Interface& itf)
 				}
 			}
 
-			if (itf.interface_kind () != InterfaceKind::ABSTRACT && !has_base) {
-				const char* base = itf.interface_kind () == InterfaceKind::LOCAL ?
-					"LocalObject" : "PortableServer::ServantBase";
+			if (!has_base) {
+				const char* base;
+				switch (itf.interface_kind ()) {
+					case InterfaceKind::LOCAL:
+						base = "LocalObject";
+						break;
+					case InterfaceKind::ABSTRACT:
+						base = "AbstractBase";
+						break;
+					default:
+						base = "PortableServer::ServantBase";
+				}
 				h_ << "public virtual ServantPOA <" << base << ">,\n";
 			}
 
@@ -184,24 +193,6 @@ void Servant::end (const Interface& itf)
 					<< "> ();\n";
 				h_.unindent ();
 				h_ << "}\n";
-
-				bool has_direct_abstract_base = false;
-				for (auto b : itf.bases ()) {
-					if (b->interface_kind () == InterfaceKind::ABSTRACT) {
-						has_direct_abstract_base = true;
-						break;
-					}
-				}
-				if (has_direct_abstract_base) {
-					h_ << "\n"
-						"virtual Bridge <AbstractBase>*_get_abstract_base () override\n";
-					h_.indent ();
-					h_ << "return nullptr;\n";
-					h_.unindent ();
-					h_ << "}\n";
-				}
-			} else if (!has_base) {
-				h_ << "virtual Bridge <AbstractBase>* _get_abstract_base () = 0;\n";
 			}
 
 			h_.empty_line ();

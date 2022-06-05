@@ -418,9 +418,9 @@ void Proxy::end (const Interface& itf)
 		}
 	}
 
-	cpp_ << "static const char* const __interfaces [];";
+	cpp_ << "static const char* const __interfaces [];\n";
 	if (!metadata.empty ())
-		cpp_ << "static const Operation __operations [];";
+		cpp_ << "static const Operation __operations [];\n";
 
 	cpp_.unindent ();
 	cpp_ << "};\n\n";

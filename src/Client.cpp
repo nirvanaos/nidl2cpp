@@ -958,7 +958,7 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 			"{\n";
 		h_.indent ();
 
-		implement_type (members, with_legacy);
+		implement_type (item, suffix, members, with_legacy);
 		
 		if (!*suffix && !is_pseudo (item))
 			type_code_func (item);
@@ -974,7 +974,7 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 		has_check (members);
 		h_ << ";\n";
 
-		implement_type (members, with_legacy);
+		implement_type (item, suffix, members, with_legacy);
 		
 		if (!*suffix && !is_pseudo (item))
 			type_code_func (item);
@@ -984,7 +984,7 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 	}
 }
 
-void Client::implement_type (const Members& members, bool with_legacy)
+void Client::implement_type (const AST::NamedItem& cont, const char* suffix, const Members& members, bool with_legacy)
 {
 	for (auto m : members) {
 		if (is_native (*m))
@@ -1004,25 +1004,30 @@ void Client::implement_type (const Members& members, bool with_legacy)
 	h_ << "}\n";
 
 	// Implement marshaling
+	if (is_var_len (members)) {
+		h_ << "\n"
+			"static void marshal_in (const Var& src, IORequest::_ptr_type rq);\n"
+			"static void marshal_out (Var& src, IORequest::_ptr_type rq);\n"
+			"static void unmarshal (IORequest::_ptr_type rq, Var& dst);\n";
+	}
+	h_ << "static void byteswap (Var& v) NIRVANA_NOEXCEPT;\n";
+
+	cpp_.namespace_open ("CORBA/Internal");
 
 	if (with_legacy) {
-		h_.unindent ();
-		h_ << "\n#ifndef LEGACY_CORBA_CPP\n";
-		h_.indent ();
+		cpp_ << "\n#ifndef LEGACY_CORBA_CPP\n";
 	}
 
-	implement_marshaling (members, "_");
+	implement_marshaling (cont, suffix, members, "_");
 	if (with_legacy) {
-		h_ << endl;
-		h_.unindent ();
-		h_ << "#else\n";
-		h_.indent ();
-		implement_marshaling (members, "");
-		h_ << endl;
-		h_.unindent ();
-		h_ << "#endif\n";
-		h_.indent ();
+		cpp_ << endl;
+		cpp_ << "#else\n";
+		implement_marshaling (cont, suffix, members, "");
+		cpp_ << endl;
+		cpp_ << "#endif\n";
 	}
+
+	cpp_.namespace_close ();
 }
 
 void Client::has_check (const Members& members)
@@ -1054,25 +1059,29 @@ void Client::has_check (const Members& members)
 		h_ << "false";
 }
 
-void Client::implement_marshaling (const Members& members, const char* prefix)
+void Client::implement_marshaling (const AST::NamedItem& cont, const char* suffix,
+	const Members& members, const char* prefix)
 {
 	if (is_var_len (members)) {
-		h_ << "\n"
-			"static void marshal_in (const Var& src, IORequest::_ptr_type rq)\n"
-			"{\n";
+		cpp_ << "\n"
+			"void Type <" << QName (cont) << suffix
+			<< ">::marshal_in (const Var & src, IORequest::_ptr_type rq)\n"
+				"{\n";
 		marshal_members (members, "marshal_in (src.", prefix);
-		h_ << "}\n\n"
-			"static void marshal_out (Var& src, IORequest::_ptr_type rq)\n"
-			"{\n";
+		cpp_ << "}\n\n"
+			"void Type <" << QName (cont) << suffix
+			<< ">::marshal_out (Var & src, IORequest::_ptr_type rq)\n"
+				"{\n";
 		marshal_members (members, "marshal_out (src.", prefix);
-		h_ << "}\n\n"
-			"static void unmarshal (IORequest::_ptr_type rq, Var& dst)\n"
-			"{\n";
-		h_.indent ();
+		cpp_ << "}\n\n"
+			"void Type <" << QName (cont) << suffix
+			<< ">::unmarshal (IORequest::_ptr_type rq, Var & dst)\n"
+				"{\n";
+		cpp_.indent ();
 		for (Members::const_iterator m = members.begin (); m != members.end ();) {
 			// Unmarshal variable-length members
 			while (is_var_len (**m)) {
-				h_ << TypePrefix (**m) << "unmarshal (rq, dst." << prefix << (*m)->name () << ");\n";
+				cpp_ << TypePrefix (**m) << "unmarshal (rq, dst." << prefix << (*m)->name () << ");\n";
 				if (members.end () == ++m)
 					break;
 			}
@@ -1085,50 +1094,51 @@ void Client::implement_marshaling (const Members& members, const char* prefix)
 				auto end = m;
 
 				if (end == members.end ())
-					h_ << "if (unmarshal_members (rq, dst, &dst." << prefix << (*begin)->name ();
+					cpp_ << "if (unmarshal_members (rq, dst, &dst." << prefix << (*begin)->name ();
 				else
-					h_ << "if (unmarshal_members (rq, &dst." << prefix << (*begin)->name ()
+					cpp_ << "if (unmarshal_members (rq, &dst." << prefix << (*begin)->name ()
 						<< ", &dst." << prefix << (*end)->name ();
-				h_ << ")) {\n";
-				h_.indent ();
+				cpp_ << ")) {\n";
+				cpp_.indent ();
 
 				// Swap bytes
 				m = begin;
 				do {
-					h_ << TypePrefix (**m) << "byteswap (dst." << prefix << (*m)->name () << ");\n";
+					cpp_ << TypePrefix (**m) << "byteswap (dst." << prefix << (*m)->name () << ");\n";
 				} while (end != ++m);
-				h_.unindent ();
-				h_ << "}\n";
+				cpp_.unindent ();
+				cpp_ << "}\n";
 
 				// If some members have check, check them
 				m = begin;
 				do {
-					h_ << TypePrefix (**m) << "check (dst." << prefix << (*m)->name () << ");\n";
+					cpp_ << TypePrefix (**m) << "check (dst." << prefix << (*m)->name () << ");\n";
 				} while (end != ++m);
 			}
 		}
-		h_.unindent ();
-		h_ << "}\n";
+		cpp_.unindent ();
+		cpp_ << "}\n";
 	}
 
-	h_ << "\nstatic void byteswap (Var& v) NIRVANA_NOEXCEPT\n"
+	cpp_ << "\nvoid Type <" << QName (cont) << suffix
+		<< ">::byteswap (Var & v) NIRVANA_NOEXCEPT\n"
 		"{\n";
-	h_.indent ();
+	cpp_.indent ();
 	for (auto m : members) {
-		h_ << TypePrefix (*m) << "byteswap (v." << prefix << m->name () << ");\n";
+		cpp_ << TypePrefix (*m) << "byteswap (v." << prefix << m->name () << ");\n";
 	}
-	h_.unindent ();
-	h_ << "}\n";
+	cpp_.unindent ();
+	cpp_ << "}\n";
 }
 
 void Client::marshal_members (const Members& members, const char* func, const char* prefix)
 {
-	h_.indent ();
+	cpp_.indent ();
 
 	for (Members::const_iterator m = members.begin (); m != members.end ();) {
 		// Marshal variable-length members
 		while (is_var_len (**m)) {
-			h_ << TypePrefix (**m) << func << prefix << (*m)->name () << ", rq);\n";
+			cpp_ << TypePrefix (**m) << func << prefix << (*m)->name () << ", rq);\n";
 			if (members.end () == ++m)
 				break;
 		}
@@ -1140,14 +1150,14 @@ void Client::marshal_members (const Members& members, const char* func, const ch
 			} while (m != members.end () && !is_var_len (**m));
 
 			if (m == members.end ())
-				h_ << "marshal_members (src, &src." << prefix << (*begin)->name () << ", rq);\n";
+				cpp_ << "marshal_members (src, &src." << prefix << (*begin)->name () << ", rq);\n";
 			else
-				h_ << "marshal_members (&src." << prefix << (*begin)->name ()
+				cpp_ << "marshal_members (&src." << prefix << (*begin)->name ()
 					<< ", &src." << prefix << (*m)->name () << ", rq);\n";
 		}
 	}
 
-	h_.unindent ();
+	cpp_.unindent ();
 }
 
 void Client::leaf (const StructDecl& item)

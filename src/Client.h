@@ -73,28 +73,6 @@ public:
 		const AST::Operation& op;
 	};
 
-	struct MemberDefault
-	{
-		MemberDefault (const AST::Member& m, const char* pref) :
-			member (m),
-			prefix (pref)
-		{}
-
-		const AST::Member& member;
-		const char* prefix;
-	};
-
-	struct MemberInit
-	{
-		MemberInit (const AST::Member& m, const char* pref) :
-			member (m),
-			prefix (pref)
-		{}
-
-		const AST::Member& member;
-		const char* prefix;
-	};
-
 protected:
 	virtual void end (const AST::Root&);
 
@@ -138,7 +116,6 @@ private:
 	void type_code_func (const AST::NamedItem& item);
 	void constructors (const AST::Identifier& name, const Members& members, const char* prefix);
 	void accessors (const Members& members);
-	void member_type (const AST::Member& member);
 	void member_variables (const Members& members);
 	void member_variables_legacy (const Members& members);
 	void implement_type (const Members& members, bool with_legacy);
@@ -156,12 +133,6 @@ private:
 
 	void native_itf_template (const AST::Operation& op);
 
-	static bool is_boolean (const AST::Type& t)
-	{
-		const AST::Type& dt = t.dereference_type ();
-		return dt.tkind () == AST::Type::Kind::BASIC_TYPE && dt.basic_type () == AST::BasicType::BOOLEAN;
-	}
-
 	void bridge_bases (const Bases& bases);
 
 private:
@@ -173,7 +144,5 @@ private:
 
 Code& operator << (Code& stm, const Client::Param& t);
 Code& operator << (Code& stm, const Client::Signature& op);
-Code& operator << (Code& stm, const Client::MemberDefault& val);
-Code& operator << (Code& stm, const Client::MemberInit& val);
 
 #endif

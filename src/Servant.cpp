@@ -126,17 +126,17 @@ void Servant::end (const Interface& itf)
 			h_ << "S::template _wide_abstract <";
 		else if (itf.interface_kind () != InterfaceKind::PSEUDO)
 			h_ << "S::template _wide_object <";
-		h_ << QName (itf) << ">";
+		h_ << QName (itf) << '>';
 
 		auto b = all_bases.begin ();
 		if (itf.interface_kind () == InterfaceKind::PSEUDO) {
-			h_ << "S::template _wide <" << QName (**b) << ", " << QName (itf) << ">";
+			h_ << "S::template _wide <" << QName (**b) << ", " << QName (itf) << '>';
 			++b;
 		}
 
 		for (; b != all_bases.end (); ++b) {
 			h_ << ",\n"
-				"S::template _wide <" << QName (**b) << ", " << QName (itf) << ">";
+				"S::template _wide <" << QName (**b) << ", " << QName (itf) << '>';
 		}
 
 		h_ << endl;
@@ -315,13 +315,13 @@ void Servant::end (const ValueType& vt)
 		"{ // base\n";
 	h_.indent ();
 
-	h_ << "S::template _wide <ValueBase, " << QName (vt) << ">";
+	h_ << "S::template _wide <ValueBase, " << QName (vt) << '>';
 
 	const Bases all_bases = get_all_bases (vt);
 
 	for (auto b : all_bases) {
 		h_ << ",\n"
-			"S::template _wide <" << QName (*b) << ", " << QName (vt) << ">";
+			"S::template _wide <" << QName (*b) << ", " << QName (vt) << '>';
 	}
 
 	h_ << endl;
@@ -336,6 +336,55 @@ void Servant::end (const ValueType& vt)
 
 		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
 
+			// ValueData
+			h_.empty_line ();
+			h_ << "template <>\n"
+				"class ValueData <" << QName (vt) << ">\n"
+				"{\n"
+				"protected:\n";
+			h_.indent ();
+
+			// Default constructor
+			h_ << "ValueData ()";
+
+			StateMembers members = get_members (vt);
+
+			if (!members.empty ()) {
+				h_ << " :\n";
+				h_.indent ();
+				auto it = members.begin ();
+				h_ << MemberDefault (**it, "_");
+				for (++it; it != members.end (); ++it) {
+					h_ << ",\n" << MemberDefault (**it, "_");
+				}
+				h_.unindent ();
+			}
+			h_ << "\n{}\n\n";
+
+			// Accessors
+			for (auto p : members) {
+				if (p->is_public ()) {
+					h_ << Accessors (*p);
+					h_.empty_line ();
+				}
+			}
+
+			for (auto p : members) {
+				h_ << MemberVariable (*p);
+			}
+			h_.unindent ();
+
+			h_ << "};\n"
+				"\n"
+				"template <class S>\n"
+				"class ValueImpl <S, " << QName (vt) << "> :\n";
+
+			h_.indent ();
+			h_ << "public ValueImplBase <S, " << QName (vt) << ">,\n"
+				"public ValueData <" << QName (vt) << ">\n";
+			h_.unindent ();
+			h_ << "{};";
+
 			// Standard implementation
 			h_.empty_line ();
 			h_ << "template <class S>\n"
@@ -346,7 +395,7 @@ void Servant::end (const ValueType& vt)
 			const Interface* concrete_itf = get_concrete_supports (vt);
 			if (concrete_itf)
 				h_ << "public ValueImplBase <S, ValueBase>,\n"
-				"public Servant <S, " << QName (*concrete_itf) << ">";
+				"public Servant <S, " << QName (*concrete_itf) << '>';
 			else
 				h_ << "public ValueImpl <S, ValueBase>";
 
@@ -361,14 +410,17 @@ void Servant::end (const ValueType& vt)
 					abstract_base = true;
 					h_ << "Interface";
 				}
-				h_ << "Impl <S, " << QName (*b) << ">";
+				h_ << "Impl <S, " << QName (*b) << '>';
 			}
 
 			if (abstract_base)
 				h_ << ",\n"
-					"public InterfaceImpl <S, AbstractBase>";
+				"public InterfaceImpl <S, AbstractBase>";
 
-				h_.unindent ();
+			h_ << ",\n"
+				"public ValueImpl <S, " << QName (vt) << '>';
+
+			h_.unindent ();
 
 			h_ << "\n"
 				"{\n"
@@ -385,7 +437,48 @@ void Servant::end (const ValueType& vt)
 			}
 			h_ << ">::find (static_cast <S&> (*this), id);\n";
 			h_.unindent ();
-			h_ << "}\n";
+			h_ << "}\n\n";
+
+			h_.unindent ();
+			h_ << "protected:\n";
+			h_.indent ();
+
+			// Default constructor
+			h_ << "Servant ()\n"
+				"{}\n";
+
+			// Explicit constructor
+			StateMembers all_members;
+			for (auto b : all_bases) {
+				if (b->kind () == Item::Kind::VALUE_TYPE) {
+					const ValueType& bv = static_cast <const ValueType&> (*b);
+					if (bv.modifier () != ValueType::Modifier::ABSTRACT) {
+						StateMembers members = get_members (bv);
+						all_members.insert (all_members.end (), members.begin (), members.end ());
+					}
+				}
+			}
+			all_members.insert (all_members.end (), members.begin (), members.end ());
+
+			if (!all_members.empty ()) {
+				h_ << "explicit Servant (";
+				auto it = all_members.begin ();
+				h_ << Var (**it) << ' ' << (*it)->name ();
+				h_.indent ();
+				for (++it; it != all_members.end (); ++it) {
+					h_ << ",\n" << Var (**it) << ' ' << (*it)->name ();
+				}
+				h_ << ")\n";
+				h_.unindent ();
+				h_ << "{\n";
+				h_.indent ();
+				for (auto m : all_members) {
+					h_ << "this->_" << m->name () << " = std::move (" << m->name () << ");\n";
+				}
+				h_.unindent ();
+				h_ << "}\n";
+			}
+
 			h_.unindent ();
 			h_ << "};\n";
 		}

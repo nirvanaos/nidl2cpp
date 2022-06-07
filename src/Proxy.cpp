@@ -37,7 +37,7 @@ using namespace AST;
 Code& operator << (Code& stm, const Proxy::WithAlias& t)
 {
 	if (t.type.tkind () == Type::Kind::NAMED_TYPE && t.type.named_type ().kind () == Item::Kind::TYPE_DEF)
-		stm << "Alias <&" << CodeGenBase::TypeCodeName (t.type.named_type ()) << ">";
+		stm << "Alias <&" << CodeGenBase::TypeCodeName (t.type.named_type ()) << '>';
 	else
 		stm << t.type;
 	return stm;

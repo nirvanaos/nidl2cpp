@@ -273,6 +273,93 @@ Code& operator << (Code& stm, const CodeGenBase::ItemNamespace& ns)
 	return stm;
 }
 
+Code& operator << (Code& stm, const CodeGenBase::MemberType& t)
+{
+	if (CodeGenBase::is_boolean (t.type))
+		stm << CodeGenBase::TypePrefix (t.type) << "ABI";
+	else if (CodeGenBase::is_ref_type (t.type))
+		stm << CodeGenBase::Var (t.type);
+	else
+		stm << t.type;
+	return stm;
+}
+
+Code& operator << (Code& stm, const CodeGenBase::MemberVariable& m)
+{
+	return stm << CodeGenBase::MemberType (m.member)
+		<< " _" << static_cast <const string&> (m.member.name ()) << ";\n";
+}
+
+Code& operator << (Code& stm, const CodeGenBase::Accessors& a)
+{
+	// const getter
+	stm << CodeGenBase::ConstRef (a.member) << ' ' << a.member.name () << " () const\n"
+		"{\n";
+	stm.indent ();
+	stm << "return _" << a.member.name () << ";\n";
+	stm.unindent ();
+	stm << "}\n";
+
+	// reference getter
+	stm << CodeGenBase::MemberType (a.member)
+		<< "& " << a.member.name () << " ()\n"
+		"{\n";
+	stm.indent ();
+	stm << "return _" << a.member.name () << ";\n";
+	stm.unindent ();
+	stm << "}\n";
+
+	// setter
+	stm << "void " << a.member.name () << " (" << CodeGenBase::TypePrefix (a.member) << "ConstRef val)\n"
+		"{\n";
+	stm.indent ();
+	stm << '_' << a.member.name () << " = val;\n";
+	stm.unindent ();
+	stm << "}\n";
+
+	if (CodeGenBase::is_var_len (a.member)) {
+		// The move setter
+		stm << "void " << a.member.name () << " (" << CodeGenBase::Var (a.member) << "&& val)\n"
+			"{\n";
+		stm.indent ();
+		stm << '_' << a.member.name () << " = std::move (val);\n";
+		stm.unindent ();
+		stm << "}\n";
+	}
+
+	return stm;
+}
+
+Code& operator << (Code& stm, const CodeGenBase::MemberDefault& m)
+{
+	stm << m.prefix << m.member.name () << " (";
+	const Type& td = m.member.dereference_type ();
+	switch (td.tkind ()) {
+		case Type::Kind::BASIC_TYPE:
+			if (td.basic_type () == BasicType::BOOLEAN)
+				stm << CodeGenBase::Namespace ("CORBA") << "FALSE";
+			else if (td.basic_type () < BasicType::OBJECT)
+				stm << "0";
+			break;
+
+		case Type::Kind::NAMED_TYPE: {
+			const NamedItem& nt = td.named_type ();
+			if (nt.kind () == Item::Kind::ENUM) {
+				const Enum& en = static_cast <const Enum&> (nt);
+				stm << CodeGenBase::QName (*en.front ());
+			}
+		} break;
+	}
+	return stm << ')';
+}
+
+Code& operator << (Code& stm, const CodeGenBase::MemberInit& m)
+{
+	stm << m.prefix << m.member.name () << " (std::move ("
+		<< m.member.name () << "))";
+	return stm;
+}
+
 CodeGenBase::Members CodeGenBase::get_members (const ItemContainer& cont, Item::Kind member_kind)
 {
 	Members ret;
@@ -434,6 +521,12 @@ bool CodeGenBase::is_enum (const Type& type)
 	return t.tkind () == Type::Kind::NAMED_TYPE && t.named_type ().kind () == Item::Kind::ENUM;
 }
 
+bool CodeGenBase::is_boolean (const AST::Type& t)
+{
+	const Type& dt = t.dereference_type ();
+	return dt.tkind () == Type::Kind::BASIC_TYPE && dt.basic_type () == BasicType::BOOLEAN;
+}
+
 void CodeGenBase::leaf (const UnionDecl&)
 {
 	throw runtime_error ("Not yet implemented");
@@ -504,8 +597,9 @@ void CodeGenBase::get_all_bases (const ValueType& vt,
 {
 	for (auto pb : vt.bases ()) {
 		if (bset.insert (pb).second) {
-			bvec.push_back (pb);
+			// Derived must be first
 			get_all_bases (*pb, bset, bvec);
+			bvec.push_back (pb);
 		}
 	}
 	if (!vt.supports ().empty ()) {

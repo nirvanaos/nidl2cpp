@@ -845,15 +845,23 @@ void Client::end (const Exception& item)
 
 		constructors (item.name (), members, "_");
 		accessors (members);
+		h_.empty_line ();
+		h_.unindent ();
+		h_ << "private:\n";
+		h_.indent ();
 		member_variables (members);
 
 		if (options ().legacy) {
 			h_ << endl;
+			h_.unindent ();
 			h_ << "#else\n";
+			h_.indent ();
 			constructors (item.name (), members, "");
 			member_variables_legacy (members);
 			h_ << endl;
+			h_.unindent ();
 			h_ << "#endif\n";
+			h_.indent ();
 		}
 
 		h_.unindent ();
@@ -1166,9 +1174,13 @@ void Client::end (const Struct& item)
 	member_variables (members);
 
 	if (options ().legacy) {
+		h_.unindent ();
 		h_ << "#else\n";
+		h_.indent ();
 		member_variables_legacy (members);
+		h_.unindent ();
 		h_ << "#endif\n";
+		h_.indent ();
 	}
 
 	h_.unindent ();
@@ -1209,12 +1221,12 @@ void Client::constructors (const Identifier& name, const Members& members, const
 	"explicit " << name << " (";
 	it = members.begin ();
 	h_ << Var (**it) << ' ' << (*it)->name ();
+	h_.indent ();
 	for (++it; it != members.end (); ++it) {
-		h_ << ", " << Var (**it) << ' ' << (*it)->name ();
+		h_ << ",\n" << Var (**it) << ' ' << (*it)->name ();
 	}
 	h_ << ") :\n";
 
-	h_.indent ();
 	it = members.begin ();
 	h_ << MemberInit (**it, prefix);
 	for (++it; it != members.end (); ++it) {
@@ -1229,60 +1241,15 @@ void Client::accessors (const Members& members)
 	// Accessors
 	for (const Member* m : members) {
 		h_.empty_line ();
-
-		// const getter
-		h_ << ConstRef (*m) << ' ' << m->name () << " () const\n"
-			"{\n";
-		h_.indent ();
-		h_ << "return _" << m->name () << ";\n";
-		h_.unindent ();
-		h_ << "}\n";
-
-		// reference getter
-		member_type (*m);
-		h_ << "& " << m->name () << " ()\n"
-			"{\n";
-		h_.indent ();
-		h_ << "return _" << m->name () << ";\n";
-		h_.unindent ();
-		h_ << "}\n";
-
-		// setter
-		h_ << "void " << m->name () << " (" << TypePrefix (*m) << "ConstRef val)\n"
-			"{\n";
-		h_.indent ();
-		h_ << '_' << m->name () << " = val;\n";
-		h_.unindent ();
-		h_ << "}\n";
-
-		if (is_var_len (*m)) {
-			// The move setter
-			h_ << "void " << m->name () << " (" << Var (*m) << "&& val)\n"
-				"{\n";
-			h_.indent ();
-			h_ << '_' << m->name () << " = std::move (val);\n";
-			h_.unindent ();
-			h_ << "}\n";
-		}
+		h_ << Accessors (*m);
 	}
 }
 
 void Client::member_variables (const Members& members)
 {
 	for (const Member* m : members) {
-		member_type (*m);
-		h_ << " _" << static_cast <const string&> (m->name ()) << ";\n";
+		h_ << MemberVariable (*m);
 	}
-}
-
-void Client::member_type (const Member& member)
-{
-	if (is_boolean (member))
-		h_ << TypePrefix (member) << "ABI";
-	else if (is_ref_type (member))
-		h_ << Var (member);
-	else
-		h_ << static_cast <const Type&> (member);
 }
 
 void Client::member_variables_legacy (const Members& members)
@@ -1314,36 +1281,6 @@ void Client::member_variables_legacy (const Members& members)
 		}
 		h_ << ' ' << m->name () << ";\n";
 	}
-}
-
-Code& operator << (Code& stm, const Client::MemberDefault& m)
-{
-	stm << m.prefix << m.member.name () << " (";
-	const Type& td = m.member.dereference_type ();
-	switch (td.tkind ()) {
-		case Type::Kind::BASIC_TYPE:
-			if (td.basic_type () == BasicType::BOOLEAN)
-				stm << CodeGenBase::Namespace ("CORBA") << "FALSE";
-			else if (td.basic_type () < BasicType::OBJECT)
-				stm << "0";
-			break;
-
-		case Type::Kind::NAMED_TYPE: {
-			const NamedItem& nt = td.named_type ();
-			if (nt.kind () == Item::Kind::ENUM) {
-				const Enum& en = static_cast <const Enum&> (nt);
-				stm << CodeGenBase::QName (*en.front ());
-			}
-		} break;
-	}
-	return stm << ')';
-}
-
-Code& operator << (Code& stm, const Client::MemberInit& m)
-{
-	stm << m.prefix << m.member.name () << " (std::move ("
-		<< m.member.name () << "))";
-	return stm;
 }
 
 void Client::implement (const Union& item)

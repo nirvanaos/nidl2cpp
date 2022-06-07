@@ -170,6 +170,55 @@ public:
 		const AST::NamedItem& item;
 	};
 
+	struct MemberType
+	{
+		MemberType (const AST::Type& t) :
+			type (t)
+		{}
+
+		const AST::Type& type;
+	};
+
+	struct MemberVariable
+	{
+		MemberVariable (const AST::Member& m) :
+			member (m)
+		{}
+
+		const AST::Member& member;
+	};
+
+	struct Accessors
+	{
+		Accessors (const AST::Member& m) :
+			member (m)
+		{}
+
+		const AST::Member& member;
+	};
+
+	struct MemberDefault
+	{
+		MemberDefault (const AST::Member& m, const char* pref) :
+			member (m),
+			prefix (pref)
+		{}
+
+		const AST::Member& member;
+		const char* prefix;
+	};
+
+	struct MemberInit
+	{
+		MemberInit (const AST::Member& m, const char* pref) :
+			member (m),
+			prefix (pref)
+		{}
+
+		const AST::Member& member;
+		const char* prefix;
+	};
+
 	typedef std::vector <const AST::Member*> Members;
 
 	static Members get_members (const AST::Struct& cont)
@@ -203,6 +252,7 @@ public:
 	static bool is_enum (const AST::Type& type);
 	static bool is_native_interface (const AST::Type& type);
 	static bool is_native (const AST::Type& type);
+	static bool is_boolean (const AST::Type& t);
 	static bool may_have_check (const AST::Type& type);
 
 	const Options& options () const
@@ -301,5 +351,10 @@ Code& operator << (Code& stm, const CodeGenBase::ServantOp& t);
 Code& operator << (Code& stm, const CodeGenBase::Namespace& ns);
 Code& operator << (Code& stm, const CodeGenBase::ItemNamespace& ns);
 Code& operator << (Code& stm, const CodeGenBase::ConstRef& t);
+Code& operator << (Code& stm, const CodeGenBase::MemberType& t);
+Code& operator << (Code& stm, const CodeGenBase::MemberVariable& m);
+Code& operator << (Code& stm, const CodeGenBase::Accessors& a);
+Code& operator << (Code& stm, const CodeGenBase::MemberDefault& val);
+Code& operator << (Code& stm, const CodeGenBase::MemberInit& val);
 
 #endif

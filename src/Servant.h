@@ -52,6 +52,7 @@ protected:
 	virtual void end (const AST::ValueType& vt);
 	virtual void leaf (const AST::Operation& op);
 	virtual void leaf (const AST::Attribute& att);
+	virtual void leaf (const AST::StateMember& sm);
 
 private:
 	void skeleton_begin (const AST::ItemContainer& item);
@@ -69,6 +70,8 @@ private:
 
 	void implementation_suffix (const AST::InterfaceKind ik);
 	void implementation_parameters (const AST::Interface& primary, const AST::Interfaces& bases);
+
+	void attribute (const AST::Member& m);
 
 private:
 	Header h_;

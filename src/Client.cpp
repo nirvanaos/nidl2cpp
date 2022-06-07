@@ -333,7 +333,7 @@ void Client::end_interface (const ItemContainer& container)
 
 	bool att_byref = false;
 	bool pseudo_interface = false;
-	vector <const ItemContainer*> bases;
+	Bases bases;
 	if (container.kind () == Item::Kind::INTERFACE) {
 
 		const Interface& itf = static_cast <const Interface&> (container);
@@ -353,25 +353,19 @@ void Client::end_interface (const ItemContainer& container)
 				break;
 		}
 
-		const Interfaces itf_bases = itf.get_all_bases ();
+		Interfaces itf_bases = itf.get_all_bases ();
 		bases.assign (itf_bases.begin (), itf_bases.end ());
-		for (auto b : bases) {
-			string proc_name;
-			{
-				ScopedName sn = b->scoped_name ();
-				for (ScopedName::const_iterator it = sn.begin (); it != sn.end (); ++it) {
-					proc_name += '_';
-					proc_name += *it;
-				}
-			}
-			h_ << "NIRVANA_BASE_ENTRY (" << QName (*b) << ", " << proc_name << ")\n";
-		}
+		bridge_bases (bases);
 
 		if (itf.interface_kind () != InterfaceKind::PSEUDO || !bases.empty ())
 			h_ << "NIRVANA_BRIDGE_EPV\n";
 	} else {
+		const ValueType& vt = static_cast <const ValueType&> (container);
 		att_byref = true;
 		h_ << "NIRVANA_BASE_ENTRY (ValueBase, CORBA_ValueBase)\n";
+		bases = get_all_bases (vt);
+		bridge_bases (bases);
+		h_ << "NIRVANA_BRIDGE_EPV\n";
 	}
 
 	for (auto it = container.begin (); it != container.end (); ++it) {
@@ -391,17 +385,25 @@ void Client::end_interface (const ItemContainer& container)
 
 			} break;
 
+			case Item::Kind::STATE_MEMBER:
+				if (!static_cast <const StateMember&> (item).is_public ())
+					break;
+
 			case Item::Kind::ATTRIBUTE: {
-				const Attribute& att = static_cast <const Attribute&> (item);
-				h_ << ABI_ret (att, att_byref)
-					<< " (*_get_" << att.name () << ") (Bridge <" << QName (container)
+				const Member& m = static_cast <const Member&> (item);
+				h_ << ABI_ret (m, att_byref)
+					<< " (*_get_" << m.name () << ") (Bridge <" << QName (container)
 					<< ">*, Interface*);\n";
 
-				if (!att.readonly ()) {
-					h_ << "void (*_set_" << att.name () << ") (Bridge <" << QName (container)
-						<< ">*, " << ABI_param (att) << ", Interface*);\n";
+				if (!(m.kind () == Item::Kind::ATTRIBUTE && static_cast <const Attribute&> (m).readonly ())) {
+					h_ << "void (*_set_" << m.name () << ") (Bridge <" << QName (container)
+						<< ">*, " << ABI_param (m) << ", Interface*);\n";
 				}
 
+				if (m.kind () == Item::Kind::STATE_MEMBER && is_var_len (m)) {
+					h_ << "void (*_move_" << m.name () << ") (Bridge <" << QName (container)
+						<< ">*, " << ABI_param (m, Parameter::Attribute::INOUT) << ", Interface*);\n";
+				}
 			} break;
 		}
 	}
@@ -434,17 +436,24 @@ void Client::end_interface (const ItemContainer& container)
 
 			} break;
 
+			case Item::Kind::STATE_MEMBER:
+				if (!static_cast <const StateMember&> (item).is_public ())
+					break;
+
 			case Item::Kind::ATTRIBUTE: {
-				const Attribute& att = static_cast <const Attribute&> (item);
+				const Member& m = static_cast <const Member&> (item);
 
 				if (!att_byref)
-					h_ << VRet (att);
+					h_ << VRet (m);
 				else
-					h_ << ConstRef (att);
-				h_ << ' ' << att.name () << " ();\n";
+					h_ << ConstRef (m);
+				h_ << ' ' << m.name () << " ();\n";
 
-				if (!att.readonly ())
-					h_ << "void " << att.name () << " (" << Param (att) << ");\n";
+				if (!(m.kind () == Item::Kind::ATTRIBUTE && static_cast <const Attribute&> (m).readonly ()))
+					h_ << "void " << m.name () << " (" << Param (m) << ");\n";
+
+				if (m.kind () == Item::Kind::STATE_MEMBER && is_var_len (m))
+					h_ << "void " << m.name () << " (" << Var (m) << "&&);\n";
 
 			} break;
 		}
@@ -490,46 +499,70 @@ void Client::end_interface (const ItemContainer& container)
 
 			} break;
 
+			case Item::Kind::STATE_MEMBER:
+				if (!static_cast <const StateMember&> (item).is_public ())
+					break;
+
 			case Item::Kind::ATTRIBUTE: {
-				const Attribute& att = static_cast <const Attribute&> (item);
+				const Member& m = static_cast <const Member&> (item);
 
 				h_ << "\ntemplate <class T>\n";
 				if (!att_byref)
-					h_ << VRet (att);
+					h_ << VRet (m);
 				else
-					h_ << ConstRef (att);
+					h_ << ConstRef (m);
 
-				h_ << " Client <T, " << QName (container) << ">::" << att.name () << " ()\n"
+				h_ << " Client <T, " << QName (container) << ">::" << m.name () << " ()\n"
 					"{\n";
 
 				h_.indent ();
 
-				environment (att.getraises ());
+				const Attribute* att = nullptr;
+				if (m.kind () == Item::Kind::ATTRIBUTE)
+					att = &static_cast <const Attribute&> (m);
+
+				environment (att ? att->getraises () : Raises ());
 				h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n"
-					<< TypePrefix (att) << 'C';
+					<< TypePrefix (m) << 'C';
 
 				if (att_byref)
 					h_ << "_VT";
 
-				h_ << "_ret _ret = (_b._epv ().epv._get_" << att.name () << ") (&_b, &_env); \n"
+				h_ << "_ret _ret = (_b._epv ().epv._get_" << m.name () << ") (&_b, &_env);\n"
 					"_env.check ();\n"
 					"return _ret;\n";
 
 				h_.unindent ();
 				h_ << "}\n";
 
-				if (!att.readonly ()) {
+				if (!(att && att->readonly ())) {
 					h_ << "\ntemplate <class T>\n";
 
-					h_ << "void Client <T, " << QName (container) << ">::" << att.name () << " (" << Param (att) << " val)\n"
+					h_ << "void Client <T, " << QName (container) << ">::" << m.name () << " (" << Param (m) << " val)\n"
 						"{\n";
 
 					h_.indent ();
 
-					environment (att.setraises ());
-					h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n";
+					environment (att ? att->setraises () : Raises ());
+					h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n"
+						"(_b._epv ().epv._set_" << m.name () << ") (&_b, &val, &_env);\n"
+						"_env.check ();\n";
 
-					h_ << "(_b._epv ().epv._set_" << att.name () << ") (&_b, &val, &_env);\n"
+					h_.unindent ();
+					h_ << "}\n";
+				}
+
+				if (m.kind () == Item::Kind::STATE_MEMBER && is_var_len (m)) {
+					h_ << "\ntemplate <class T>\n";
+
+					h_ << "void Client <T, " << QName (container) << ">::" << m.name () << " (" << Var (m) << "&& val)\n"
+						"{\n";
+
+					h_.indent ();
+
+					environment (Raises ());
+					h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n"
+						"(_b._epv ().epv._move_" << m.name () << ") (&_b, &val, &_env);\n"
 						"_env.check ();\n";
 
 					h_.unindent ();
@@ -580,6 +613,7 @@ void Client::end_interface (const ItemContainer& container)
 		switch (item.kind ()) {
 			case Item::Kind::OPERATION:
 			case Item::Kind::ATTRIBUTE:
+			case Item::Kind::STATE_MEMBER:
 				break;
 			default: {
 				const NamedItem& def = static_cast <const NamedItem&> (item);
@@ -591,6 +625,21 @@ void Client::end_interface (const ItemContainer& container)
 	}
 	h_.unindent ();
 	h_ << "};\n";
+}
+
+void Client::bridge_bases (const Bases& bases)
+{
+	for (auto b : bases) {
+		string proc_name;
+		{
+			ScopedName sn = b->scoped_name ();
+			for (ScopedName::const_iterator it = sn.begin (); it != sn.end (); ++it) {
+				proc_name += '_';
+				proc_name += *it;
+			}
+		}
+		h_ << "NIRVANA_BASE_ENTRY (" << QName (*b) << ", " << proc_name << ")\n";
+	}
 }
 
 void Client::begin (const Interface& itf)
@@ -1226,7 +1275,7 @@ void Client::member_variables (const Members& members)
 	}
 }
 
-void Client::member_type (const AST::Member& member)
+void Client::member_type (const Member& member)
 {
 	if (is_boolean (member))
 		h_ << TypePrefix (member) << "ABI";

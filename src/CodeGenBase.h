@@ -29,6 +29,7 @@
 
 #include "Code.h"
 #include "Options.h"
+#include <unordered_set>
 
 class CodeGenBase : public AST::CodeGen
 {
@@ -81,9 +82,9 @@ public:
 			att (p.attribute ())
 		{}
 
-		ABI_param (const AST::Attribute& t) :
-			type (t),
-			att (AST::Parameter::Attribute::IN)
+		ABI_param (const AST::Member& m, AST::Parameter::Attribute pa = AST::Parameter::Attribute::IN) :
+			type (m),
+			att (pa)
 		{}
 
 		const AST::Type& type;
@@ -186,6 +187,15 @@ public:
 		return get_members (cont, AST::Item::Kind::UNION_ELEMENT);
 	}
 
+	typedef std::vector <const AST::StateMember*> StateMembers;
+	static StateMembers get_members (const AST::ValueType& cont);
+
+	// Value and abstract bases of value base
+	typedef std::vector <const AST::ItemContainer*> Bases;
+	static Bases get_all_bases (const AST::ValueType& vt);
+
+	static const AST::Interface* get_concrete_supports (const AST::ValueType& vt);
+
 	static bool is_var_len (const AST::Type& type);
 	static bool is_var_len (const Members& members);
 	static bool is_pseudo (const AST::NamedItem& item);
@@ -266,6 +276,11 @@ private:
 	static Members get_members (const AST::ItemContainer& cont, AST::Item::Kind member_kind);
 	
 	static bool is_native_interface (const AST::NamedItem& type);
+
+	static void get_all_bases (const AST::ValueType& vt,
+		std::unordered_set <const AST::ItemContainer*>& bset, Bases& bvec);
+	static void get_all_bases (const AST::Interface& ai,
+		std::unordered_set <const AST::ItemContainer*>& bset, Bases& bvec);
 
 private:
 	static const char* const protected_names_ [];

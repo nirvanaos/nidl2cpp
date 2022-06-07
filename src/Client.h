@@ -55,8 +55,8 @@ public:
 			att (p.attribute ())
 		{}
 
-		Param (const AST::Attribute& t) :
-			type (t),
+		Param (const AST::Member& m) :
+			type (m),
 			att (AST::Parameter::Attribute::IN)
 		{}
 
@@ -119,7 +119,7 @@ protected:
 	virtual void leaf (const AST::ValueTypeDecl& item);
 	virtual void begin (const AST::ValueType& item);
 	virtual void end (const AST::ValueType& item);
-	
+
 	virtual void leaf (const AST::ValueBox& item);
 
 private:
@@ -161,6 +161,8 @@ private:
 		const AST::Type& dt = t.dereference_type ();
 		return dt.tkind () == AST::Type::Kind::BASIC_TYPE && dt.basic_type () == AST::BasicType::BOOLEAN;
 	}
+
+	void bridge_bases (const Bases& bases);
 
 private:
 	Header h_; // .h file

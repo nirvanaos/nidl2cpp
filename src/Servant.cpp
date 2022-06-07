@@ -73,6 +73,43 @@ void Servant::skeleton_begin (const ItemContainer& item)
 	h_.indent ();
 }
 
+void Servant::skeleton_end (const ItemContainer& item)
+{
+	h_.unindent ();
+	h_ << "};\n"
+		"\ntemplate <class S>\n"
+		"const Bridge <" << QName (item) << ">::EPV Skeleton <S, " << QName (item) << ">::epv_ = {\n";
+	h_.indent ();
+	h_ << "{ // header\n";
+	h_.indent ();
+	h_ << "Bridge <" << QName (item) << ">::repository_id_,\n"
+		"S::template __duplicate <" << QName (item) << ">,\n"
+		"S::template __release <" << QName (item) << ">\n";
+	h_.unindent ();
+	h_ << "}";
+
+}
+
+void Servant::epv ()
+{
+	if (!epv_.empty ()) {
+		h_ << ",\n"
+			"{ // EPV\n";
+		h_.indent ();
+		auto n = epv_.begin ();
+		h_ << "S::" << *n;
+		for (++n; n != epv_.end (); ++n) {
+			h_ << ",\nS::" << *n;
+		}
+		h_.unindent ();
+		h_ << "\n}";
+		epv_.clear ();
+	}
+
+	h_.unindent ();
+	h_ << "\n};\n";
+}
+
 void Servant::end (const Interface& itf)
 {
 	skeleton_end (itf);
@@ -228,6 +265,7 @@ void Servant::end (const Interface& itf)
 
 		if (options ().legacy && itf.interface_kind () != InterfaceKind::PSEUDO
 			&& (!options ().no_POA || itf.interface_kind () != InterfaceKind::ABSTRACT)) {
+
 			h_ << endl << "#ifdef LEGACY_CORBA_CPP\n";
 			const NamedItem* ns = itf.parent ();
 			if (ns) {
@@ -270,44 +308,89 @@ void Servant::end (const Interface& itf)
 void Servant::end (const ValueType& vt)
 {
 	skeleton_end (vt);
-	epv ();
-}
 
-void Servant::skeleton_end (const ItemContainer& item)
-{
-	h_.unindent ();
-	h_ << "};\n"
-		"\ntemplate <class S>\n"
-		"const Bridge <" << QName (item) << ">::EPV Skeleton <S, " << QName (item) << ">::epv_ = {\n";
+	// Bases
+
+	h_ << ",\n"
+		"{ // base\n";
 	h_.indent ();
-	h_ << "{ // header\n";
-	h_.indent ();
-	h_ << "Bridge <" << QName (item) << ">::repository_id_,\n"
-		"S::template __duplicate <" << QName (item) << ">,\n"
-		"S::template __release <" << QName (item) << ">\n";
+
+	h_ << "S::template _wide <ValueBase, " << QName (vt) << ">";
+
+	const Bases all_bases = get_all_bases (vt);
+
+	for (auto b : all_bases) {
+		h_ << ",\n"
+			"S::template _wide <" << QName (*b) << ", " << QName (vt) << ">";
+	}
+
+	h_ << endl;
 	h_.unindent ();
 	h_ << "}";
 
-}
+	// EPV
+	epv ();
 
-void Servant::epv ()
-{
-	if (!epv_.empty ()) {
-		h_ << ",\n"
-			"{ // EPV\n";
-		h_.indent ();
-		auto n = epv_.begin ();
-		h_ << "S::" << *n;
-		for (++n; n != epv_.end (); ++n) {
-			h_ << ",\nS::" << *n;
+	// Servant implementations
+	if (!options ().no_servant) {
+
+		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
+
+			// Standard implementation
+			h_.empty_line ();
+			h_ << "template <class S>\n"
+				"class Servant <S, " << QName (vt) << "> :\n";
+
+			h_.indent ();
+
+			const Interface* concrete_itf = get_concrete_supports (vt);
+			if (concrete_itf)
+				h_ << "public ValueImplBase <S, ValueBase>,\n"
+				"public Servant <S, " << QName (*concrete_itf) << ">";
+			else
+				h_ << "public ValueImpl <S, ValueBase>";
+
+			bool abstract_base = false;
+			for (auto b : all_bases) {
+				h_ << ",\n"
+					"public ";
+				if (b->kind () == Item::Kind::VALUE_TYPE)
+					h_ << "Value";
+				else {
+					assert (static_cast <const Interface&> (*b).interface_kind () == InterfaceKind::ABSTRACT);
+					abstract_base = true;
+					h_ << "Interface";
+				}
+				h_ << "Impl <S, " << QName (*b) << ">";
+			}
+
+			if (abstract_base)
+				h_ << ",\n"
+					"public InterfaceImpl <S, AbstractBase>";
+
+				h_.unindent ();
+
+			h_ << "\n"
+				"{\n"
+				"public:\n";
+
+			h_.indent ();
+			h_ << "typedef " << QName (vt) << " PrimaryInterface;\n"
+				"\nInterface* _query_valuetype (String_in id) NIRVANA_NOEXCEPT\n"
+				"{\n";
+			h_.indent ();
+			h_ << "return FindInterface <" << QName (vt);
+			for (auto b : all_bases) {
+				h_ << ", " << QName (*b);
+			}
+			h_ << ">::find (static_cast <S&> (*this), id);\n";
+			h_.unindent ();
+			h_ << "}\n";
+			h_.unindent ();
+			h_ << "};\n";
 		}
-		h_.unindent ();
-		h_ << "\n}";
-		epv_.clear ();
-	}
 
-	h_.unindent ();
-	h_ << "\n};\n";
+	}
 }
 
 void Servant::implementation_suffix (const InterfaceKind ik)
@@ -379,12 +462,23 @@ void Servant::leaf (const Operation& op)
 
 void Servant::leaf (const Attribute& att)
 {
-	const ItemScope& itf = *att.parent ();
+	attribute (att);
+}
 
-	h_ << "static " << ABI_ret (att, attributes_by_ref_);
+void Servant::leaf (const StateMember& m)
+{
+	if (m.is_public ())
+		attribute (m);
+}
+
+void Servant::attribute (const Member& m)
+{
+	const ItemScope& itf = *m.parent ();
+
+	h_ << "static " << ABI_ret (m, attributes_by_ref_);
 	{
 		string name = "__get_";
-		name += att.name ();
+		name += m.name ();
 		h_ << ' ' << name << " (Bridge <" << QName (itf) << ">* _b, Interface* _env)\n"
 			"{\n";
 		epv_.push_back (move (name));
@@ -392,32 +486,53 @@ void Servant::leaf (const Attribute& att)
 	h_.indent ();
 	h_ << "try {\n";
 	h_.indent ();
-	h_ << "return " << TypePrefix (att);
+	h_ << "return " << TypePrefix (m);
 	if (attributes_by_ref_)
 		h_ << "VT_";
-	h_ << "ret (S::_implementation (_b)." << att.name () << " ());\n";
+	h_ << "ret (S::_implementation (_b)." << m.name () << " ());\n";
 	catch_block ();
-	h_ << "return " << TypePrefix (att);
+	h_ << "return " << TypePrefix (m);
 	if (attributes_by_ref_)
 		h_ << "VT_";
 	h_ << "ret ();\n";
 	h_.unindent ();
 	h_ << "}\n";
 
-	if (!att.readonly ()) {
+	if (!(m.kind () == Item::Kind::ATTRIBUTE && static_cast <const Attribute&> (m).readonly ())) {
 		{
 			string name = "__set_";
-			name += att.name ();
-			h_ << "static void " << name << " (Bridge <" << QName (itf) << ">* _b, " << ABI_param (att) << " val, Interface* _env)\n"
+			name += m.name ();
+			h_ << "static void " << name << " (Bridge <" << QName (itf) << ">* _b, "
+				<< ABI_param (m) << " val, Interface* _env)\n"
 				"{\n";
 			epv_.push_back (move (name));
 		}
 		h_.indent ();
 		h_ << "try {\n";
 		h_.indent ();
-		h_ << "S::_implementation (_b)." << att.name () << " (";
-		servant_param (att, "val");
+		h_ << "S::_implementation (_b)." << m.name () << " (";
+		servant_param (m, "val");
 		h_ << ");\n";
+		catch_block ();
+		h_.unindent ();
+		h_ << "}\n";
+	}
+
+	if (m.kind () == Item::Kind::STATE_MEMBER && is_var_len (m)) {
+		{
+			string name = "__move_";
+			name += m.name ();
+			h_ << "static void " << name << " (Bridge <" << QName (itf) << ">* _b, "
+				<< ABI_param (m, Parameter::Attribute::INOUT) << " val, Interface* _env)\n"
+				"{\n";
+			epv_.push_back (move (name));
+		}
+		h_.indent ();
+		h_ << "try {\n";
+		h_.indent ();
+		h_ << "S::_implementation (_b)." << m.name () << " (std::move (";
+		servant_param (m, "val", Parameter::Attribute::INOUT);
+		h_ << "));\n";
 		catch_block ();
 		h_.unindent ();
 		h_ << "}\n";

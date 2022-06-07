@@ -456,7 +456,6 @@ void CodeGenBase::leaf (const UnionElement&)
 
 void CodeGenBase::leaf (const StateMember&)
 {
-	throw runtime_error ("Not yet implemented");
 }
 
 void CodeGenBase::leaf (const ValueFactory&)
@@ -469,3 +468,80 @@ void CodeGenBase::leaf (const ValueBox&)
 	throw runtime_error ("Not yet implemented");
 }
 
+CodeGenBase::StateMembers CodeGenBase::get_members (const ValueType& cont)
+{
+	StateMembers ret;
+	for (auto it = cont.begin (); it != cont.end (); ++it) {
+		const Item& item = **it;
+		if (item.kind () == Item::Kind::STATE_MEMBER)
+			ret.push_back (&static_cast <const StateMember&> (item));
+	}
+	return ret;
+}
+
+CodeGenBase::Bases CodeGenBase::get_all_bases (const ValueType& vt)
+{
+	Bases bvec;
+	{
+		unordered_set <const ItemContainer*> bset;
+		get_all_bases (vt, bset, bvec);
+	}
+	const Interface* itf = get_concrete_supports (vt);
+	if (itf) {
+		Interfaces exclude = itf->get_all_bases ();
+		for (auto it = bvec.begin (); it != bvec.end ();) {
+			if (find (exclude.begin (), exclude.end (), *it) != exclude.end ())
+				bvec.erase (it);
+			else
+				++it;
+		}
+	}
+	return bvec;
+}
+
+void CodeGenBase::get_all_bases (const ValueType& vt,
+	unordered_set <const ItemContainer*>& bset, Bases& bvec)
+{
+	for (auto pb : vt.bases ()) {
+		if (bset.insert (pb).second) {
+			bvec.push_back (pb);
+			get_all_bases (*pb, bset, bvec);
+		}
+	}
+	if (!vt.supports ().empty ()) {
+		auto it = vt.supports ().begin ();
+		if ((*it)->interface_kind () != InterfaceKind::ABSTRACT)
+			++it;
+		for (; it != vt.supports ().end (); ++it) {
+			const Interface* pai = *it;
+			assert (pai->interface_kind () == InterfaceKind::ABSTRACT);
+			if (bset.insert (pai).second) {
+				bvec.push_back (pai);
+				get_all_bases (*pai, bset, bvec);
+			}
+		}
+	}
+}
+
+void CodeGenBase::get_all_bases (const Interface& ai,
+	unordered_set <const ItemContainer*>& bset, Bases& bvec)
+{
+	for (auto pb : ai.bases ()) {
+		if (bset.insert (pb).second) {
+			bvec.push_back (pb);
+			get_all_bases (*pb, bset, bvec);
+		}
+	}
+}
+
+const Interface* CodeGenBase::get_concrete_supports (const ValueType& vt)
+{
+	if (!vt.supports ().empty () && vt.supports ().front ()->interface_kind () != InterfaceKind::ABSTRACT)
+		return vt.supports ().front ();
+	for (auto pb : vt.bases ()) {
+		const Interface* itf = get_concrete_supports (*pb);
+		if (itf)
+			return itf;
+	}
+	return nullptr;
+}

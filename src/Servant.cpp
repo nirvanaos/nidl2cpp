@@ -315,13 +315,13 @@ void Servant::end (const ValueType& vt)
 		"{ // base\n";
 	h_.indent ();
 
-	h_ << "S::template _wide <ValueBase, " << QName (vt) << '>';
+	h_ << "S::template _wide_val <ValueBase, " << QName (vt) << '>';
 
 	const Bases all_bases = get_all_bases (vt);
 
 	for (auto b : all_bases) {
 		h_ << ",\n"
-			"S::template _wide <" << QName (*b) << ", " << QName (vt) << '>';
+			"S::template _wide_val <" << QName (*b) << ", " << QName (vt) << '>';
 	}
 
 	h_ << endl;

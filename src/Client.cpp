@@ -1230,7 +1230,7 @@ void Client::constructors (const Identifier& name, const Members& members, const
 	assert (!members.empty ());
 	h_.empty_line ();
 	// Default constructor
-	h_ << name << " () :\n";
+	h_ << name << " () NIRVANA_NOEXCEPT :\n";
 	h_.indent ();
 	auto it = members.begin ();
 	h_ << MemberDefault (**it, prefix);

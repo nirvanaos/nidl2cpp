@@ -442,12 +442,15 @@ void Servant::end (const ValueType& vt)
 			h_.unindent ();
 			h_ << "}\n\n";
 
+			if (abstract_base)
+				h_ << "using InterfaceImpl <S, AbstractBase>::_get_abstract_base;\n\n";
+
 			h_.unindent ();
 			h_ << "protected:\n";
 			h_.indent ();
 
 			// Default constructor
-			h_ << "Servant ()\n"
+			h_ << "Servant () NIRVANA_NOEXCEPT\n"
 				"{}\n";
 
 			// Explicit constructor

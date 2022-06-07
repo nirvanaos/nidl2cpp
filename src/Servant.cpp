@@ -392,6 +392,8 @@ void Servant::end (const ValueType& vt)
 
 			h_.indent ();
 
+			h_ << "public ValueTraits <S>,\n";
+
 			const Interface* concrete_itf = get_concrete_supports (vt);
 			if (concrete_itf)
 				h_ << "public ValueImplBase <S, ValueBase>,\n"
@@ -428,7 +430,8 @@ void Servant::end (const ValueType& vt)
 
 			h_.indent ();
 			h_ << "typedef " << QName (vt) << " PrimaryInterface;\n"
-				"\nInterface* _query_valuetype (String_in id) NIRVANA_NOEXCEPT\n"
+				"\n"
+				"Interface* _query_valuetype (String_in id) NIRVANA_NOEXCEPT\n"
 				"{\n";
 			h_.indent ();
 			h_ << "return FindInterface <" << QName (vt);

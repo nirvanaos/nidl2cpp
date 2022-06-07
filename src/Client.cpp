@@ -840,8 +840,11 @@ void Client::end (const Exception& item)
 
 		h_ << "};\n\n";
 
-		if (options ().legacy)
+		if (options ().legacy) {
+			h_.unindent ();
 			h_ << "#ifndef LEGACY_CORBA_CPP\n";
+			h_.indent ();
+		}
 
 		constructors (item.name (), members, "_");
 		accessors (members);
@@ -1002,16 +1005,23 @@ void Client::implement_type (const Members& members, bool with_legacy)
 
 	// Implement marshaling
 
-	if (with_legacy)
+	if (with_legacy) {
+		h_.unindent ();
 		h_ << "\n#ifndef LEGACY_CORBA_CPP\n";
+		h_.indent ();
+	}
 
 	implement_marshaling (members, "_");
 	if (with_legacy) {
 		h_ << endl;
+		h_.unindent ();
 		h_ << "#else\n";
+		h_.indent ();
 		implement_marshaling (members, "");
 		h_ << endl;
+		h_.unindent ();
 		h_ << "#endif\n";
+		h_.indent ();
 	}
 }
 
@@ -1159,8 +1169,11 @@ void Client::end (const Struct& item)
 {
 	Members members = get_members (item);
 
-	if (options ().legacy)
+	if (options ().legacy) {
+		h_.unindent ();
 		h_ << "#ifndef LEGACY_CORBA_CPP\n";
+		h_.indent ();
+	}
 
 	constructors (item.name (), members, "_");
 	accessors (members);

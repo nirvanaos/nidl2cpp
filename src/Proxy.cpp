@@ -563,35 +563,10 @@ Code& Proxy::exp (const NamedItem& item)
 		"CORBA::Internal::RepIdOf <" << QName (item) << ">::repository_id_, CORBA::TypeCode, CORBA::Internal::";
 }
 
-void Proxy::end (const Exception& item)
-{
-	Members members = get_members (item);
-
-	if (!members.empty ()) {
-		cpp_.namespace_open ("CORBA/Internal");
-		type_code_members (item, members);
-	}
-
-	cpp_.namespace_close ();
-	exp (item) << "TypeCodeException <" << QName (item) << ", " << (members.empty () ? "false" : "true") << ">)\n";
-}
-
 void Proxy::type_code_name (const NamedItem& item)
 {
 	cpp_ << "template <>\n"
 		"const Char TypeCodeName <" << QName (item) << ">::name_ [] = \"" << static_cast <const string&> (item.name ()) << "\";\n";
-}
-
-void Proxy::end (const Struct& item)
-{
-	if (is_pseudo (item))
-		return;
-
-	cpp_.namespace_open ("CORBA/Internal");
-	type_code_name (item);
-	type_code_members (item, get_members (item));
-	cpp_.namespace_close ();
-	exp (item) << "TypeCodeStruct <" << QName (item) << ">)\n";
 }
 
 void Proxy::leaf (const Enum& item)
@@ -617,4 +592,182 @@ void Proxy::leaf (const Enum& item)
 
 	cpp_.namespace_close ();
 	exp (item) << "TypeCodeEnum <" << QName (item) << ">)\n";
+}
+
+void Proxy::end (const Exception& item)
+{
+	Members members = get_members (item);
+
+	if (!members.empty ()) {
+		cpp_.namespace_open ("CORBA/Internal");
+		type_code_members (item, members);
+		implement_marshaling (item, "::_Data", members, "_");
+	}
+
+	cpp_.namespace_close ();
+	exp (item) << "TypeCodeException <" << QName (item) << ", " << (members.empty () ? "false" : "true") << ">)\n";
+}
+
+void Proxy::end (const Struct& item)
+{
+	if (is_pseudo (item))
+		return;
+
+	Members members = get_members (item);
+
+	cpp_.namespace_open ("CORBA/Internal");
+	type_code_name (item);
+	type_code_members (item, members);
+
+	cpp_.empty_line ();
+
+	// Marshaling
+	if (options ().legacy)
+		cpp_ << "\n#ifndef LEGACY_CORBA_CPP\n";
+
+	implement_marshaling (item, "", members, "_");
+	if (options ().legacy) {
+		cpp_ << endl;
+		cpp_ << "#else\n";
+		implement_marshaling (item, "", members, "");
+		cpp_ << endl;
+		cpp_ << "#endif\n";
+	}
+
+	cpp_.namespace_close ();
+
+	// Export TypeCode
+	exp (item) << "TypeCodeStruct <" << QName (item) << ">)\n";
+}
+
+void Proxy::implement_marshaling (const NamedItem& cont, const char* suffix,
+	const Members& members, const char* prefix)
+{
+	if (is_var_len (members)) {
+
+		string my_prefix = "v.";
+		my_prefix += prefix;
+
+		cpp_ << "\n"
+			"void Type <" << QName (cont) << suffix
+			<< ">::marshal_in (const Var& v, IORequest::_ptr_type rq)\n"
+			"{\n";
+		marshal_members (members, "marshal_in", my_prefix.c_str (), "&v + 1");
+		cpp_ << "}\n\n"
+			"void Type <" << QName (cont) << suffix
+			<< ">::marshal_out (Var& v, IORequest::_ptr_type rq)\n"
+			"{\n";
+		marshal_members (members, "marshal_out", my_prefix.c_str (), "&v + 1");
+		cpp_ << "}\n\n"
+			"void Type <" << QName (cont) << suffix
+			<< ">::unmarshal (IORequest::_ptr_type rq, Var& v)\n"
+			"{\n";
+
+		unmarshal_members (members, my_prefix.c_str (), "&v + 1");
+		cpp_ << "}\n";
+	} else {
+
+		cpp_ << "\n"
+			"void Type <" << QName (cont) << suffix
+			<< ">::byteswap (Var& v) NIRVANA_NOEXCEPT\n"
+			"{\n";
+		cpp_.indent ();
+		for (auto m : members) {
+			cpp_ << TypePrefix (*m) << "byteswap (v." << prefix << m->name () << ");\n";
+		}
+		cpp_.unindent ();
+		cpp_ << "}\n";
+	}
+}
+
+void Proxy::end (const ValueType& vt)
+{
+	cpp_.namespace_open ("CORBA/Internal");
+	StateMembers members = get_members (vt);
+	if (!members.empty ()) {
+		cpp_.empty_line ();
+		cpp_ << "void ValueData <" << QName (vt) << ">::_marshal (I_ptr <IORequest> rq)\n"
+			"{\n";
+		marshal_members ((const Members&)members, "marshal_in", "_", "this + 1");
+		cpp_ << "}\n"
+			"void ValueData <" << QName (vt) << ">::_unmarshal (I_ptr <IORequest> rq)\n"
+			"{\n";
+		unmarshal_members ((const Members&)members, "_", "this + 1");
+		cpp_ << "}\n";
+	}
+	cpp_.namespace_close ();
+}
+
+void Proxy::marshal_members (const Members& members, const char* func, const char* prefix, const char* cend)
+{
+	cpp_.indent ();
+
+	for (Members::const_iterator m = members.begin (); m != members.end ();) {
+		// Marshal variable-length members
+		while (is_var_len (**m)) {
+			cpp_ << TypePrefix (**m) << func << " (" << prefix << (*m)->name () << ", rq);\n";
+			if (members.end () == ++m)
+				break;
+		}
+		if (m != members.end ()) {
+			// Marshal fixed-length members
+			auto begin = m;
+			do {
+				++m;
+			} while (m != members.end () && !is_var_len (**m));
+
+			cpp_ << "marshal_members (&" << prefix << (*begin)->name () << ", ";
+			if (m != members.end ())
+				cpp_ << "&" << prefix << (*m)->name ();
+			else
+				cpp_ << cend;
+			cpp_ << ", rq);\n";
+		}
+	}
+
+	cpp_.unindent ();
+}
+
+void Proxy::unmarshal_members (const Members& members, const char* prefix, const char* cend)
+{
+	cpp_.indent ();
+	for (Members::const_iterator m = members.begin (); m != members.end ();) {
+		// Unmarshal variable-length members
+		while (is_var_len (**m)) {
+			cpp_ << TypePrefix (**m) << "unmarshal (rq, " << prefix << (*m)->name () << ");\n";
+			if (members.end () == ++m)
+				break;
+		}
+		if (m != members.end ()) {
+			// Unmarshal fixed-length members
+			auto begin = m;
+			do {
+				++m;
+			} while (m != members.end () && !is_var_len (**m));
+			auto end = m;
+
+			cpp_ << "if (unmarshal_members (rq, &" << prefix << (*begin)->name ();
+			if (end != members.end ())
+				cpp_ << ", &" << prefix << (*end)->name ();
+			else
+				cpp_ << ", " << cend;
+			cpp_ << ")) {\n";
+			cpp_.indent ();
+
+			// Swap bytes
+			m = begin;
+			do {
+				cpp_ << TypePrefix (**m) << "byteswap (" << prefix << (*m)->name () << ");\n";
+			} while (end != ++m);
+			cpp_.unindent ();
+			cpp_ << "}\n";
+
+			// If some members have check, check them
+			m = begin;
+			do {
+				cpp_ << TypePrefix (**m) << "check (" << prefix << (*m)->name () << ");\n";
+			} while (end != ++m);
+		}
+	}
+	cpp_.unindent ();
 }

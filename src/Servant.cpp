@@ -369,6 +369,19 @@ void Servant::end (const ValueType& vt)
 				}
 			}
 
+			// Marshaling
+			h_ << "void _marshal (I_ptr <IORequest>)";
+			if (!members.empty ())
+				h_ << ";\n";
+			else
+				h_ << " {}\n";
+			h_ << "void _unmarshal (I_ptr <IORequest>)";
+			if (!members.empty ())
+				h_ << ";\n";
+			else
+				h_ << " {}\n";
+
+			// Member variables
 			for (auto p : members) {
 				h_ << MemberVariable (*p);
 			}
@@ -445,6 +458,34 @@ void Servant::end (const ValueType& vt)
 			if (abstract_base)
 				h_ << "using InterfaceImpl <S, AbstractBase>::_get_abstract_base;\n\n";
 
+			vector <const ValueType*> concrete_bases;
+			for (auto b : all_bases) {
+				if (b->kind () == Item::Kind::VALUE_TYPE) {
+					const ValueType& vt = static_cast <const ValueType&> (*b);
+					if (vt.modifier () != ValueType::Modifier::ABSTRACT)
+						concrete_bases.push_back (&vt);
+				}
+			}
+
+			h_ << "void _marshal (I_ptr <IORequest> rq)\n"
+				"{\n";
+			h_.indent ();
+			for (auto b : concrete_bases) {
+				h_ << "ValueData <" << QName (*b) << ">::_marshal (rq);\n";
+			}
+			h_ << "ValueData <" << QName (vt) << ">::_marshal (rq);\n";
+			h_.unindent ();
+			h_ << "}\n"
+				"void _unmarshal (I_ptr <IORequest> rq)\n"
+				"{\n";
+			h_.indent ();
+			for (auto b : concrete_bases) {
+				h_ << "ValueData <" << QName (*b) << ">::_unmarshal (rq);\n";
+			}
+			h_ << "ValueData <" << QName (vt) << ">::_unmarshal (rq);\n";
+			h_.unindent ();
+			h_ << "}\n\n";
+
 			h_.unindent ();
 			h_ << "protected:\n";
 			h_.indent ();
@@ -455,14 +496,9 @@ void Servant::end (const ValueType& vt)
 
 			// Explicit constructor
 			StateMembers all_members;
-			for (auto b : all_bases) {
-				if (b->kind () == Item::Kind::VALUE_TYPE) {
-					const ValueType& bv = static_cast <const ValueType&> (*b);
-					if (bv.modifier () != ValueType::Modifier::ABSTRACT) {
-						StateMembers members = get_members (bv);
-						all_members.insert (all_members.end (), members.begin (), members.end ());
-					}
-				}
+			for (auto b : concrete_bases) {
+				StateMembers members = get_members (*b);
+				all_members.insert (all_members.end (), members.begin (), members.end ());
 			}
 			all_members.insert (all_members.end (), members.begin (), members.end ());
 
@@ -488,7 +524,6 @@ void Servant::end (const ValueType& vt)
 			h_.unindent ();
 			h_ << "};\n";
 		}
-
 	}
 }
 

@@ -66,6 +66,8 @@ protected:
 	virtual void end (const AST::Struct& item);
 	virtual void leaf (const AST::Enum& item);
 
+	virtual void end (const AST::ValueType& item);
+
 private:
 	static bool is_custom (const AST::Operation& op);
 
@@ -96,6 +98,10 @@ private:
 	void type_code_name (const AST::NamedItem& item);
 
 	Code& exp (const AST::NamedItem& item);
+
+	void implement_marshaling (const AST::NamedItem& cont, const char* suffix, const Members& members, const char* prefix);
+	void marshal_members (const Members& members, const char* func, const char* prefix, const char* end);
+	void unmarshal_members (const Members& members, const char* prefix, const char* end);
 
 private:
 	Code cpp_;

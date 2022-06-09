@@ -639,3 +639,4 @@ const Interface* CodeGenBase::get_concrete_supports (const ValueType& vt)
 	}
 	return nullptr;
 }
+

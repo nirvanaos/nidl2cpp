@@ -118,10 +118,8 @@ private:
 	void accessors (const Members& members);
 	void member_variables (const Members& members);
 	void member_variables_legacy (const Members& members);
-	void implement_type (const AST::NamedItem& cont, const char* suffix, const Members& members, bool with_legacy);
+	void implement_type (const AST::NamedItem& cont, const Members& members);
 	void has_check (const Members& members);
-	void implement_marshaling (const AST::NamedItem& cont, const char* suffix, const Members& members, const char* prefix);
-	void marshal_members (const Members& members, const char* func, const char* prefix);
 	static bool nested (const AST::NamedItem& item);
 	void h_namespace_open (const AST::NamedItem& item);
 

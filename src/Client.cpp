@@ -930,9 +930,6 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 
 	const NamedItem& item = rid.item ();
 
-	// suffix is not empty for exception data structure
-	bool with_legacy = !*suffix && options ().legacy;
-	
 	bool var_len = is_var_len (members);
 	if (var_len) {
 		// ABI
@@ -958,7 +955,7 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 			"{\n";
 		h_.indent ();
 
-		implement_type (item, suffix, members, with_legacy);
+		implement_type (item, members);
 		
 		if (!*suffix && !is_pseudo (item))
 			type_code_func (item);
@@ -974,7 +971,7 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 		has_check (members);
 		h_ << ";\n";
 
-		implement_type (item, suffix, members, with_legacy);
+		implement_type (item, members);
 		
 		if (!*suffix && !is_pseudo (item))
 			type_code_func (item);
@@ -984,7 +981,7 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 	}
 }
 
-void Client::implement_type (const AST::NamedItem& cont, const char* suffix, const Members& members, bool with_legacy)
+void Client::implement_type (const AST::NamedItem& cont, const Members& members)
 {
 	for (auto m : members) {
 		if (is_native (*m))
@@ -1006,28 +1003,12 @@ void Client::implement_type (const AST::NamedItem& cont, const char* suffix, con
 	// Implement marshaling
 	if (is_var_len (members)) {
 		h_ << "\n"
-			"static void marshal_in (const Var& src, IORequest::_ptr_type rq);\n"
-			"static void marshal_out (Var& src, IORequest::_ptr_type rq);\n"
-			"static void unmarshal (IORequest::_ptr_type rq, Var& dst);\n";
-	}
-	h_ << "static void byteswap (Var& v) NIRVANA_NOEXCEPT;\n";
+			"static void marshal_in (const Var&, IORequest::_ptr_type);\n"
+			"static void marshal_out (Var&, IORequest::_ptr_type);\n"
+			"static void unmarshal (IORequest::_ptr_type, Var&);\n";
+	} else
+		h_ << "static void byteswap (Var&) NIRVANA_NOEXCEPT;\n";
 
-	cpp_.namespace_open ("CORBA/Internal");
-
-	if (with_legacy) {
-		cpp_ << "\n#ifndef LEGACY_CORBA_CPP\n";
-	}
-
-	implement_marshaling (cont, suffix, members, "_");
-	if (with_legacy) {
-		cpp_ << endl;
-		cpp_ << "#else\n";
-		implement_marshaling (cont, suffix, members, "");
-		cpp_ << endl;
-		cpp_ << "#endif\n";
-	}
-
-	cpp_.namespace_close ();
 }
 
 void Client::has_check (const Members& members)
@@ -1057,107 +1038,6 @@ void Client::has_check (const Members& members)
 		}
 	} else
 		h_ << "false";
-}
-
-void Client::implement_marshaling (const AST::NamedItem& cont, const char* suffix,
-	const Members& members, const char* prefix)
-{
-	if (is_var_len (members)) {
-		cpp_ << "\n"
-			"void Type <" << QName (cont) << suffix
-			<< ">::marshal_in (const Var & src, IORequest::_ptr_type rq)\n"
-				"{\n";
-		marshal_members (members, "marshal_in (src.", prefix);
-		cpp_ << "}\n\n"
-			"void Type <" << QName (cont) << suffix
-			<< ">::marshal_out (Var & src, IORequest::_ptr_type rq)\n"
-				"{\n";
-		marshal_members (members, "marshal_out (src.", prefix);
-		cpp_ << "}\n\n"
-			"void Type <" << QName (cont) << suffix
-			<< ">::unmarshal (IORequest::_ptr_type rq, Var & dst)\n"
-				"{\n";
-		cpp_.indent ();
-		for (Members::const_iterator m = members.begin (); m != members.end ();) {
-			// Unmarshal variable-length members
-			while (is_var_len (**m)) {
-				cpp_ << TypePrefix (**m) << "unmarshal (rq, dst." << prefix << (*m)->name () << ");\n";
-				if (members.end () == ++m)
-					break;
-			}
-			if (m != members.end ()) {
-				// Unmarshal fixed-length members
-				auto begin = m;
-				do {
-					++m;
-				} while (m != members.end () && !is_var_len (**m));
-				auto end = m;
-
-				if (end == members.end ())
-					cpp_ << "if (unmarshal_members (rq, dst, &dst." << prefix << (*begin)->name ();
-				else
-					cpp_ << "if (unmarshal_members (rq, &dst." << prefix << (*begin)->name ()
-						<< ", &dst." << prefix << (*end)->name ();
-				cpp_ << ")) {\n";
-				cpp_.indent ();
-
-				// Swap bytes
-				m = begin;
-				do {
-					cpp_ << TypePrefix (**m) << "byteswap (dst." << prefix << (*m)->name () << ");\n";
-				} while (end != ++m);
-				cpp_.unindent ();
-				cpp_ << "}\n";
-
-				// If some members have check, check them
-				m = begin;
-				do {
-					cpp_ << TypePrefix (**m) << "check (dst." << prefix << (*m)->name () << ");\n";
-				} while (end != ++m);
-			}
-		}
-		cpp_.unindent ();
-		cpp_ << "}\n";
-	}
-
-	cpp_ << "\nvoid Type <" << QName (cont) << suffix
-		<< ">::byteswap (Var & v) NIRVANA_NOEXCEPT\n"
-		"{\n";
-	cpp_.indent ();
-	for (auto m : members) {
-		cpp_ << TypePrefix (*m) << "byteswap (v." << prefix << m->name () << ");\n";
-	}
-	cpp_.unindent ();
-	cpp_ << "}\n";
-}
-
-void Client::marshal_members (const Members& members, const char* func, const char* prefix)
-{
-	cpp_.indent ();
-
-	for (Members::const_iterator m = members.begin (); m != members.end ();) {
-		// Marshal variable-length members
-		while (is_var_len (**m)) {
-			cpp_ << TypePrefix (**m) << func << prefix << (*m)->name () << ", rq);\n";
-			if (members.end () == ++m)
-				break;
-		}
-		if (m != members.end ()) {
-			// Marshal fixed-length members
-			auto begin = m;
-			do {
-				++m;
-			} while (m != members.end () && !is_var_len (**m));
-
-			if (m == members.end ())
-				cpp_ << "marshal_members (src, &src." << prefix << (*begin)->name () << ", rq);\n";
-			else
-				cpp_ << "marshal_members (&src." << prefix << (*begin)->name ()
-					<< ", &src." << prefix << (*m)->name () << ", rq);\n";
-		}
-	}
-
-	cpp_.unindent ();
 }
 
 void Client::leaf (const StructDecl& item)

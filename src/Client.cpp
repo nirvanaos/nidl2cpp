@@ -419,9 +419,8 @@ void Client::end_interface (const ItemContainer& container)
 		<< unindent
 		<<
 		"{\n"
-		"public:\n";
-
-	h_.indent ();
+		"public:\n"
+		<< indent;
 
 	for (auto it = container.begin (); it != container.end (); ++it) {
 		const Item& item = **it;
@@ -459,8 +458,7 @@ void Client::end_interface (const ItemContainer& container)
 		}
 	}
 
-	h_.unindent ();
-	h_ << "};\n";
+	h_ << unindent << "};\n";
 
 	// Client operations
 
@@ -614,6 +612,7 @@ void Client::end_interface (const ItemContainer& container)
 			case Item::Kind::OPERATION:
 			case Item::Kind::ATTRIBUTE:
 			case Item::Kind::STATE_MEMBER:
+			case Item::Kind::VALUE_FACTORY:
 				break;
 			default: {
 				const NamedItem& def = static_cast <const NamedItem&> (item);
@@ -663,9 +662,87 @@ void Client::begin (const ValueType& itf)
 	begin_interface (itf);
 }
 
-void Client::end (const ValueType& itf)
+void Client::end (const ValueType& vt)
 {
-	end_interface (itf);
+	end_interface (vt);
+
+	vector <const ValueFactory*> factories;
+	for (auto it = vt.begin (); it != vt.end (); ++it) {
+		const Item& item = **it;
+		if (item.kind () == Item::Kind::VALUE_FACTORY)
+			factories.push_back (&static_cast <const ValueFactory&> (item));
+	}
+
+	if (!factories.empty ()) {
+		h_.namespace_open (vt);
+		h_.empty_line ();
+		h_ << "class " << vt.name () << "_init;\n";
+
+		h_.namespace_open ("CORBA/Internal");
+		h_.empty_line ();
+
+		{
+			string factory_id = vt.repository_id ();
+			size_t pos = factory_id.rfind (':');
+			if (pos == string::npos)
+				pos = factory_id.size ();
+			factory_id.insert (pos, "_init");
+
+			h_ << "NIRVANA_BRIDGE_BEGIN (" << QName (vt) << "_init, \"" << factory_id << "\")\n"
+				"NIRVANA_BASE_ENTRY  (ValueFactoryBase, CORBA_ValueFactoryBase)\n"
+				"NIRVANA_BRIDGE_EPV\n";
+		}
+
+		for (auto f : factories) {
+			h_ << "Interface* (*" << f->name () << ") (Bridge <" << QName (vt) << "_init>*";
+			for (auto it = f->begin (); it != f->end (); ++it) {
+				h_ << ", " << ABI_param (**it);
+			}
+			h_ << ", Interface*);\n";
+		}
+		h_ << "NIRVANA_BRIDGE_END ()\n"
+			"\n"
+			// Client interface
+			"template <class T>\n"
+			"class Client <T, " << QName (vt) << "_init> :\n"
+			<< indent
+			<< "public T\n"
+			<< unindent
+			<<
+			"{\n"
+			"public:\n"
+			<< indent;
+		for (auto f : factories) {
+			h_ << "Type <" << QName (vt) << ">::VRet " << Signature (*f) << ";\n";
+		}
+		h_ << unindent
+			<< "};\n";
+
+		for (auto f : factories) {
+			h_ << "\ntemplate <class T>\n"
+				<< "Type <" << QName (vt) << ">::VRet " << " Client <T, " << QName (vt) << "_init>::" << Signature (*f) << "\n"
+				"{\n"
+				<< indent;
+			environment (f->raises ());
+			h_ << "Bridge < " << QName (vt) << "_init>& _b (T::_get_bridge (_env));\n"
+				"Type <" << QName (vt) << ">::C_ret _ret = (_b._epv ().epv." << f->name ()
+				<< ") (&_b";
+			for (auto it = f->begin (); it != f->end (); ++it) {
+				h_ << ", &" << (*it)->name ();
+			}
+			h_ << ", &_env);\n"
+				"_env.check ();\n"
+				"return _ret;\n"
+				<< unindent
+				<< "}\n";
+		}
+
+		h_.namespace_open (vt);
+		h_.empty_line ();
+		h_ << "class " << vt.name () << "_init : public "
+			<< Namespace ("CORBA/Internal") << "ClientInterface <" << vt.name () << ", CORBA::ValueFactoryBase>\n"
+			"{};\n";
+	}
 }
 
 inline
@@ -1236,4 +1313,6 @@ void Client::implement (const Enum& item)
 }
 
 void Client::leaf (const AST::ValueBox& item)
-{}
+{
+	// TODO:: Implement
+}

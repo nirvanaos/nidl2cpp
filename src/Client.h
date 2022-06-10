@@ -66,11 +66,11 @@ public:
 
 	struct Signature
 	{
-		Signature (const AST::Operation& o) :
+		Signature (const AST::OperationBase& o) :
 			op (o)
 		{}
 
-		const AST::Operation& op;
+		const AST::OperationBase& op;
 	};
 
 protected:

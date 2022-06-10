@@ -553,7 +553,6 @@ void CodeGenBase::leaf (const StateMember&)
 
 void CodeGenBase::leaf (const ValueFactory&)
 {
-	throw runtime_error ("Not yet implemented");
 }
 
 void CodeGenBase::leaf (const ValueBox&)

@@ -666,17 +666,12 @@ void Client::end (const ValueType& vt)
 {
 	end_interface (vt);
 
-	vector <const ValueFactory*> factories;
-	for (auto it = vt.begin (); it != vt.end (); ++it) {
-		const Item& item = **it;
-		if (item.kind () == Item::Kind::VALUE_FACTORY)
-			factories.push_back (&static_cast <const ValueFactory&> (item));
-	}
+	Factories factories = get_factories (vt);
 
 	if (!factories.empty ()) {
 		h_.namespace_open (vt);
 		h_.empty_line ();
-		h_ << "class " << vt.name () << "_init;\n";
+		h_ << "class " << vt.name () << FACTORY_SUFFIX ";\n";
 
 		h_.namespace_open ("CORBA/Internal");
 		h_.empty_line ();
@@ -686,15 +681,15 @@ void Client::end (const ValueType& vt)
 			size_t pos = factory_id.rfind (':');
 			if (pos == string::npos)
 				pos = factory_id.size ();
-			factory_id.insert (pos, "_init");
+			factory_id.insert (pos, FACTORY_SUFFIX);
 
-			h_ << "NIRVANA_BRIDGE_BEGIN (" << QName (vt) << "_init, \"" << factory_id << "\")\n"
+			h_ << "NIRVANA_BRIDGE_BEGIN (" << QName (vt) << FACTORY_SUFFIX ", \"" << factory_id << "\")\n"
 				"NIRVANA_BASE_ENTRY  (ValueFactoryBase, CORBA_ValueFactoryBase)\n"
 				"NIRVANA_BRIDGE_EPV\n";
 		}
 
 		for (auto f : factories) {
-			h_ << "Interface* (*" << f->name () << ") (Bridge <" << QName (vt) << "_init>*";
+			h_ << "Interface* (*" << f->name () << ") (Bridge <" << QName (vt) << FACTORY_SUFFIX ">*";
 			for (auto it = f->begin (); it != f->end (); ++it) {
 				h_ << ", " << ABI_param (**it);
 			}
@@ -704,9 +699,10 @@ void Client::end (const ValueType& vt)
 			"\n"
 			// Client interface
 			"template <class T>\n"
-			"class Client <T, " << QName (vt) << "_init> :\n"
+			"class Client <T, " << QName (vt) << FACTORY_SUFFIX "> :\n"
 			<< indent
-			<< "public T\n"
+			<< "public T,\n"
+			"public Definitions <" << QName (vt) << ">\n"
 			<< unindent
 			<<
 			"{\n"
@@ -720,11 +716,11 @@ void Client::end (const ValueType& vt)
 
 		for (auto f : factories) {
 			h_ << "\ntemplate <class T>\n"
-				<< "Type <" << QName (vt) << ">::VRet " << " Client <T, " << QName (vt) << "_init>::" << Signature (*f) << "\n"
+				<< "Type <" << QName (vt) << ">::VRet " << " Client <T, " << QName (vt) << FACTORY_SUFFIX ">::" << Signature (*f) << "\n"
 				"{\n"
 				<< indent;
 			environment (f->raises ());
-			h_ << "Bridge < " << QName (vt) << "_init>& _b (T::_get_bridge (_env));\n"
+			h_ << "Bridge < " << QName (vt) << FACTORY_SUFFIX ">& _b (T::_get_bridge (_env));\n"
 				"Type <" << QName (vt) << ">::C_ret _ret = (_b._epv ().epv." << f->name ()
 				<< ") (&_b";
 			for (auto it = f->begin (); it != f->end (); ++it) {
@@ -739,7 +735,7 @@ void Client::end (const ValueType& vt)
 
 		h_.namespace_open (vt);
 		h_.empty_line ();
-		h_ << "class " << vt.name () << "_init : public "
+		h_ << "class " << vt.name () << FACTORY_SUFFIX " : public "
 			<< Namespace ("CORBA/Internal") << "ClientInterface <" << vt.name () << ", CORBA::ValueFactoryBase>\n"
 			"{};\n";
 	}

@@ -639,3 +639,13 @@ const Interface* CodeGenBase::get_concrete_supports (const ValueType& vt)
 	return nullptr;
 }
 
+CodeGenBase::Factories CodeGenBase::get_factories (const ValueType& vt)
+{
+	Factories factories;
+	for (auto it = vt.begin (); it != vt.end (); ++it) {
+		const Item& item = **it;
+		if (item.kind () == Item::Kind::VALUE_FACTORY)
+			factories.push_back (&static_cast <const ValueFactory&> (item));
+	}
+	return factories;
+}

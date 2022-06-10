@@ -55,8 +55,8 @@ protected:
 	virtual void leaf (const AST::StateMember& sm);
 
 private:
-	void skeleton_begin (const AST::ItemContainer& item);
-	void skeleton_end (const AST::ItemContainer& item);
+	void skeleton_begin (const AST::ItemContainer& item, const char* suffix = "");
+	void skeleton_end (const AST::ItemContainer& item, const char* suffix = "");
 	void epv ();
 
 	void servant_param (const AST::Parameter& param)

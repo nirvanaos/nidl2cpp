@@ -57,57 +57,58 @@ void Servant::begin (const ValueType& vt)
 	skeleton_begin (vt);
 }
 
-void Servant::skeleton_begin (const ItemContainer& item)
+void Servant::skeleton_begin (const ItemContainer& item, const char* suffix)
 {
 	h_.namespace_open ("CORBA/Internal");
 	h_.empty_line ();
 
 	h_ << "template <class S>\n"
-		"class Skeleton <S, " << QName (item) << "> : public Definitions <" << QName (item) << ">\n"
+		"class Skeleton <S, " << QName (item) << suffix << "> : public Definitions <"
+		<< QName (item) << ">\n"
 		"{\n"
-		"public:\n";
-	h_.indent ();
-	h_ << "static const typename Bridge <" << QName (item) << ">::EPV epv_;\n\n";
-	h_.unindent ();
-	h_ << "protected:\n";
-	h_.indent ();
+		"public:\n"
+		<< indent
+		<< "static const typename Bridge <" << QName (item) << suffix << ">::EPV epv_;\n\n"
+		<< unindent
+		<< "protected:\n"
+		<< indent;
 }
 
-void Servant::skeleton_end (const ItemContainer& item)
+void Servant::skeleton_end (const ItemContainer& item, const char* suffix)
 {
-	h_.unindent ();
-	h_ << "};\n"
+	h_ << unindent
+		<< "};\n"
 		"\ntemplate <class S>\n"
-		"const Bridge <" << QName (item) << ">::EPV Skeleton <S, " << QName (item) << ">::epv_ = {\n";
-	h_.indent ();
-	h_ << "{ // header\n";
-	h_.indent ();
-	h_ << "Bridge <" << QName (item) << ">::repository_id_,\n"
-		"S::template __duplicate <" << QName (item) << ">,\n"
-		"S::template __release <" << QName (item) << ">\n";
-	h_.unindent ();
-	h_ << "}";
-
+		"const Bridge <" << QName (item) << suffix << ">::EPV Skeleton <S, "
+		<< QName (item) << suffix << ">::epv_ = {\n"
+		<< indent
+		<< "{ // header\n"
+		<< indent
+		<< "Bridge <" << QName (item) << suffix << ">::repository_id_,\n"
+		"S::template __duplicate <" << QName (item) << suffix << ">,\n"
+		"S::template __release <" << QName (item) << suffix << ">\n"
+		<< unindent
+		<< "}";
 }
 
 void Servant::epv ()
 {
 	if (!epv_.empty ()) {
 		h_ << ",\n"
-			"{ // EPV\n";
-		h_.indent ();
+			"{ // EPV\n"
+			<< indent;
 		auto n = epv_.begin ();
 		h_ << "S::" << *n;
 		for (++n; n != epv_.end (); ++n) {
 			h_ << ",\nS::" << *n;
 		}
-		h_.unindent ();
-		h_ << "\n}";
+		h_ << unindent
+			<< "\n}";
 		epv_.clear ();
 	}
 
-	h_.unindent ();
-	h_ << "\n};\n";
+	h_ << unindent
+		<< "\n};\n";
 }
 
 void Servant::end (const Interface& itf)
@@ -119,8 +120,8 @@ void Servant::end (const Interface& itf)
 
 	if (itf.interface_kind () != InterfaceKind::PSEUDO || !all_bases.empty ()) {
 		h_ << ",\n"
-			"{ // base\n";
-		h_.indent ();
+			"{ // base\n"
+			<< indent;
 
 		if (itf.interface_kind () == InterfaceKind::ABSTRACT)
 			h_ << "S::template _wide_abstract <";
@@ -139,9 +140,9 @@ void Servant::end (const Interface& itf)
 				"S::template _wide <" << QName (**b) << ", " << QName (itf) << '>';
 		}
 
-		h_ << endl;
-		h_.unindent ();
-		h_ << "}";
+		h_ << endl
+			<< unindent
+			<< "}";
 	}
 
 	// EPV
@@ -312,10 +313,9 @@ void Servant::end (const ValueType& vt)
 	// Bases
 
 	h_ << ",\n"
-		"{ // base\n";
-	h_.indent ();
-
-	h_ << "S::template _wide_val <ValueBase, " << QName (vt) << '>';
+		"{ // base\n"
+		<< indent
+		<< "S::template _wide_val <ValueBase, " << QName (vt) << '>';
 
 	const Bases all_bases = get_all_bases (vt);
 
@@ -324,9 +324,9 @@ void Servant::end (const ValueType& vt)
 			"S::template _wide_val <" << QName (*b) << ", " << QName (vt) << '>';
 	}
 
-	h_ << endl;
-	h_.unindent ();
-	h_ << "}";
+	h_ << endl
+		<< unindent
+		<< "}";
 
 	// EPV
 	epv ();
@@ -525,6 +525,18 @@ void Servant::end (const ValueType& vt)
 			h_ << "};\n";
 		}
 	}
+/*
+	Factories factories = get_factories (vt);
+	if (!factories.empty ()) {
+		skeleton_begin (vt, FACTORY_SUFFIX);
+		skeleton_end (vt, FACTORY_SUFFIX);
+		h_ << ",\n"
+			"{ // base\n"
+			<< indent
+			<< "S::template _wide_val <ValueFactoryBase, " << QName (vt) << FACTORY_SUFFIX ">";
+		epv ();
+	}
+*/
 }
 
 void Servant::implementation_suffix (const InterfaceKind ik)

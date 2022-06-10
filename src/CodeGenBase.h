@@ -31,6 +31,8 @@
 #include "Options.h"
 #include <unordered_set>
 
+#define FACTORY_SUFFIX "_factory"
+
 class CodeGenBase : public AST::CodeGen
 {
 public:
@@ -244,6 +246,9 @@ public:
 	static Bases get_all_bases (const AST::ValueType& vt);
 
 	static const AST::Interface* get_concrete_supports (const AST::ValueType& vt);
+
+	typedef std::vector <const AST::ValueFactory*> Factories;
+	static Factories get_factories (const AST::ValueType& vt);
 
 	static bool is_var_len (const AST::Type& type);
 	static bool is_var_len (const Members& members);

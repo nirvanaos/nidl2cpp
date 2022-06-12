@@ -128,238 +128,6 @@ bool CodeGenBase::is_keyword (const Identifier& id)
 	return binary_search (protected_names_, std::end (protected_names_), id.c_str (), pred);
 }
 
-Code& operator << (Code& stm, const CodeGenBase::QName& qn)
-{
-	stm << CodeGenBase::ParentName (qn.item) << qn.item.name ();
-	return stm;
-}
-
-Code& operator << (Code& stm, const CodeGenBase::ParentName& qn)
-{
-	const NamedItem* parent = qn.item.parent ();
-	if (parent) {
-		Item::Kind pk = parent->kind ();
-		if (pk == Item::Kind::MODULE) {
-			stm.namespace_prefix (static_cast <const Module*> (parent));
-		} else {
-			if (Item::Kind::INTERFACE == pk || Item::Kind::VALUE_TYPE == pk) {
-				stm.namespace_prefix ("CORBA/Internal");
-				stm << "Definitions <" << CodeGenBase::QName (*parent) << '>';
-			} else {
-				stm << CodeGenBase::QName (*parent);
-			}
-			stm << "::";
-		}
-	} else if (stm.cur_namespace ().empty ())
-		stm << "::";
-	return stm;
-}
-
-Code& operator << (Code& stm, const CodeGenBase::TypePrefix& t)
-{
-	stm.namespace_prefix ("CORBA/Internal");
-	stm << "Type";
-	return stm << " <" << t.type << ">::";
-}
-
-Code& operator << (Code& stm, const CodeGenBase::ABI_ret& t)
-{
-	if (t.type.tkind () == Type::Kind::VOID)
-		stm << "void";
-	else if (CodeGenBase::is_ref_type (t.type))
-		stm << "Interface*";
-	else if (CodeGenBase::is_enum (t.type))
-		stm << "ABI_enum";
-	else
-		stm << CodeGenBase::TypePrefix (t.type) << (t.byref ? "ABI_VT_ret" : "ABI_ret");
-	return stm;
-}
-
-Code& operator << (Code& stm, const CodeGenBase::ABI_param& t)
-{
-	if (CodeGenBase::is_ref_type (t.type)) {
-		switch (t.att) {
-			case Parameter::Attribute::IN:
-				stm << "Interface*";
-				break;
-			case Parameter::Attribute::OUT:
-			case Parameter::Attribute::INOUT:
-				stm << "Interface**";
-				break;
-		}
-	} else if (CodeGenBase::is_enum (t.type)) {
-		switch (t.att) {
-			case Parameter::Attribute::IN:
-				stm << "ABI_enum";
-				break;
-			case Parameter::Attribute::OUT:
-			case Parameter::Attribute::INOUT:
-				stm << "ABI_enum*";
-				break;
-		}
-	} else {
-		stm << CodeGenBase::TypePrefix (t.type);
-		switch (t.att) {
-			case Parameter::Attribute::IN:
-				stm << "ABI_in";
-				break;
-			case Parameter::Attribute::OUT:
-			case Parameter::Attribute::INOUT:
-				stm << "ABI_out";
-				break;
-		}
-	}
-	return stm;
-}
-
-Code& operator << (Code& stm, const CodeGenBase::Var& t)
-{
-	assert (t.type.tkind () != Type::Kind::VOID);
-	return stm << CodeGenBase::TypePrefix (t.type) << "Var";
-}
-
-Code& operator << (Code& stm, const CodeGenBase::VRet& t)
-{
-	if (t.type.tkind () != Type::Kind::VOID)
-		return stm << CodeGenBase::TypePrefix (t.type) << "VRet";
-	else
-		return stm << "void";
-}
-
-Code& operator << (Code& stm, const CodeGenBase::ConstRef& t)
-{
-	assert (t.type.tkind () != Type::Kind::VOID);
-	return stm << CodeGenBase::TypePrefix (t.type) << "ConstRef";
-}
-
-Code& operator << (Code& stm, const CodeGenBase::TypeCodeName& t)
-{
-	return stm << CodeGenBase::ParentName (t.item) << "_tc_" << static_cast <const string&> (t.item.name ());
-}
-
-Code& operator << (Code& stm, const CodeGenBase::ServantParam& t)
-{
-	stm << CodeGenBase::TypePrefix (t.type);
-	if (t.att == Parameter::Attribute::IN)
-		stm << "ConstRef";
-	else
-		stm << "Var&";
-	return stm;
-}
-
-Code& operator << (Code& stm, const CodeGenBase::ServantOp& op)
-{
-	stm << CodeGenBase::VRet (op.op) << ' ' << op.op.name () << " (";
-	auto it = op.op.begin ();
-	if (it != op.op.end ()) {
-		stm << CodeGenBase::ServantParam (**it) << ' ' << (*it)->name ();
-		++it;
-		for (; it != op.op.end (); ++it) {
-			stm << ", " << CodeGenBase::ServantParam (**it) << ' ' << (*it)->name ();
-		}
-	}
-	return stm << ')';
-}
-
-Code& operator << (Code& stm, const CodeGenBase::Namespace& ns)
-{
-	stm.namespace_prefix (ns.prefix);
-	return stm;
-}
-
-Code& operator << (Code& stm, const CodeGenBase::ItemNamespace& ns)
-{
-	stm.namespace_prefix (ns.item);
-	return stm;
-}
-
-Code& operator << (Code& stm, const CodeGenBase::MemberType& t)
-{
-	if (CodeGenBase::is_boolean (t.type))
-		stm << CodeGenBase::TypePrefix (t.type) << "ABI";
-	else if (CodeGenBase::is_ref_type (t.type))
-		stm << CodeGenBase::Var (t.type);
-	else
-		stm << t.type;
-	return stm;
-}
-
-Code& operator << (Code& stm, const CodeGenBase::MemberVariable& m)
-{
-	return stm << CodeGenBase::MemberType (m.member)
-		<< " _" << static_cast <const string&> (m.member.name ()) << ";\n";
-}
-
-Code& operator << (Code& stm, const CodeGenBase::Accessors& a)
-{
-	// const getter
-	stm << CodeGenBase::ConstRef (a.member) << ' ' << a.member.name () << " () const\n"
-		"{\n";
-	stm.indent ();
-	stm << "return _" << a.member.name () << ";\n";
-	stm.unindent ();
-	stm << "}\n";
-
-	// reference getter
-	stm << CodeGenBase::MemberType (a.member)
-		<< "& " << a.member.name () << " ()\n"
-		"{\n";
-	stm.indent ();
-	stm << "return _" << a.member.name () << ";\n";
-	stm.unindent ();
-	stm << "}\n";
-
-	// setter
-	stm << "void " << a.member.name () << " (" << CodeGenBase::TypePrefix (a.member) << "ConstRef val)\n"
-		"{\n";
-	stm.indent ();
-	stm << '_' << a.member.name () << " = val;\n";
-	stm.unindent ();
-	stm << "}\n";
-
-	if (CodeGenBase::is_var_len (a.member)) {
-		// The move setter
-		stm << "void " << a.member.name () << " (" << CodeGenBase::Var (a.member) << "&& val)\n"
-			"{\n";
-		stm.indent ();
-		stm << '_' << a.member.name () << " = std::move (val);\n";
-		stm.unindent ();
-		stm << "}\n";
-	}
-
-	return stm;
-}
-
-Code& operator << (Code& stm, const CodeGenBase::MemberDefault& m)
-{
-	stm << m.prefix << m.member.name () << " (";
-	const Type& td = m.member.dereference_type ();
-	switch (td.tkind ()) {
-		case Type::Kind::BASIC_TYPE:
-			if (td.basic_type () == BasicType::BOOLEAN)
-				stm << CodeGenBase::Namespace ("CORBA") << "FALSE";
-			else if (td.basic_type () < BasicType::OBJECT)
-				stm << "0";
-			break;
-
-		case Type::Kind::NAMED_TYPE: {
-			const NamedItem& nt = td.named_type ();
-			if (nt.kind () == Item::Kind::ENUM) {
-				const Enum& en = static_cast <const Enum&> (nt);
-				stm << CodeGenBase::QName (*en.front ());
-			}
-		} break;
-	}
-	return stm << ')';
-}
-
-Code& operator << (Code& stm, const CodeGenBase::MemberInit& m)
-{
-	stm << m.prefix << m.member.name () << " (std::move ("
-		<< m.member.name () << "))";
-	return stm;
-}
-
 CodeGenBase::Members CodeGenBase::get_members (const ItemContainer& cont, Item::Kind member_kind)
 {
 	Members ret;
@@ -557,7 +325,6 @@ void CodeGenBase::leaf (const ValueFactory&)
 
 void CodeGenBase::leaf (const ValueBox&)
 {
-	throw runtime_error ("Not yet implemented");
 }
 
 CodeGenBase::StateMembers CodeGenBase::get_members (const ValueType& cont)
@@ -648,4 +415,220 @@ CodeGenBase::Factories CodeGenBase::get_factories (const ValueType& vt)
 			factories.push_back (&static_cast <const ValueFactory&> (item));
 	}
 	return factories;
+}
+
+Code& operator << (Code& stm, const QName& qn)
+{
+	return stm << ParentName (qn.item) << qn.item.name ();
+}
+
+Code& operator << (Code& stm, const ParentName& qn)
+{
+	const NamedItem* parent = qn.item.parent ();
+	if (parent) {
+		Item::Kind pk = parent->kind ();
+		if (pk == Item::Kind::MODULE) {
+			stm.namespace_prefix (static_cast <const Module*> (parent));
+		} else {
+			if (Item::Kind::INTERFACE == pk || Item::Kind::VALUE_TYPE == pk) {
+				stm.namespace_prefix ("CORBA/Internal");
+				stm << "Definitions <" << QName (*parent) << '>';
+			} else {
+				stm << QName (*parent);
+			}
+			stm << "::";
+		}
+	} else if (stm.cur_namespace ().empty ())
+		stm << "::";
+	return stm;
+}
+
+Code& operator << (Code& stm, const TypePrefix& t)
+{
+	return stm << Namespace ("CORBA/Internal") << "Type" << " <" << t.type << ">::";
+}
+
+Code& operator << (Code& stm, const ABI_ret& t)
+{
+	if (t.type.tkind () == Type::Kind::VOID)
+		stm << "void";
+	else if (CodeGenBase::is_ref_type (t.type))
+		stm << "Interface*";
+	else if (CodeGenBase::is_enum (t.type))
+		stm << "ABI_enum";
+	else
+		stm << TypePrefix (t.type) << (t.byref ? "ABI_VT_ret" : "ABI_ret");
+	return stm;
+}
+
+Code& operator << (Code& stm, const ABI_param& t)
+{
+	if (CodeGenBase::is_ref_type (t.type)) {
+		switch (t.att) {
+			case Parameter::Attribute::IN:
+				stm << "Interface*";
+				break;
+			case Parameter::Attribute::OUT:
+			case Parameter::Attribute::INOUT:
+				stm << "Interface**";
+				break;
+		}
+	} else if (CodeGenBase::is_enum (t.type)) {
+		switch (t.att) {
+			case Parameter::Attribute::IN:
+				stm << "ABI_enum";
+				break;
+			case Parameter::Attribute::OUT:
+			case Parameter::Attribute::INOUT:
+				stm << "ABI_enum*";
+				break;
+		}
+	} else {
+		stm << TypePrefix (t.type);
+		switch (t.att) {
+			case Parameter::Attribute::IN:
+				stm << "ABI_in";
+				break;
+			case Parameter::Attribute::OUT:
+			case Parameter::Attribute::INOUT:
+				stm << "ABI_out";
+				break;
+		}
+	}
+	return stm;
+}
+
+Code& operator << (Code& stm, const Var& t)
+{
+	assert (t.type.tkind () != Type::Kind::VOID);
+	return stm << TypePrefix (t.type) << "Var";
+}
+
+Code& operator << (Code& stm, const VRet& t)
+{
+	if (t.type.tkind () != Type::Kind::VOID)
+		return stm << TypePrefix (t.type) << "VRet";
+	else
+		return stm << "void";
+}
+
+Code& operator << (Code& stm, const ConstRef& t)
+{
+	assert (t.type.tkind () != Type::Kind::VOID);
+	return stm << TypePrefix (t.type) << "ConstRef";
+}
+
+Code& operator << (Code& stm, const TypeCodeName& t)
+{
+	return stm << ParentName (t.item) << "_tc_" << static_cast <const string&> (t.item.name ());
+}
+
+Code& operator << (Code& stm, const ServantParam& t)
+{
+	stm << TypePrefix (t.type);
+	if (t.att == Parameter::Attribute::IN)
+		stm << "ConstRef";
+	else
+		stm << "Var&";
+	return stm;
+}
+
+Code& operator << (Code& stm, const ServantOp& op)
+{
+	stm << VRet (op.op) << ' ' << op.op.name () << " (";
+	auto it = op.op.begin ();
+	if (it != op.op.end ()) {
+		stm << ServantParam (**it) << ' ' << (*it)->name ();
+		++it;
+		for (; it != op.op.end (); ++it) {
+			stm << ", " << ServantParam (**it) << ' ' << (*it)->name ();
+		}
+	}
+	return stm << ')';
+}
+
+Code& operator << (Code& stm, const MemberType& t)
+{
+	if (CodeGenBase::is_boolean (t.type))
+		stm << TypePrefix (t.type) << "ABI";
+	else if (CodeGenBase::is_ref_type (t.type))
+		stm << Var (t.type);
+	else
+		stm << t.type;
+	return stm;
+}
+
+Code& operator << (Code& stm, const MemberVariable& m)
+{
+	return stm << MemberType (m.member)
+		<< " _" << static_cast <const string&> (m.member.name ()) << ";\n";
+}
+
+Code& operator << (Code& stm, const Accessors& a)
+{
+	// const getter
+	stm << ConstRef (a.member) << ' ' << a.member.name () << " () const\n"
+		"{\n";
+	stm.indent ();
+	stm << "return _" << a.member.name () << ";\n";
+	stm.unindent ();
+	stm << "}\n";
+
+	// reference getter
+	stm << MemberType (a.member)
+		<< "& " << a.member.name () << " ()\n"
+		"{\n";
+	stm.indent ();
+	stm << "return _" << a.member.name () << ";\n";
+	stm.unindent ();
+	stm << "}\n";
+
+	// setter
+	stm << "void " << a.member.name () << " (" << TypePrefix (a.member) << "ConstRef val)\n"
+		"{\n";
+	stm.indent ();
+	stm << '_' << a.member.name () << " = val;\n";
+	stm.unindent ();
+	stm << "}\n";
+
+	if (CodeGenBase::is_var_len (a.member)) {
+		// The move setter
+		stm << "void " << a.member.name () << " (" << Var (a.member) << "&& val)\n"
+			"{\n";
+		stm.indent ();
+		stm << '_' << a.member.name () << " = std::move (val);\n";
+		stm.unindent ();
+		stm << "}\n";
+	}
+
+	return stm;
+}
+
+Code& operator << (Code& stm, const MemberDefault& m)
+{
+	stm << m.prefix << m.member.name () << " (";
+	const Type& td = m.member.dereference_type ();
+	switch (td.tkind ()) {
+		case Type::Kind::BASIC_TYPE:
+			if (td.basic_type () == BasicType::BOOLEAN)
+				stm << Namespace ("CORBA") << "FALSE";
+			else if (td.basic_type () < BasicType::OBJECT)
+				stm << "0";
+			break;
+
+		case Type::Kind::NAMED_TYPE: {
+			const NamedItem& nt = td.named_type ();
+			if (nt.kind () == Item::Kind::ENUM) {
+				const Enum& en = static_cast <const Enum&> (nt);
+				stm << QName (*en.front ());
+			}
+		} break;
+	}
+	return stm << ')';
+}
+
+Code& operator << (Code& stm, const MemberInit& m)
+{
+	return stm << m.prefix << m.member.name () << " (std::move ("
+		<< m.member.name () << "))";
 }

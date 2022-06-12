@@ -278,7 +278,7 @@ Code& operator << (Code& stm, const Type& t)
 			stm << basic_types [(size_t)t.basic_type ()];
 			break;
 		case Type::Kind::NAMED_TYPE:
-			stm << CodeGenBase::QName (t.named_type ());
+			stm << QName (t.named_type ());
 			break;
 		case Type::Kind::STRING:
 			stm.namespace_prefix ("CORBA/Internal");
@@ -340,7 +340,7 @@ Code& operator << (Code& stm, const Variant& var)
 		} break;
 
 		case Variant::VT::CONSTANT:
-			stm << CodeGenBase::QName (var.as_constant ());
+			stm << QName (var.as_constant ());
 			break;
 
 		default:

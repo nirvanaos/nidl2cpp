@@ -39,188 +39,6 @@ public:
 	static bool is_keyword (const AST::Identifier& id);
 	inline static const char protected_prefix_ [] = "_cxx_";
 
-	struct QName
-	{
-		QName (const AST::NamedItem& ni) :
-			item (ni)
-		{}
-
-		const AST::NamedItem& item;
-	};
-
-	struct ParentName
-	{
-		ParentName (const AST::NamedItem& ni) :
-			item (ni)
-		{}
-
-		const AST::NamedItem& item;
-	};
-
-	struct TypePrefix
-	{
-		TypePrefix (const AST::Type& t) :
-			type (t)
-		{}
-
-		const AST::Type& type;
-	};
-
-	struct ABI_ret
-	{
-		ABI_ret (const AST::Type& t, bool _byref = false) :
-			type (t),
-			byref (_byref)
-		{}
-
-		const AST::Type& type;
-		bool byref;
-	};
-
-	struct ABI_param
-	{
-		ABI_param (const AST::Parameter& p) :
-			type (p),
-			att (p.attribute ())
-		{}
-
-		ABI_param (const AST::Member& m, AST::Parameter::Attribute pa = AST::Parameter::Attribute::IN) :
-			type (m),
-			att (pa)
-		{}
-
-		const AST::Type& type;
-		const AST::Parameter::Attribute att;
-	};
-
-	struct Var
-	{
-		Var (const AST::Type& t) :
-			type (t)
-		{}
-
-		const AST::Type& type;
-	};
-
-	struct VRet
-	{
-		VRet (const AST::Type& t) :
-			type (t)
-		{}
-
-		const AST::Type& type;
-	};
-
-	struct ConstRef
-	{
-		ConstRef (const AST::Type& t) :
-			type (t)
-		{}
-
-		const AST::Type& type;
-	};
-
-	struct TypeCodeName
-	{
-		TypeCodeName (const AST::NamedItem& ni) :
-			item (ni)
-		{}
-
-		const AST::NamedItem& item;
-	};
-
-	struct ServantParam
-	{
-		ServantParam (const AST::Parameter& p) :
-			type (p),
-			att (p.attribute ())
-		{}
-
-		ServantParam (const AST::Attribute& t) :
-			type (t),
-			att (AST::Parameter::Attribute::IN)
-		{}
-
-		const AST::Type& type;
-		const AST::Parameter::Attribute att;
-	};
-
-	struct ServantOp
-	{
-		ServantOp (const AST::Operation& o) :
-			op (o)
-		{}
-
-		const AST::Operation& op;
-	};
-
-	struct Namespace
-	{
-		Namespace (const char* ns) :
-			prefix (ns)
-		{}
-
-		const char* prefix;
-	};
-
-	struct ItemNamespace
-	{
-		ItemNamespace (const AST::NamedItem& ni) :
-			item (ni)
-		{}
-
-		const AST::NamedItem& item;
-	};
-
-	struct MemberType
-	{
-		MemberType (const AST::Type& t) :
-			type (t)
-		{}
-
-		const AST::Type& type;
-	};
-
-	struct MemberVariable
-	{
-		MemberVariable (const AST::Member& m) :
-			member (m)
-		{}
-
-		const AST::Member& member;
-	};
-
-	struct Accessors
-	{
-		Accessors (const AST::Member& m) :
-			member (m)
-		{}
-
-		const AST::Member& member;
-	};
-
-	struct MemberDefault
-	{
-		MemberDefault (const AST::Member& m, const char* pref) :
-			member (m),
-			prefix (pref)
-		{}
-
-		const AST::Member& member;
-		const char* prefix;
-	};
-
-	struct MemberInit
-	{
-		MemberInit (const AST::Member& m, const char* pref) :
-			member (m),
-			prefix (pref)
-		{}
-
-		const AST::Member& member;
-		const char* prefix;
-	};
-
 	typedef std::vector <const AST::Member*> Members;
 
 	static Members get_members (const AST::Struct& cont)
@@ -269,24 +87,6 @@ protected:
 	CodeGenBase (const Options& options) :
 		options_ (options)
 	{}
-
-	static Code& indent (Code& stm)
-	{
-		stm.indent ();
-		return stm;
-	}
-
-	static Code& unindent (Code& stm)
-	{
-		stm.unindent ();
-		return stm;
-	}
-
-	static Code& empty_line (Code& stm)
-	{
-		stm.empty_line ();
-		return stm;
-	}
 
 	virtual void leaf (const AST::Include& item) {}
 	virtual void leaf (const AST::Native&) {}
@@ -343,23 +143,232 @@ private:
 	const Options& options_;
 };
 
-Code& operator << (Code& stm, const CodeGenBase::QName& qn);
-Code& operator << (Code& stm, const CodeGenBase::ParentName& qn);
-Code& operator << (Code& stm, const CodeGenBase::TypePrefix& t);
-Code& operator << (Code& stm, const CodeGenBase::ABI_ret& t);
-Code& operator << (Code& stm, const CodeGenBase::ABI_param& t);
-Code& operator << (Code& stm, const CodeGenBase::Var& t);
-Code& operator << (Code& stm, const CodeGenBase::VRet& t);
-Code& operator << (Code& stm, const CodeGenBase::TypeCodeName& t);
-Code& operator << (Code& stm, const CodeGenBase::ServantParam& t);
-Code& operator << (Code& stm, const CodeGenBase::ServantOp& t);
-Code& operator << (Code& stm, const CodeGenBase::Namespace& ns);
-Code& operator << (Code& stm, const CodeGenBase::ItemNamespace& ns);
-Code& operator << (Code& stm, const CodeGenBase::ConstRef& t);
-Code& operator << (Code& stm, const CodeGenBase::MemberType& t);
-Code& operator << (Code& stm, const CodeGenBase::MemberVariable& m);
-Code& operator << (Code& stm, const CodeGenBase::Accessors& a);
-Code& operator << (Code& stm, const CodeGenBase::MemberDefault& val);
-Code& operator << (Code& stm, const CodeGenBase::MemberInit& val);
+struct QName
+{
+	QName (const AST::NamedItem& ni) :
+		item (ni)
+	{}
+
+	const AST::NamedItem& item;
+};
+
+Code& operator << (Code& stm, const QName& qn);
+
+struct ParentName
+{
+	ParentName (const AST::NamedItem& ni) :
+		item (ni)
+	{}
+
+	const AST::NamedItem& item;
+};
+
+Code& operator << (Code& stm, const ParentName& qn);
+
+struct TypePrefix
+{
+	TypePrefix (const AST::Type& t) :
+		type (t)
+	{}
+
+	const AST::Type& type;
+};
+
+Code& operator << (Code& stm, const TypePrefix& t);
+
+struct ABI_ret
+{
+	ABI_ret (const AST::Type& t, bool _byref = false) :
+		type (t),
+		byref (_byref)
+	{}
+
+	const AST::Type& type;
+	bool byref;
+};
+
+Code& operator << (Code& stm, const ABI_ret& t);
+
+struct ABI_param
+{
+	ABI_param (const AST::Parameter& p) :
+		type (p),
+		att (p.attribute ())
+	{}
+
+	ABI_param (const AST::Member& m, AST::Parameter::Attribute pa = AST::Parameter::Attribute::IN) :
+		type (m),
+		att (pa)
+	{}
+
+	const AST::Type& type;
+	const AST::Parameter::Attribute att;
+};
+
+Code& operator << (Code& stm, const ABI_param& t);
+
+struct Var
+{
+	Var (const AST::Type& t) :
+		type (t)
+	{}
+
+	const AST::Type& type;
+};
+
+Code& operator << (Code& stm, const Var& t);
+
+struct VRet
+{
+	VRet (const AST::Type& t) :
+		type (t)
+	{}
+
+	const AST::Type& type;
+};
+
+Code& operator << (Code& stm, const VRet& t);
+
+struct ConstRef
+{
+	ConstRef (const AST::Type& t) :
+		type (t)
+	{}
+
+	const AST::Type& type;
+};
+
+Code& operator << (Code& stm, const ConstRef& t);
+
+struct TypeCodeName
+{
+	TypeCodeName (const AST::NamedItem& ni) :
+		item (ni)
+	{}
+
+	const AST::NamedItem& item;
+};
+
+Code& operator << (Code& stm, const TypeCodeName& t);
+
+struct ServantParam
+{
+	ServantParam (const AST::Parameter& p) :
+		type (p),
+		att (p.attribute ())
+	{}
+
+	ServantParam (const AST::Attribute& t) :
+		type (t),
+		att (AST::Parameter::Attribute::IN)
+	{}
+
+	const AST::Type& type;
+	const AST::Parameter::Attribute att;
+};
+
+Code& operator << (Code& stm, const ServantParam& t);
+
+struct ServantOp
+{
+	ServantOp (const AST::Operation& o) :
+		op (o)
+	{}
+
+	const AST::Operation& op;
+};
+
+Code& operator << (Code& stm, const ServantOp& t);
+
+struct Namespace
+{
+	Namespace (const char* ns) :
+		prefix (ns)
+	{}
+
+	const char* prefix;
+};
+
+inline
+Code& operator << (Code& stm, const Namespace& ns)
+{
+	stm.namespace_prefix (ns.prefix);
+	return stm;
+}
+
+struct ItemNamespace
+{
+	ItemNamespace (const AST::NamedItem& ni) :
+		item (ni)
+	{}
+
+	const AST::NamedItem& item;
+};
+
+inline
+Code& operator << (Code& stm, const ItemNamespace& ns)
+{
+	stm.namespace_prefix (ns.item);
+	return stm;
+}
+
+struct MemberType
+{
+	MemberType (const AST::Type& t) :
+		type (t)
+	{}
+
+	const AST::Type& type;
+};
+
+Code& operator << (Code& stm, const MemberType& t);
+
+struct MemberVariable
+{
+	MemberVariable (const AST::Member& m) :
+		member (m)
+	{}
+
+	const AST::Member& member;
+};
+
+Code& operator << (Code& stm, const MemberVariable& m);
+
+struct Accessors
+{
+	Accessors (const AST::Member& m) :
+		member (m)
+	{}
+
+	const AST::Member& member;
+};
+
+Code& operator << (Code& stm, const Accessors& a);
+
+struct MemberDefault
+{
+	MemberDefault (const AST::Member& m, const char* pref) :
+		member (m),
+		prefix (pref)
+	{}
+
+	const AST::Member& member;
+	const char* prefix;
+};
+
+Code& operator << (Code& stm, const MemberDefault& val);
+
+struct MemberInit
+{
+	MemberInit (const AST::Member& m, const char* pref) :
+		member (m),
+		prefix (pref)
+	{}
+
+	const AST::Member& member;
+	const char* prefix;
+};
+
+Code& operator << (Code& stm, const MemberInit& val);
 
 #endif

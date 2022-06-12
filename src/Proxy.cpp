@@ -37,7 +37,7 @@ using namespace AST;
 Code& operator << (Code& stm, const Proxy::WithAlias& t)
 {
 	if (t.type.tkind () == Type::Kind::NAMED_TYPE && t.type.named_type ().kind () == Item::Kind::TYPE_DEF)
-		stm << "Alias <&" << CodeGenBase::TypeCodeName (t.type.named_type ()) << '>';
+		stm << "Alias <&" << TypeCodeName (t.type.named_type ()) << '>';
 	else
 		stm << t.type;
 	return stm;
@@ -46,8 +46,8 @@ Code& operator << (Code& stm, const Proxy::WithAlias& t)
 void Proxy::end (const Root&)
 {
 	if (custom_) {
-		cpp_.empty_line ();
-		cpp_ << "#include \"" << cpp_.file ().stem ().generic_string () << "_native.h\"\n";
+		cpp_ << empty_line
+			<< "#include \"" << cpp_.file ().stem ().generic_string () << "_native.h\"\n";
 	}
 	cpp_.close ();
 }
@@ -55,16 +55,16 @@ void Proxy::end (const Root&)
 void Proxy::leaf (const TypeDef& item)
 {
 	string name = export_name (item);
-	cpp_.empty_line ();
-	cpp_ << "extern \"C\" NIRVANA_OLF_SECTION const Nirvana::ExportInterface " << name << ";\n\n";
+	cpp_ << empty_line
+		<< "extern \"C\" NIRVANA_OLF_SECTION const Nirvana::ExportInterface " << name << ";\n\n";
 	cpp_.namespace_open ("CORBA/Internal");
 	cpp_ <<
 		"template <>\n"
-		"class TypeCodeTypeDef <&::" << name << "> :\n";
-	cpp_.indent ();
-	cpp_ << "public TypeCodeTypeDefImpl <&::" << name << ", " << WithAlias (item) << ">\n";
-	cpp_.unindent ();
-	cpp_ << "{};\n"
+		"class TypeCodeTypeDef <&::" << name << "> :\n"
+		<< indent
+		<< "public TypeCodeTypeDefImpl <&::" << name << ", " << WithAlias (item) << ">\n"
+		<< unindent
+		<< "{};\n"
 		"\n"
 		"template <>\n"
 		"const Char TypeCodeName <TypeCodeTypeDef <&::" << name << "> >::name_ [] = \"" << static_cast <const string&> (item.name ()) << "\";\n";
@@ -105,8 +105,8 @@ void Proxy::implement (const Operation& op)
 	if (!params_out.empty ())
 		cpp_ << "static const Parameter " PREFIX_OP_PARAM_OUT << op.name () << "[" << params_out.size () << "];\n";
 
-	cpp_.empty_line ();
-	cpp_ << "static void " PREFIX_OP_PROC << static_cast <const string&> (op.name ())
+	cpp_ << empty_line
+		<< "static void " PREFIX_OP_PROC << static_cast <const string&> (op.name ())
 		<< " (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)";
 
 	if (is_custom (op)) {
@@ -115,9 +115,7 @@ void Proxy::implement (const Operation& op)
 		return;
 	}
 
-	cpp_ << "\n{\n";
-
-	cpp_.indent ();
+	cpp_ << "\n{\n" << indent;
 
 	// out and inout params
 	for (auto p : params_out) {
@@ -126,8 +124,8 @@ void Proxy::implement (const Operation& op)
 	if (op.tkind () != Type::Kind::VOID)
 		cpp_ << Var (op) << " _ret;\n";
 
-	cpp_ << "{\n";
-	cpp_.indent ();
+	cpp_ << "{\n"
+		<< indent;
 
 	// in params
 	for (auto it = op.begin (); it != op.end (); ++it) {
@@ -157,9 +155,9 @@ void Proxy::implement (const Operation& op)
 			}
 		}
 	}
-	cpp_ << ");\n";
-	cpp_.unindent ();
-	cpp_ << "}\n"; // Input params are out of scope here
+	cpp_ << ");\n"
+		<< unindent
+		<< "}\n"; // Input params are out of scope here
 
 	// Marshal output
 	for (auto p : params_out) {
@@ -168,16 +166,16 @@ void Proxy::implement (const Operation& op)
 	if (op.tkind () != Type::Kind::VOID)
 		cpp_ << TypePrefix (op) << "marshal_out (_ret, _call);\n";
 
-	cpp_.unindent ();
-	cpp_ << "}\n";
+	cpp_ << unindent
+		<< "}\n";
 }
 
 void Proxy::implement (const Attribute& att)
 {
 	const ItemScope& itf = *att.parent ();
 
-	cpp_.empty_line ();
-	cpp_ << "static void " PREFIX_OP_PROC "_get_" << static_cast <const string&> (att.name ())
+	cpp_ << empty_line
+		<< "static void " PREFIX_OP_PROC "_get_" << static_cast <const string&> (att.name ())
 		<< " (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)";
 
 	if (is_native (att)) {
@@ -186,8 +184,8 @@ void Proxy::implement (const Attribute& att)
 		return;
 	}
 
-	cpp_ << "\n{\n";
-	cpp_.indent ();
+	cpp_ << "\n{\n"
+		<< indent;
 
 	// ret
 	cpp_ << Var (att) << " _ret;\n";
@@ -198,26 +196,25 @@ void Proxy::implement (const Attribute& att)
 	// Marshal
 	cpp_ << TypePrefix (att) << "marshal_out (_ret, _call);\n";
 
-	cpp_.unindent ();
-	cpp_ << "}\n";
+	cpp_ << unindent
+		<< "}\n";
 
 	if (!att.readonly ()) {
-		cpp_.empty_line ();
-
-		cpp_ << "static const Parameter " PREFIX_OP_PARAM_IN "_set_" << static_cast <const string&> (att.name ()) << " [1];\n\n";
-
-		cpp_ << "static void " PREFIX_OP_PROC "_set_" << static_cast <const string&> (att.name ())
+		cpp_ << empty_line
+			<< "static const Parameter " PREFIX_OP_PARAM_IN "_set_"
+			<< static_cast <const string&> (att.name ()) << " [1];\n\n"
+			<< "static void " PREFIX_OP_PROC "_set_" << static_cast <const string&> (att.name ())
 			<< " (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)\n"
-			"{\n";
-		cpp_.indent ();
+			"{\n"
+			<< indent
 
-		cpp_ << Var (att) << " val;\n";
-		cpp_ << TypePrefix (att) << "unmarshal (_call, val);\n"
+			<< Var (att) << " val;\n"
+			<< TypePrefix (att) << "unmarshal (_call, val);\n"
 			"_call->unmarshal_end ();\n"
-			"_servant->" << att.name () << " (val);\n";
+			"_servant->" << att.name () << " (val);\n"
 
-		cpp_.unindent ();
-		cpp_ << "}\n";
+			<< unindent
+			<< "}\n";
 	}
 }
 
@@ -241,8 +238,8 @@ void Proxy::end (const Interface& itf)
 		return;
 
 	cpp_.namespace_open ("CORBA/Internal");
-	cpp_.empty_line ();
-	cpp_ << "IMPLEMENT_PROXY_FACTORY(" << ParentName (itf) << ", " << itf.name () << ");\n"
+	cpp_ << empty_line
+		<< "IMPLEMENT_PROXY_FACTORY(" << ParentName (itf) << ", " << itf.name () << ");\n"
 		"\n"
 		"template <>\n"
 		"class Proxy <" << QName (itf) << "> : public ProxyBase <" << QName (itf) << '>';
@@ -252,20 +249,20 @@ void Proxy::end (const Interface& itf)
 	for (auto p : bases) {
 		cpp_ << ",\npublic ProxyBaseInterface <" << QName (*p) << '>';
 	}
-	cpp_.unindent ();
-	cpp_ << "\n{\n";
-	cpp_.indent ();
-	cpp_ << "typedef ProxyBase <" << QName (itf) << "> Base;\n";
-	cpp_.unindent ();
-	cpp_ << "public:\n";
-	cpp_.indent ();
+	cpp_ << unindent
+		<< "\n{\n"
+		<< indent
+		<< "typedef ProxyBase <" << QName (itf) << "> Base;\n"
+		<< unindent
+		<< "public:\n"
+		<< indent
 
 	// Constructor
-	cpp_ << "Proxy (IOReference::_ptr_type proxy_manager, uint16_t interface_idx) :\n";
-	cpp_.indent ();
-	cpp_ << "Base (proxy_manager, interface_idx)\n";
-	cpp_.unindent ();
-	cpp_ << '{';
+		<< "Proxy (IOReference::_ptr_type proxy_manager, uint16_t interface_idx) :\n"
+		<< indent
+		<< "Base (proxy_manager, interface_idx)\n"
+		<< unindent
+		<< '{';
 	if (!bases.empty ()) {
 		cpp_ << endl;
 		cpp_.indent ();
@@ -341,8 +338,8 @@ void Proxy::end (const Interface& itf)
 						}
 					}
 
-					cpp_.unindent ();
-					cpp_ << "}\n\n";
+					cpp_ << unindent
+						<< "}\n\n";
 				}
 			} break;
 
@@ -367,20 +364,20 @@ void Proxy::end (const Interface& itf)
 						"static const UShort " PREFIX_OP_IDX "_get_" << att.name () << " = " << (metadata.size () - 1) << ";\n";
 				} else {
 
-					cpp_ << "\n{\n";
-					cpp_.indent ();
+					cpp_ << "\n{\n"
+						<< indent
 
-					cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
+						<< "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
 						<< (metadata.size () - 1) << "));\n"
 						"_call->invoke ();\n"
-						"check_request (_call);\n";
+						"check_request (_call);\n"
 
-					cpp_ << Var (att) << " _ret;\n"
+						<< Var (att) << " _ret;\n"
 						<< TypePrefix (att) << "unmarshal (_call, _ret);\n"
-						"return _ret;\n";
+						"return _ret;\n"
 
-					cpp_.unindent ();
-					cpp_ << "}\n";
+						<< unindent
+						<< "}\n";
 				}
 
 				if (!att.readonly ()) {
@@ -400,17 +397,17 @@ void Proxy::end (const Interface& itf)
 							"static const UShort " PREFIX_OP_IDX "_set_" << att.name () << " = " << (metadata.size () - 1) << ";\n";
 					} else {
 
-						cpp_ << "\n{\n";
-						cpp_.indent ();
+						cpp_ << "\n{\n"
+							<< indent
 
-						cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
+							<< "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
 							<< (metadata.size () - 1) << "));\n"
 							<< TypePrefix (att) << "marshal_in (val, _call);\n"
 							"_call->invoke ();\n"
-							"check_request (_call);\n";
+							"check_request (_call);\n"
 
-						cpp_.unindent ();
-						cpp_ << "}\n\n";
+							<< unindent
+							<< "}\n\n";
 					}
 				}
 				cpp_ << endl;
@@ -422,8 +419,8 @@ void Proxy::end (const Interface& itf)
 	if (!metadata.empty ())
 		cpp_ << "static const Operation __operations [];\n";
 
-	cpp_.unindent ();
-	cpp_ << "};\n\n";
+	cpp_ << unindent
+		<< "};\n\n";
 
 	if (!metadata.empty ()) {
 
@@ -437,8 +434,8 @@ void Proxy::end (const Interface& itf)
 					assert (op.params_in.size () == 1);
 					cpp_.indent ();
 					md_member (*op.params_in.front (), string ());
-					cpp_ << endl;
-					cpp_.unindent ();
+					cpp_ << endl
+						<< unindent;
 				}
 				cpp_ << "};\n";
 			}
@@ -449,8 +446,8 @@ void Proxy::end (const Interface& itf)
 			}
 		}
 
-		cpp_ << "const Operation Proxy <" << QName (itf) << ">::__operations [" << metadata.size () << "] = {\n";
-		cpp_.indent ();
+		cpp_ << "const Operation Proxy <" << QName (itf) << ">::__operations [" << metadata.size () << "] = {\n"
+			<< indent;
 
 		auto it = metadata.cbegin ();
 		md_operation (itf, *it);
@@ -459,30 +456,29 @@ void Proxy::end (const Interface& itf)
 			md_operation (itf, *it);
 		}
 
-		cpp_.unindent ();
-		cpp_ << "\n};\n";
+		cpp_ << unindent
+			<< "\n};\n";
 	}
 
-	cpp_ << "const Char* const Proxy <" << QName (itf) << ">::__interfaces [] = {\n";
-	cpp_.indent ();
-	cpp_ << QName (itf) << "::repository_id_";
+	cpp_ << "const Char* const Proxy <" << QName (itf) << ">::__interfaces [] = {\n"
+		<< indent
+		<< QName (itf) << "::repository_id_";
 	for (auto p : bases) {
 		cpp_ << ",\n" << QName (*p) << "::repository_id_";
 	}
-	cpp_.unindent ();
-	cpp_ << "\n};\n";
+	cpp_ << unindent
+		<< "\n};\n"
 
-	cpp_ <<
-		"template <>\n"
-		"const InterfaceMetadata ProxyFactoryImpl <" << QName (itf) << ">::metadata_ = {\n";
-	cpp_.indent ();
-	cpp_ << "{Proxy <" << QName (itf) << ">::__interfaces, countof (Proxy <" << QName (itf) << ">::__interfaces)},\n";
+		<< "template <>\n"
+		"const InterfaceMetadata ProxyFactoryImpl <" << QName (itf) << ">::metadata_ = {\n"
+		<< indent
+		<< "{Proxy <" << QName (itf) << ">::__interfaces, countof (Proxy <" << QName (itf) << ">::__interfaces)},\n";
 	if (metadata.empty ())
 		cpp_ << "{nullptr, 0}";
 	else
 		cpp_ << "{Proxy <" << QName (itf) << ">::__operations, countof (Proxy <" << QName (itf) << ">::__operations)}\n";
-	cpp_.unindent ();
-	cpp_ << "};\n";
+	cpp_ << unindent
+		<< "};\n";
 
 	cpp_.namespace_close ();
 	cpp_ << "NIRVANA_EXPORT (" << export_name (itf) << ", " << QName (itf)
@@ -536,8 +532,7 @@ void Proxy::md_members (const Members& members)
 		cpp_ << ",\n";
 		md_member (**it);
 	}
-	cpp_.unindent ();
-	cpp_ << endl;
+	cpp_ << unindent << endl;
 }
 
 void Proxy::md_member (const Type& t, const string& name)
@@ -587,8 +582,8 @@ void Proxy::leaf (const Enum& item)
 	for (++it; it != item.end (); ++it) {
 		cpp_ << ",\n\"" << (*it)->name () << '\"';
 	};
-	cpp_.unindent ();
-	cpp_ << "\n};\n";
+	cpp_ << unindent
+		<< "\n};\n";
 
 	cpp_.namespace_close ();
 	exp (item) << "TypeCodeEnum <" << QName (item) << ">)\n";
@@ -627,11 +622,11 @@ void Proxy::end (const Struct& item)
 
 	implement_marshaling (item, "", members, "_");
 	if (options ().legacy) {
-		cpp_ << endl;
-		cpp_ << "#else\n";
+		cpp_ << endl
+			<< "#else\n";
 		implement_marshaling (item, "", members, "");
-		cpp_ << endl;
-		cpp_ << "#endif\n";
+		cpp_ << endl
+			<< "#endif\n";
 	}
 
 	cpp_.namespace_close ();
@@ -670,13 +665,13 @@ void Proxy::implement_marshaling (const NamedItem& cont, const char* suffix,
 		cpp_ << "\n"
 			"void Type <" << QName (cont) << suffix
 			<< ">::byteswap (Var& v) NIRVANA_NOEXCEPT\n"
-			"{\n";
-		cpp_.indent ();
+			"{\n"
+			<< indent;
 		for (auto m : members) {
 			cpp_ << TypePrefix (*m) << "byteswap (v." << prefix << m->name () << ");\n";
 		}
-		cpp_.unindent ();
-		cpp_ << "}\n";
+		cpp_ << unindent
+			<< "}\n";
 	}
 }
 
@@ -685,8 +680,8 @@ void Proxy::end (const ValueType& vt)
 	cpp_.namespace_open ("CORBA/Internal");
 	StateMembers members = get_members (vt);
 	if (!members.empty ()) {
-		cpp_.empty_line ();
-		cpp_ << "void ValueData <" << QName (vt) << ">::_marshal (I_ptr <IORequest> rq)\n"
+		cpp_ << empty_line
+			<< "void ValueData <" << QName (vt) << ">::_marshal (I_ptr <IORequest> rq)\n"
 			"{\n";
 		marshal_members ((const Members&)members, "marshal_in", "_", "this + 1");
 		cpp_ << "}\n"
@@ -751,16 +746,16 @@ void Proxy::unmarshal_members (const Members& members, const char* prefix, const
 				cpp_ << ", &" << prefix << (*end)->name ();
 			else
 				cpp_ << ", " << cend;
-			cpp_ << ")) {\n";
-			cpp_.indent ();
+			cpp_ << ")) {\n"
+				<< indent;
 
 			// Swap bytes
 			m = begin;
 			do {
 				cpp_ << TypePrefix (**m) << "byteswap (" << prefix << (*m)->name () << ");\n";
 			} while (end != ++m);
-			cpp_.unindent ();
-			cpp_ << "}\n";
+			cpp_ << unindent
+				<< "}\n";
 
 			// If some members have check, check them
 			m = begin;

@@ -32,7 +32,7 @@ using namespace AST;
 
 Code& operator << (Code& stm, const Client::Param& t)
 {
-	stm << CodeGenBase::TypePrefix (t.type);
+	stm << TypePrefix (t.type);
 	switch (t.att) {
 		case Parameter::Attribute::IN:
 			stm << "C_in";
@@ -74,7 +74,8 @@ void Client::end (const Root&)
 void Client::leaf (const Include& item)
 {
 	h_ << "#include " << (item.system () ? '<' : '"')
-		<< path (path (item.file ()).replace_extension ("").string () + options ().client_suffix).replace_extension ("h").string ()
+		<< path (path (item.file ()).replace_extension ("").string ()
+			+ options ().client_suffix).replace_extension ("h").string ()
 		<< (item.system () ? '>' : '"')
 		<< endl;
 }
@@ -88,7 +89,9 @@ void Client::type_code_decl (const NamedItem& item)
 		h_ << "extern ";
 	else
 		h_ << "static ";
-	h_ << "const " << Namespace ("Nirvana") << "ImportInterfaceT <" << Namespace ("CORBA") << "TypeCode> _tc_" << static_cast <const string&> (item.name ()) << ";\n";
+	h_ << "const " << Namespace ("Nirvana") << "ImportInterfaceT <"
+		<< Namespace ("CORBA") << "TypeCode> _tc_"
+		<< static_cast <const string&> (item.name ()) << ";\n";
 }
 
 void Client::type_code_def (const RepositoryId& rid)
@@ -98,8 +101,8 @@ void Client::type_code_def (const RepositoryId& rid)
 	if (is_pseudo (item))
 		return;
 
-	cpp_.empty_line ();
-	cpp_ << "NIRVANA_OLF_SECTION_N (" << (export_count_++) << ')';
+	cpp_ << empty_line
+		<< "NIRVANA_OLF_SECTION_N (" << (export_count_++) << ')';
 	if (!nested (item))
 		 cpp_ << " extern";
 	cpp_ << " const " << Namespace ("Nirvana") << "ImportInterfaceT <" << Namespace ("CORBA") << "TypeCode>\n"
@@ -134,8 +137,9 @@ void Client::h_namespace_open (const NamedItem& item)
 void Client::leaf (const TypeDef& item)
 {
 	h_namespace_open (item);
-	h_.empty_line ();
-	h_ << "typedef " << static_cast <const Type&> (item) << ' ' << item.name () << ";\n";
+	h_ << empty_line
+		<< "typedef " << static_cast <const Type&> (item) << ' ' << item.name ()
+		<< ";\n";
 	type_code_decl (item);
 	type_code_def (item);
 
@@ -181,8 +185,8 @@ void Client::backward_compat_var (const NamedItem& item)
 void Client::forward_decl (const NamedItem& item)
 {
 	h_.namespace_open (item);
-	h_.empty_line ();
-	h_ << "class " << item.name () << ";\n";
+	h_ << empty_line
+		<< "class " << item.name () << ";\n";
 	type_code_decl (item);
 }
 
@@ -192,8 +196,8 @@ void Client::forward_guard (const NamedItem& item)
 	if (parent)
 		forward_guard (*parent);
 	else {
-		h_.empty_line ();
-		h_ << "#ifndef IDL_DECLARED";
+		h_ << empty_line
+			<< "#ifndef IDL_DECLARED";
 	}
 	h_ << '_' << item.name ();
 }
@@ -216,8 +220,8 @@ void Client::forward_interface (const NamedItem& item)
 	forward_decl (item);
 	h_ << endl;
 	h_.namespace_open ("CORBA/Internal");
-	h_.empty_line ();
-	h_ << "template <>\n"
+	h_ << empty_line
+		<< "template <>\n"
 		"struct Type <" << QName (item) << "> : ";
 
 	bool has_type_code = true;
@@ -268,8 +272,8 @@ void Client::forward_interface (const NamedItem& item)
 	h_ << "};\n";
 
 	h_.namespace_close ();
-	h_.empty_line ();
-	h_ << "#endif\n"; // Close forward guard
+	h_ << empty_line
+		<< "#endif\n"; // Close forward guard
 
 	if (options ().legacy) {
 		h_.namespace_open (item);
@@ -279,7 +283,8 @@ void Client::forward_interface (const NamedItem& item)
 			<< static_cast <const string&> (item.name ()) << "_ptr;\n"
 			"typedef " << Namespace ("CORBA/Internal") << "Type <" << item.name () << ">::C_var "
 			<< static_cast <const string&> (item.name ()) << "_var;\n"
-			"typedef " << static_cast <const string&> (item.name ()) << "_var& " << static_cast <const string&> (item.name ()) << "_out;\n"
+			"typedef " << static_cast <const string&> (item.name ()) << "_var& "
+			<< static_cast <const string&> (item.name ()) << "_out;\n"
 			"#endif\n";
 	}
 }
@@ -296,13 +301,13 @@ void Client::leaf (const ValueTypeDecl& vt)
 
 void Client::type_code_func (const NamedItem& item)
 {
-	h_.empty_line ();
-	h_ << "static I_ptr <TypeCode> type_code ()\n"
-		"{\n";
-	h_.indent ();
-	h_ << "return " << TypeCodeName (item) << ";\n";
-	h_.unindent ();
-	h_ << "}\n\n";
+	h_ << empty_line
+		<< "static I_ptr <TypeCode> type_code ()\n"
+		"{\n"
+		<< indent
+		<< "return " << TypeCodeName (item) << ";\n"
+		<< unindent
+		<< "}\n\n";
 }
 
 void Client::begin_interface (const ItemContainer& container)
@@ -311,25 +316,26 @@ void Client::begin_interface (const ItemContainer& container)
 		type_code_def (container);
 
 	h_.namespace_open ("CORBA/Internal");
-	h_.empty_line ();
-	h_ << "template <>\n"
+	h_ << empty_line
+		<< "template <>\n"
 		"struct Definitions <" << QName (container) << ">\n"
-		"{\n";
-	h_.indent ();
+		"{\n"
+		<< indent;
 }
 
 void Client::end_interface (const ItemContainer& container)
 {
 	// Close struct Definitions
-	h_.unindent ();
-	h_ << "};\n";
+	h_ << unindent
+		<< "};\n";
 
 	implement_nested_items (container);
 
 	// Bridge
 	h_.namespace_open ("CORBA/Internal");
-	h_.empty_line ();
-	h_ << "NIRVANA_BRIDGE_BEGIN (" << QName (container) << ", \"" << container.repository_id () << "\")\n";
+	h_ << empty_line
+		<< "NIRVANA_BRIDGE_BEGIN (" << QName (container) << ", \""
+		<< container.repository_id () << "\")\n";
 
 	bool att_byref = false;
 	bool pseudo_interface = false;
@@ -528,43 +534,41 @@ void Client::end_interface (const ItemContainer& container)
 
 				h_ << "_ret _ret = (_b._epv ().epv._get_" << m.name () << ") (&_b, &_env);\n"
 					"_env.check ();\n"
-					"return _ret;\n";
-
-				h_.unindent ();
-				h_ << "}\n";
+					"return _ret;\n"
+					<< unindent
+					<< "}\n";
 
 				if (!(att && att->readonly ())) {
 					h_ << "\ntemplate <class T>\n";
 
-					h_ << "void Client <T, " << QName (container) << ">::" << m.name () << " (" << Param (m) << " val)\n"
-						"{\n";
+					h_ << "void Client <T, " << QName (container) << ">::" << m.name ()
+						<< " (" << Param (m) << " val)\n"
+						"{\n"
 
-					h_.indent ();
-
+					<< indent;
 					environment (att ? att->setraises () : Raises ());
 					h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n"
 						"(_b._epv ().epv._set_" << m.name () << ") (&_b, &val, &_env);\n"
-						"_env.check ();\n";
-
-					h_.unindent ();
-					h_ << "}\n";
+						"_env.check ();\n"
+					<< unindent
+					<< "}\n";
 				}
 
 				if (m.kind () == Item::Kind::STATE_MEMBER && is_var_len (m)) {
 					h_ << "\ntemplate <class T>\n";
 
-					h_ << "void Client <T, " << QName (container) << ">::" << m.name () << " (" << Var (m) << "&& val)\n"
-						"{\n";
+					h_ << "void Client <T, " << QName (container) << ">::" << m.name ()
+						<< " (" << Var (m) << "&& val)\n"
+						"{\n"
 
-					h_.indent ();
+					<< indent;
 
 					environment (Raises ());
 					h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n"
 						"(_b._epv ().epv._move_" << m.name () << ") (&_b, &val, &_env);\n"
-						"_env.check ();\n";
-
-					h_.unindent ();
-					h_ << "}\n";
+						"_env.check ();\n"
+						<< unindent
+						<< "}\n";
 				}
 
 			} break;
@@ -573,8 +577,9 @@ void Client::end_interface (const ItemContainer& container)
 
 	// Interface definition
 	h_.namespace_open (container);
-	h_.empty_line ();
-	h_ << "class " << container.name () << " : public " << Namespace ("CORBA/Internal") << "ClientInterface <" << container.name ();
+	h_ << empty_line
+		<< "class " << container.name () << " : public "
+		<< Namespace ("CORBA/Internal") << "ClientInterface <" << container.name ();
 	for (auto b : bases) {
 		h_ << ", " << QName (*b);
 	}
@@ -604,8 +609,8 @@ void Client::end_interface (const ItemContainer& container)
 	}
 	h_ << ">\n"
 		"{\n"
-		"public:\n";
-	h_.indent ();
+		"public:\n"
+		<< indent;
 	for (auto it = container.begin (); it != container.end (); ++it) {
 		const Item& item = **it;
 		switch (item.kind ()) {
@@ -622,8 +627,8 @@ void Client::end_interface (const ItemContainer& container)
 			}
 		}
 	}
-	h_.unindent ();
-	h_ << "};\n";
+	h_ << unindent
+		<< "};\n";
 }
 
 void Client::bridge_bases (const Bases& bases)
@@ -670,8 +675,8 @@ void Client::end (const ValueType& vt)
 
 	if (!factories.empty ()) {
 		h_.namespace_open (vt);
-		h_.empty_line ();
-		h_ << "class " << vt.name () << FACTORY_SUFFIX ";\n";
+		h_ << empty_line
+			<< "class " << vt.name () << FACTORY_SUFFIX ";\n";
 
 		h_.namespace_open ("CORBA/Internal");
 		h_.empty_line ();
@@ -734,8 +739,8 @@ void Client::end (const ValueType& vt)
 		}
 
 		h_.namespace_open (vt);
-		h_.empty_line ();
-		h_ << "class " << vt.name () << FACTORY_SUFFIX " : public "
+		h_ << empty_line
+			<< "class " << vt.name () << FACTORY_SUFFIX " : public "
 			<< Namespace ("CORBA/Internal") << "ClientInterface <" << vt.name () << ", CORBA::ValueFactoryBase>\n"
 			"{};\n";
 	}
@@ -773,9 +778,9 @@ void Client::native_itf_template (const Operation& op)
 			}
 
 			h_ << ")\n"
-				"{\n";
-			h_.indent ();
-			h_ << "return " << op.name () << " (";
+				"{\n"
+				<< indent
+				<< "return " << op.name () << " (";
 			it = op.begin ();
 			if (par_iid == *it)
 				h_ << "I::repository_id_";
@@ -789,9 +794,9 @@ void Client::native_itf_template (const Operation& op)
 				else
 					h_ << (*it)->name ();
 			}
-			h_ << ").template downcast <I> ();\n";
-			h_.unindent ();
-			h_ << "}\n";
+			h_ << ").template downcast <I> ();\n"
+				<< unindent
+				<< "}\n";
 		}
 	}
 }
@@ -888,12 +893,12 @@ void Client::leaf (const Constant& item)
 void Client::begin (const Exception& item)
 {
 	h_namespace_open (item);
-	h_.empty_line ();
-	h_ << "class " << item.name () << " : public " << Namespace ("CORBA") << "UserException\n"
+	h_ << empty_line
+		<< "class " << item.name () << " : public " << Namespace ("CORBA") << "UserException\n"
 		"{\n"
-		"public:\n";
-	h_.indent ();
-	h_ << "NIRVANA_EXCEPTION_DCL (" << item.name () << ");\n\n";
+		"public:\n"
+		<< indent
+		<< "NIRVANA_EXCEPTION_DCL (" << item.name () << ");\n\n";
 }
 
 void Client::end (const Exception& item)
@@ -902,51 +907,50 @@ void Client::end (const Exception& item)
 	if (!members.empty ()) {
 
 		// Define struct _Data
-		h_.empty_line ();
-		h_ <<
-			"struct _Data\n"
-			"{\n";
+		h_ << empty_line
+			<< "struct _Data\n"
+			"{\n"
 
-		h_.indent ();
+			<< indent;
 		member_variables (members);
-		h_.unindent ();
+		h_ << unindent
 
-		h_ << "};\n\n";
+			<< "};\n\n";
 
 		if (options ().legacy) {
-			h_.unindent ();
-			h_ << "#ifndef LEGACY_CORBA_CPP\n";
-			h_.indent ();
+			h_ << unindent
+				<< "#ifndef LEGACY_CORBA_CPP\n"
+				<< indent;
 		}
 
 		constructors (item.name (), members, "_");
 		accessors (members);
-		h_.empty_line ();
-		h_.unindent ();
-		h_ << "private:\n";
-		h_.indent ();
+		h_ << empty_line
+			<< unindent
+			<< "private:\n"
+			<< indent;
 		member_variables (members);
 
 		if (options ().legacy) {
-			h_ << endl;
-			h_.unindent ();
-			h_ << "#else\n";
-			h_.indent ();
+			h_ << endl
+				<< unindent
+				<< "#else\n"
+				<< indent;
 			constructors (item.name (), members, "");
 			member_variables_legacy (members);
-			h_ << endl;
-			h_.unindent ();
-			h_ << "#endif\n";
-			h_.indent ();
+			h_ << endl
+				<< unindent
+				<< "#endif\n"
+				<< indent;
 		}
 
-		h_.unindent ();
-		h_ << "private:\n";
-		h_.indent ();
+		h_ << unindent
+			<< "private:\n"
+			<< indent
 
-		h_ << "virtual void* __data () NIRVANA_NOEXCEPT\n"
-			"{\n";
-		h_.indent ();
+			<< "virtual void* __data () NIRVANA_NOEXCEPT\n"
+			"{\n"
+			<< indent;
 		if (options ().legacy)
 			h_ << "#ifndef LEGACY_CORBA_CPP\n";
 		h_ << "return &_" << static_cast <const string&> (members.front ()->name ()) << ";\n";
@@ -956,11 +960,11 @@ void Client::end (const Exception& item)
 				"return &" << members.front ()->name () << ";\n"
 				"#endif\n";
 		}
-		h_.unindent ();
-		h_ << "}\n";
+		h_ << unindent
+			<< "}\n";
 	}
-	h_.unindent ();
-	h_ << "};\n";
+	h_ << unindent
+		<< "};\n";
 
 	// Type code
 	type_code_decl (item);
@@ -980,8 +984,8 @@ void Client::implement (const Exception& item)
 
 	// Define exception
 	assert (cpp_.cur_namespace ().empty ());
-	cpp_.empty_line ();
-	cpp_ << "NIRVANA_EXCEPTION_DEF (" << ParentName (item) << ", " << item.name () << ")\n\n";
+	cpp_ << empty_line
+		<< "NIRVANA_EXCEPTION_DEF (" << ParentName (item) << ", " << item.name () << ")\n\n";
 
 	implement_nested_items (item);
 }
@@ -991,13 +995,15 @@ void Client::rep_id_of (const RepositoryId& rid)
 	const NamedItem& item = rid.item ();
 	if (!is_pseudo (item)) {
 		h_.namespace_open ("CORBA/Internal");
-		h_.empty_line ();
-		h_ << "template <>\n"
-			"const Char RepIdOf <" << QName (item) << ">::repository_id_ [] = \"" << rid.repository_id () << "\";\n\n";
+		h_ << empty_line
+			<< "template <>\n"
+			"const Char RepIdOf <" << QName (item) << ">::repository_id_ [] = \""
+			<< rid.repository_id () << "\";\n\n";
 	}
 }
 
-void Client::define_structured_type (const RepositoryId& rid, const Members& members, const char* suffix)
+void Client::define_structured_type (const RepositoryId& rid,
+	const Members& members, const char* suffix)
 {
 	rep_id_of (rid);
 
@@ -1008,13 +1014,13 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 		// ABI
 		h_ << "template <>\n"
 			"struct ABI < " << QName (item) << suffix << ">\n"
-			"{\n";
-		h_.indent ();
+			"{\n"
+			<< indent;
 		for (auto member : members) {
 			h_ << TypePrefix (*member) << "ABI " << member->name () << ";\n";
 		}
-		h_.unindent ();
-		h_ << "};\n\n";
+		h_ << unindent
+			<< "};\n\n";
 	}
 
 	// Type
@@ -1025,22 +1031,22 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 		h_ << "TypeVarLen < " << QName (item) << suffix << ", ";
 		has_check (members);
 		h_ << ">\n"
-			"{\n";
-		h_.indent ();
+			"{\n"
+			<< indent;
 
 		implement_type (item, members);
 		
 		if (!*suffix && !is_pseudo (item))
 			type_code_func (item);
 
-		h_.unindent ();
-		h_ << "};\n";
+		h_ << unindent
+			<< "};\n";
 	} else {
 		h_ << "TypeFixLen < " << QName (item) << suffix << ">\n"
-		"{\n";
-		h_.indent ();
+			"{\n"
+			<< indent
 
-		h_ << "static const bool has_check = ";
+			<< "static const bool has_check = ";
 		has_check (members);
 		h_ << ";\n";
 
@@ -1049,8 +1055,8 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 		if (!*suffix && !is_pseudo (item))
 			type_code_func (item);
 
-		h_.unindent ();
-		h_ << "};\n";
+		h_ << unindent
+			<< "};\n";
 	}
 }
 
@@ -1064,14 +1070,14 @@ void Client::implement_type (const AST::NamedItem& cont, const Members& members)
 	// Implement check()
 
 	h_ << "static void check (const ABI& val)\n"
-		"{\n";
-	h_.indent ();
+		"{\n"
+		<< indent;
 	for (auto member : members) {
 		if (may_have_check (*member))
 			h_ << TypePrefix (*member) << "check (val." << member->name () << ");\n";
 	}
-	h_.unindent ();
-	h_ << "}\n";
+	h_ << unindent
+		<< "}\n";
 
 	// Implement marshaling
 	if (is_var_len (members)) {
@@ -1098,8 +1104,8 @@ void Client::has_check (const Members& members)
 				break;
 		}
 		if (check_member != members.end ()) {
-			h_ << '\n';
-			h_.indent ();
+			h_ << '\n'
+				<< indent;
 			do {
 				h_ << "| " << TypePrefix (**(check_member++)) << "has_check";
 				for (; check_member != members.end (); ++check_member) {
@@ -1121,11 +1127,11 @@ void Client::leaf (const StructDecl& item)
 void Client::begin (const Struct& item)
 {
 	h_namespace_open (item);
-	h_.empty_line ();
-	h_ << "class " << item.name () << "\n"
+	h_ << empty_line
+		<< "class " << item.name () << "\n"
 		"{\n"
-		"public:\n";
-	h_.indent ();
+		"public:\n"
+		<< indent;
 }
 
 void Client::end (const Struct& item)
@@ -1133,34 +1139,34 @@ void Client::end (const Struct& item)
 	Members members = get_members (item);
 
 	if (options ().legacy) {
-		h_.unindent ();
-		h_ << "#ifndef LEGACY_CORBA_CPP\n";
-		h_.indent ();
+		h_ << unindent
+			<< "#ifndef LEGACY_CORBA_CPP\n"
+			<< indent;
 	}
 
 	constructors (item.name (), members, "_");
 	accessors (members);
 
 	// Member variables
-	h_.unindent ();
-	h_.empty_line ();
-	h_ << "private:\n";
-	h_.indent ();
-	h_ << "friend struct " << Namespace ("CORBA/Internal") << "Type <" << item.name () << ">;\n";
+	h_ << unindent
+		<< empty_line
+		<< "private:\n"
+		<< indent
+		<< "friend struct " << Namespace ("CORBA/Internal") << "Type <" << item.name () << ">;\n";
 	member_variables (members);
 
 	if (options ().legacy) {
-		h_.unindent ();
-		h_ << "#else\n";
-		h_.indent ();
+		h_ << unindent
+			<< "#else\n"
+			<< indent;
 		member_variables_legacy (members);
-		h_.unindent ();
-		h_ << "#endif\n";
-		h_.indent ();
+		h_ << unindent
+			<< "#endif\n"
+			<< indent;
 	}
 
-	h_.unindent ();
-	h_ << "};\n";
+	h_ << unindent
+		<< "};\n";
 
 	// Type code
 	type_code_decl (item);
@@ -1181,23 +1187,23 @@ void Client::implement (const Struct& item)
 void Client::constructors (const Identifier& name, const Members& members, const char* prefix)
 {
 	assert (!members.empty ());
-	h_.empty_line ();
+	h_ << empty_line
 	// Default constructor
-	h_ << name << " () NIRVANA_NOEXCEPT :\n";
-	h_.indent ();
+		<< name << " () NIRVANA_NOEXCEPT :\n"
+		<< indent;
 	auto it = members.begin ();
 	h_ << MemberDefault (**it, prefix);
 	for (++it; it != members.end (); ++it) {
 		h_ << ",\n" << MemberDefault (**it, prefix);
 	}
-	h_.unindent ();
-	h_ << "\n{}\n"
+	h_ << unindent
+		<< "\n{}\n"
 
 	// Explicit constructor
 	"explicit " << name << " (";
 	it = members.begin ();
-	h_ << Var (**it) << ' ' << (*it)->name ();
-	h_.indent ();
+	h_ << Var (**it) << ' ' << (*it)->name ()
+		<< indent;
 	for (++it; it != members.end (); ++it) {
 		h_ << ",\n" << Var (**it) << ' ' << (*it)->name ();
 	}
@@ -1208,16 +1214,16 @@ void Client::constructors (const Identifier& name, const Members& members, const
 	for (++it; it != members.end (); ++it) {
 		h_ << ",\n" << MemberInit (**it, prefix);
 	}
-	h_.unindent ();
-	h_ << "\n{}\n";
+	h_ << unindent
+		<< "\n{}\n";
 }
 
 void Client::accessors (const Members& members)
 {
 	// Accessors
 	for (const Member* m : members) {
-		h_.empty_line ();
-		h_ << Accessors (*m);
+		h_ << empty_line
+			<< Accessors (*m);
 	}
 }
 
@@ -1268,17 +1274,17 @@ void Client::implement (const Union& item)
 void Client::leaf (const Enum& item)
 {
 	h_namespace_open (item);
-	h_.empty_line ();
-	h_ << "enum class " << item.name () << " : " << Namespace ("CORBA/Internal") << "ABI_enum\n"
-		"{\n";
-	h_.indent ();
+	h_ << empty_line
+		<< "enum class " << item.name () << " : " << Namespace ("CORBA/Internal") << "ABI_enum\n"
+		"{\n"
+		<< indent;
 	auto it = item.begin ();
 	h_ << (*it)->name ();
 	for (++it; it != item.end (); ++it) {
 		h_ << ",\n" << (*it)->name ();
 	}
-	h_.unindent ();
-	h_ << "\n};\n";
+	h_ << unindent
+		<< "\n};\n";
 	type_code_decl (item);
 
 	if (!nested (item))
@@ -1295,8 +1301,8 @@ void Client::implement (const Enum& item)
 	h_.indent ();
 	if (!is_pseudo (item))
 		type_code_func (item);
-	h_.unindent ();
-	h_ << "};\n";
+	h_ << unindent
+		<< "};\n";
 
 	if (options ().legacy) {
 		h_.namespace_open (item);
@@ -1310,5 +1316,5 @@ void Client::implement (const Enum& item)
 
 void Client::leaf (const AST::ValueBox& item)
 {
-	// TODO:: Implement
+	throw runtime_error ("Not yet implemented");
 }

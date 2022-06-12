@@ -165,4 +165,22 @@ Code& operator << (Code& stm, const AST::Identifier& id);
 Code& operator << (Code& stm, const AST::Type& t);
 Code& operator << (Code& stm, const AST::Variant& var);
 
+inline Code& indent (Code& stm)
+{
+	stm.indent ();
+	return stm;
+}
+
+inline Code& unindent (Code& stm)
+{
+	stm.unindent ();
+	return stm;
+}
+
+inline Code& empty_line (Code& stm)
+{
+	stm.empty_line ();
+	return stm;
+}
+
 #endif

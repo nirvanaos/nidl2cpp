@@ -60,9 +60,9 @@ void Servant::begin (const ValueType& vt)
 void Servant::skeleton_begin (const ItemContainer& item, const char* suffix)
 {
 	h_.namespace_open ("CORBA/Internal");
-	h_.empty_line ();
+	h_ << empty_line
 
-	h_ << "template <class S>\n"
+		<< "template <class S>\n"
 		"class Skeleton <S, " << QName (item) << suffix << "> : public Definitions <"
 		<< QName (item) << ">\n"
 		"{\n"
@@ -152,7 +152,7 @@ void Servant::end (const Interface& itf)
 	if (!options ().no_servant) {
 
 		if (itf.interface_kind () != InterfaceKind::ABSTRACT) {
-			
+
 			// Standard implementation
 			h_.empty_line ();
 			h_ << "template <class S>\n"
@@ -174,10 +174,10 @@ void Servant::end (const Interface& itf)
 
 		if (!options ().no_POA && itf.interface_kind () != InterfaceKind::PSEUDO) {
 			// POA implementation
-			h_.empty_line ();
-			h_ << "template <>\n"
-				"class NIRVANA_NOVTABLE ServantPOA <" << QName (itf) << "> :\n";
-			h_.indent ();
+			h_ << empty_line
+				<< "template <>\n"
+				"class NIRVANA_NOVTABLE ServantPOA <" << QName (itf) << "> :\n"
+				<< indent;
 
 			bool has_base = false;
 			for (auto b : all_bases) {
@@ -207,30 +207,30 @@ void Servant::end (const Interface& itf)
 			}
 			h_ << "public InterfaceImpl <ServantPOA <" << QName (itf) << ">, "
 				<< QName (itf) << ">\n";
-			h_.unindent ();
-			h_ << "{\n"
-				"public:\n";
-			h_.indent ();
-			h_ << "typedef " << QName (itf) << " PrimaryInterface;\n\n";
+			h_ << unindent
+				<< "{\n"
+				"public:\n"
+				<< indent
+				<< "typedef " << QName (itf) << " PrimaryInterface;\n\n";
 
 			if (itf.interface_kind () != InterfaceKind::ABSTRACT) {
 				h_ << "virtual Interface* _query_interface (const String& id) override\n"
-					"{\n";
-				h_.indent ();
-				h_ << "return FindInterface <" << QName (itf);
+					"{\n"
+					<< indent
+					<< "return FindInterface <" << QName (itf);
 				for (auto b : all_bases) {
 					h_ << ", " << QName (*b);
 				}
-				h_ << ">::find (*this, id);\n";
-				h_.unindent ();
-				h_ << "}\n\n";
-				h_ << "I_ref <" << QName (itf) << "> _this ()\n"
-					"{\n";
-				h_.indent ();
-				h_ << "return this->_get_proxy ().template downcast <" << QName (itf)
-					<< "> ();\n";
-				h_.unindent ();
-				h_ << "}\n";
+				h_ << ">::find (*this, id);\n"
+					<< unindent
+					<< "}\n\n"
+					<< "I_ref <" << QName (itf) << "> _this ()\n"
+					"{\n"
+					<< indent
+					<< "return this->_get_proxy ().template downcast <" << QName (itf)
+					<< "> ();\n"
+					<< unindent
+					<< "}\n";
 			}
 
 			h_.empty_line ();
@@ -250,16 +250,16 @@ void Servant::end (const Interface& itf)
 					} break;
 				}
 			}
-			
-			h_.unindent ();
-			
-			h_ << "\nprotected:\n";
-			h_.indent ();
-			h_ << "ServantPOA ()\n"
+
+			h_
+				<< unindent
+				<< "\nprotected:\n"
+				<< indent
+				<< "ServantPOA ()\n"
 				"{}\n";
 
-			h_.unindent ();
-			h_ << "};\n";
+			h_ << unindent
+				<< "};\n";
 		}
 
 		h_.namespace_close ();
@@ -282,11 +282,11 @@ void Servant::end (const Interface& itf)
 
 				if (!options ().no_POA)
 					h_ << "\ntypedef " << Namespace ("CORBA/Internal")
-						<< "ServantPOA <" << QName (itf) << "> " << itf.name () << ";\n";
+					<< "ServantPOA <" << QName (itf) << "> " << itf.name () << ";\n";
 
 				if (itf.interface_kind () != InterfaceKind::ABSTRACT)
 					h_ << "template <class T> using " << itf.name () << "_tie = "
-						<< Namespace ("CORBA/Internal") << "ServantTied <T, " << QName (itf) << ">;\n\n";
+					<< Namespace ("CORBA/Internal") << "ServantTied <T, " << QName (itf) << ">;\n\n";
 
 				for (size_t cnt = sn.size (); cnt; --cnt) {
 					h_ << "}\n";
@@ -299,7 +299,7 @@ void Servant::end (const Interface& itf)
 
 				if (itf.interface_kind () != InterfaceKind::ABSTRACT)
 					h_ << "template <class T> using POA_" << static_cast <const string&> (itf.name ()) << "_tie = "
-						<< Namespace ("CORBA/Internal") << "ServantTied <T, " << QName (itf) << ">;\n\n";
+					<< Namespace ("CORBA/Internal") << "ServantTied <T, " << QName (itf) << ">;\n\n";
 			}
 			h_ << "#endif\n";
 		}
@@ -337,21 +337,21 @@ void Servant::end (const ValueType& vt)
 		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
 
 			// ValueData
-			h_.empty_line ();
-			h_ << "template <>\n"
+			h_ << empty_line
+				<< "template <>\n"
 				"class ValueData <" << QName (vt) << ">\n"
 				"{\n"
-				"protected:\n";
-			h_.indent ();
+				"protected:\n"
+				<< indent
 
-			// Default constructor
-			h_ << "ValueData ()";
+				// Default constructor
+				<< "ValueData ()";
 
 			StateMembers members = get_members (vt);
 
 			if (!members.empty ()) {
-				h_ << " :\n";
-				h_.indent ();
+				h_ << " :\n"
+					<< indent;
 				auto it = members.begin ();
 				h_ << MemberDefault (**it, "_");
 				for (++it; it != members.end (); ++it) {
@@ -364,8 +364,8 @@ void Servant::end (const ValueType& vt)
 			// Accessors
 			for (auto p : members) {
 				if (p->is_public ()) {
-					h_ << Accessors (*p);
-					h_.empty_line ();
+					h_ << Accessors (*p)
+						<< empty_line;
 				}
 			}
 
@@ -385,27 +385,27 @@ void Servant::end (const ValueType& vt)
 			for (auto p : members) {
 				h_ << MemberVariable (*p);
 			}
-			h_.unindent ();
+			h_ << unindent
 
-			h_ << "};\n"
+				<< "};\n"
 				"\n"
 				"template <class S>\n"
-				"class ValueImpl <S, " << QName (vt) << "> :\n";
+				"class ValueImpl <S, " << QName (vt) << "> :\n"
 
-			h_.indent ();
-			h_ << "public ValueImplBase <S, " << QName (vt) << ">,\n"
-				"public ValueData <" << QName (vt) << ">\n";
-			h_.unindent ();
-			h_ << "{};";
+				<< indent
+				<< "public ValueImplBase <S, " << QName (vt) << ">,\n"
+				"public ValueData <" << QName (vt) << ">\n"
+				<< unindent
+				<< "{};";
 
 			// Standard implementation
-			h_.empty_line ();
-			h_ << "template <class S>\n"
-				"class Servant <S, " << QName (vt) << "> :\n";
+			h_ << empty_line
+				<< "template <class S>\n"
+				"class Servant <S, " << QName (vt) << "> :\n"
 
-			h_.indent ();
+				<< indent
 
-			h_ << "public ValueTraits <S>,\n";
+				<< "public ValueTraits <S>,\n";
 
 			const Interface* concrete_itf = get_concrete_supports (vt);
 			if (concrete_itf)
@@ -433,27 +433,27 @@ void Servant::end (const ValueType& vt)
 				"public InterfaceImpl <S, AbstractBase>";
 
 			h_ << ",\n"
-				"public ValueImpl <S, " << QName (vt) << '>';
+				"public ValueImpl <S, " << QName (vt) << '>'
 
-			h_.unindent ();
+				<< unindent
 
-			h_ << "\n"
+				<< "\n"
 				"{\n"
-				"public:\n";
+				"public:\n"
 
-			h_.indent ();
-			h_ << "typedef " << QName (vt) << " PrimaryInterface;\n"
+				<< indent
+				<< "typedef " << QName (vt) << " PrimaryInterface;\n"
 				"\n"
 				"Interface* _query_valuetype (String_in id) NIRVANA_NOEXCEPT\n"
-				"{\n";
-			h_.indent ();
-			h_ << "return FindInterface <" << QName (vt);
+				"{\n"
+				<< indent
+				<< "return FindInterface <" << QName (vt);
 			for (auto b : all_bases) {
 				h_ << ", " << QName (*b);
 			}
-			h_ << ">::find (static_cast <S&> (*this), id);\n";
-			h_.unindent ();
-			h_ << "}\n\n";
+			h_ << ">::find (static_cast <S&> (*this), id);\n"
+				<< unindent
+				<< "}\n\n";
 
 			if (abstract_base)
 				h_ << "using InterfaceImpl <S, AbstractBase>::_get_abstract_base;\n\n";
@@ -468,30 +468,30 @@ void Servant::end (const ValueType& vt)
 			}
 
 			h_ << "void _marshal (I_ptr <IORequest> rq)\n"
-				"{\n";
-			h_.indent ();
+				"{\n"
+				<< indent;
 			for (auto b : concrete_bases) {
 				h_ << "ValueData <" << QName (*b) << ">::_marshal (rq);\n";
 			}
-			h_ << "ValueData <" << QName (vt) << ">::_marshal (rq);\n";
-			h_.unindent ();
-			h_ << "}\n"
+			h_ << "ValueData <" << QName (vt) << ">::_marshal (rq);\n"
+				<< unindent
+				<< "}\n"
 				"void _unmarshal (I_ptr <IORequest> rq)\n"
-				"{\n";
-			h_.indent ();
+				"{\n"
+				<< indent;
 			for (auto b : concrete_bases) {
 				h_ << "ValueData <" << QName (*b) << ">::_unmarshal (rq);\n";
 			}
-			h_ << "ValueData <" << QName (vt) << ">::_unmarshal (rq);\n";
-			h_.unindent ();
-			h_ << "}\n\n";
+			h_ << "ValueData <" << QName (vt) << ">::_unmarshal (rq);\n"
+				<< unindent
+				<< "}\n\n"
 
-			h_.unindent ();
-			h_ << "protected:\n";
-			h_.indent ();
+				<< unindent
+				<< "protected:\n"
+				<< indent
 
-			// Default constructor
-			h_ << "Servant () NIRVANA_NOEXCEPT\n"
+				// Default constructor
+				<< "Servant () NIRVANA_NOEXCEPT\n"
 				"{}\n";
 
 			// Explicit constructor
@@ -510,33 +510,33 @@ void Servant::end (const ValueType& vt)
 				for (++it; it != all_members.end (); ++it) {
 					h_ << ",\n" << Var (**it) << ' ' << (*it)->name ();
 				}
-				h_ << ")\n";
-				h_.unindent ();
-				h_ << "{\n";
-				h_.indent ();
+				h_ << ")\n"
+					<< unindent
+					<< "{\n"
+					<< indent;
 				for (auto m : all_members) {
 					h_ << "this->_" << m->name () << " = std::move (" << m->name () << ");\n";
 				}
-				h_.unindent ();
-				h_ << "}\n";
+				h_ << unindent
+					<< "}\n";
 			}
 
-			h_.unindent ();
-			h_ << "};\n";
+			h_ << unindent
+				<< "};\n";
 		}
 	}
-/*
-	Factories factories = get_factories (vt);
-	if (!factories.empty ()) {
-		skeleton_begin (vt, FACTORY_SUFFIX);
-		skeleton_end (vt, FACTORY_SUFFIX);
-		h_ << ",\n"
-			"{ // base\n"
-			<< indent
-			<< "S::template _wide_val <ValueFactoryBase, " << QName (vt) << FACTORY_SUFFIX ">";
-		epv ();
-	}
-*/
+	/*
+		Factories factories = get_factories (vt);
+		if (!factories.empty ()) {
+			skeleton_begin (vt, FACTORY_SUFFIX);
+			skeleton_end (vt, FACTORY_SUFFIX);
+			h_ << ",\n"
+				"{ // base\n"
+				<< indent
+				<< "S::template _wide_val <ValueFactoryBase, " << QName (vt) << FACTORY_SUFFIX ">";
+			epv ();
+		}
+	*/
 }
 
 void Servant::implementation_suffix (const InterfaceKind ik)
@@ -578,10 +578,10 @@ void Servant::leaf (const Operation& op)
 	}
 
 	h_ << ", Interface* _env)\n"
-		"{\n";
-	h_.indent ();
-	h_ << "try {\n";
-	h_.indent ();
+		"{\n"
+		<< indent
+		<< "try {\n"
+		<< indent;
 	if (op.tkind () != Type::Kind::VOID)
 		h_ << "return " << TypePrefix (op) << "ret (";
 	h_ << "S::_implementation (_b)." << op.name () << " (";
@@ -602,8 +602,8 @@ void Servant::leaf (const Operation& op)
 		h_ << "return " << TypePrefix (op) << "ret ();\n";
 	}
 
-	h_.unindent ();
-	h_ << "}\n\n";
+	h_ << unindent
+		<< "}\n\n";
 }
 
 void Servant::leaf (const Attribute& att)
@@ -629,10 +629,10 @@ void Servant::attribute (const Member& m)
 			"{\n";
 		epv_.push_back (move (name));
 	}
-	h_.indent ();
-	h_ << "try {\n";
-	h_.indent ();
-	h_ << "return " << TypePrefix (m);
+	h_ << indent
+		<< "try {\n"
+		<< indent
+		<< "return " << TypePrefix (m);
 	if (attributes_by_ref_)
 		h_ << "VT_";
 	h_ << "ret (S::_implementation (_b)." << m.name () << " ());\n";
@@ -640,9 +640,9 @@ void Servant::attribute (const Member& m)
 	h_ << "return " << TypePrefix (m);
 	if (attributes_by_ref_)
 		h_ << "VT_";
-	h_ << "ret ();\n";
-	h_.unindent ();
-	h_ << "}\n";
+	h_ << "ret ();\n"
+		<< unindent
+		<< "}\n";
 
 	if (!(m.kind () == Item::Kind::ATTRIBUTE && static_cast <const Attribute&> (m).readonly ())) {
 		{
@@ -653,15 +653,15 @@ void Servant::attribute (const Member& m)
 				"{\n";
 			epv_.push_back (move (name));
 		}
-		h_.indent ();
-		h_ << "try {\n";
-		h_.indent ();
-		h_ << "S::_implementation (_b)." << m.name () << " (";
+		h_ << indent
+			<< "try {\n"
+			<< indent
+			<< "S::_implementation (_b)." << m.name () << " (";
 		servant_param (m, "val");
 		h_ << ");\n";
 		catch_block ();
-		h_.unindent ();
-		h_ << "}\n";
+		h_ << unindent
+			<< "}\n";
 	}
 
 	if (m.kind () == Item::Kind::STATE_MEMBER && is_var_len (m)) {
@@ -673,15 +673,15 @@ void Servant::attribute (const Member& m)
 				"{\n";
 			epv_.push_back (move (name));
 		}
-		h_.indent ();
-		h_ << "try {\n";
-		h_.indent ();
-		h_ << "S::_implementation (_b)." << m.name () << " (std::move (";
+		h_ << indent
+			<< "try {\n"
+			<< indent
+			<< "S::_implementation (_b)." << m.name () << " (std::move (";
 		servant_param (m, "val", Parameter::Attribute::INOUT);
 		h_ << "));\n";
 		catch_block ();
-		h_.unindent ();
-		h_ << "}\n";
+		h_ << unindent
+			<< "}\n";
 	}
 
 	h_ << endl;
@@ -706,14 +706,14 @@ void Servant::servant_param (const Type& t, const string& name, Parameter::Attri
 
 void Servant::catch_block ()
 {
-	h_.unindent ();
-	h_ << "} catch (Exception& e) {\n";
-	h_.indent ();
-	h_ << "set_exception (_env, e);\n";
-	h_.unindent ();
-	h_ << "} catch (...) {\n";
-	h_.indent ();
-	h_ << "set_unknown_exception (_env);\n";
-	h_.unindent ();
-	h_ << "}\n";
+	h_ << unindent
+		<< "} catch (Exception& e) {\n"
+		<< indent
+		<< "set_exception (_env, e);\n"
+		<< unindent
+		<< "} catch (...) {\n"
+		<< indent
+		<< "set_unknown_exception (_env);\n"
+		<< unindent
+		<< "}\n";
 }

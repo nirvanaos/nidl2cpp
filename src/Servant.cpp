@@ -525,18 +525,62 @@ void Servant::end (const ValueType& vt)
 				<< "};\n";
 		}
 	}
-	/*
-		Factories factories = get_factories (vt);
-		if (!factories.empty ()) {
-			skeleton_begin (vt, FACTORY_SUFFIX);
-			skeleton_end (vt, FACTORY_SUFFIX);
-			h_ << ",\n"
-				"{ // base\n"
+
+	Factories factories = get_factories (vt);
+	if (!factories.empty ()) {
+		skeleton_begin (vt, FACTORY_SUFFIX);
+
+		for (auto f : factories) {
+			h_ << "static Interface* _" << f->name () << "(Bridge <" << QName (vt)
+				<< FACTORY_SUFFIX ">* _b";
+			for (auto p : *f) {
+				h_ << ", " << ABI_param (*p) << ' ' << p->name ();
+			}
+			h_ << ", Interface* _env)\n"
+				"{\n"
 				<< indent
-				<< "S::template _wide_val <ValueFactoryBase, " << QName (vt) << FACTORY_SUFFIX ">";
-			epv ();
+				<< "try {\n"
+				<< indent
+				<< "return Type <" << QName (vt) << ">::ret (S::_implementation (_b)."
+				<< f->name () << " (";
+			if (!f->empty ()) {
+				auto par = f->begin ();
+				servant_param (**par);
+				for (++par; par != f->end (); ++par) {
+					h_ << ", ";
+					servant_param (**par);
+				}
+			}
+			h_ << "));\n";
+			catch_block ();
+
+			// Return default value on exception
+			h_ << "return Type <" << QName (vt) << ">::ret ();\n";
+
+			h_ << unindent
+				<< "}\n\n";
 		}
-	*/
+
+		skeleton_end (vt, FACTORY_SUFFIX);
+		h_ << ",\n"
+			"{ // base\n"
+			<< indent
+			<< "S::template _wide_val <ValueFactoryBase, " << QName (vt) << FACTORY_SUFFIX ">,\n"
+			"{ // EPV\n"
+			<< indent;
+		auto f = factories.begin ();
+		h_ << "S::_" << (*f)->name ();
+		for (++f; f != factories.end (); ++f) {
+			h_ << ",\nS::_" << (*f)->name ();
+		}
+		h_ << unindent
+			<< "\n}"
+			<< unindent
+			<< "\n}"
+			<< unindent
+			<< "\n};\n";
+	}
+
 }
 
 void Servant::implementation_suffix (const InterfaceKind ik)

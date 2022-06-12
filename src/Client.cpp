@@ -695,8 +695,8 @@ void Client::end (const ValueType& vt)
 
 		for (auto f : factories) {
 			h_ << "Interface* (*" << f->name () << ") (Bridge <" << QName (vt) << FACTORY_SUFFIX ">*";
-			for (auto it = f->begin (); it != f->end (); ++it) {
-				h_ << ", " << ABI_param (**it);
+			for (auto p : *f) {
+				h_ << ", " << ABI_param (*p);
 			}
 			h_ << ", Interface*);\n";
 		}

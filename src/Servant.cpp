@@ -341,14 +341,24 @@ void Servant::end (const ValueType& vt)
 				<< "template <>\n"
 				"class ValueData <" << QName (vt) << ">\n"
 				"{\n"
-				"protected:\n"
-				<< indent
-
-				// Default constructor
-				<< "ValueData ()";
+				"public:\n"
+				<< indent;
 
 			StateMembers members = get_members (vt);
 
+			// Accessors
+			for (auto p : members) {
+				if (p->is_public ()) {
+					h_ << Accessors (*p)
+						<< empty_line;
+				}
+			}
+
+			h_ << unindent
+				<< "protected:\n"
+				<< indent
+				// Default constructor
+				<< "ValueData ()";
 			if (!members.empty ()) {
 				h_ << " :\n"
 					<< indent;
@@ -361,14 +371,6 @@ void Servant::end (const ValueType& vt)
 			}
 			h_ << "\n{}\n\n";
 
-			// Accessors
-			for (auto p : members) {
-				if (p->is_public ()) {
-					h_ << Accessors (*p)
-						<< empty_line;
-				}
-			}
-
 			// Marshaling
 			h_ << "void _marshal (I_ptr <IORequest>)";
 			if (!members.empty ())
@@ -380,6 +382,10 @@ void Servant::end (const ValueType& vt)
 				h_ << ";\n";
 			else
 				h_ << " {}\n";
+
+			h_ << endl << unindent
+				<< "protected:\n"
+				<< indent;
 
 			// Member variables
 			for (auto p : members) {
@@ -565,7 +571,9 @@ void Servant::end (const ValueType& vt)
 		h_ << ",\n"
 			"{ // base\n"
 			<< indent
-			<< "S::template _wide_val <ValueFactoryBase, " << QName (vt) << FACTORY_SUFFIX ">,\n"
+			<< "S::template _wide_val <ValueFactoryBase, " << QName (vt) << FACTORY_SUFFIX ">\n"
+			<< unindent
+			<< "},\n"
 			"{ // EPV\n"
 			<< indent;
 		auto f = factories.begin ();
@@ -574,8 +582,6 @@ void Servant::end (const ValueType& vt)
 			h_ << ",\nS::_" << (*f)->name ();
 		}
 		h_ << unindent
-			<< "\n}"
-			<< unindent
 			<< "\n}"
 			<< unindent
 			<< "\n};\n";

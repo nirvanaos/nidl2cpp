@@ -133,6 +133,8 @@ private:
 
 	void bridge_bases (const Bases& bases);
 
+	static size_t version (const std::string& rep_id);
+
 private:
 	Header h_; // .h file
 	Code cpp_; // .cpp file.

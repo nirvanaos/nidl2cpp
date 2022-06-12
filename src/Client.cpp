@@ -667,6 +667,20 @@ void Client::begin (const ValueType& itf)
 	begin_interface (itf);
 }
 
+inline
+size_t Client::version (const string& rep_id)
+{
+
+	for (const char* begin = rep_id.data (), *p = begin + rep_id.size () - 1; p > begin; --p) {
+		char c = *p;
+		if (':' == c)
+			return p - begin;
+		else if (c != '.' && !('0' <= c && c <= '9'))
+			break;
+	}
+	return rep_id.size ();
+}
+
 void Client::end (const ValueType& vt)
 {
 	end_interface (vt);
@@ -683,10 +697,7 @@ void Client::end (const ValueType& vt)
 
 		{
 			string factory_id = vt.repository_id ();
-			size_t pos = factory_id.rfind (':');
-			if (pos == string::npos)
-				pos = factory_id.size ();
-			factory_id.insert (pos, FACTORY_SUFFIX);
+			factory_id.insert (version (factory_id), FACTORY_SUFFIX);
 
 			h_ << "NIRVANA_BRIDGE_BEGIN (" << QName (vt) << FACTORY_SUFFIX ", \"" << factory_id << "\")\n"
 				"NIRVANA_BASE_ENTRY  (ValueFactoryBase, CORBA_ValueFactoryBase)\n"

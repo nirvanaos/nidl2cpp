@@ -238,9 +238,9 @@ void Proxy::end (const Interface& itf)
 		return;
 
 	cpp_.namespace_open ("CORBA/Internal");
-	cpp_ << empty_line
-		<< "IMPLEMENT_PROXY_FACTORY(" << ParentName (itf) << ", " << itf.name () << ");\n"
-		"\n"
+	cpp_.empty_line ();
+	type_code_name (itf);
+	cpp_ << "\n"
 		"template <>\n"
 		"class Proxy <" << QName (itf) << "> : public ProxyBase <" << QName (itf) << '>';
 

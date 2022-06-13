@@ -574,14 +574,16 @@ Code& operator << (Code& stm, const Accessors& a)
 	stm.unindent ();
 	stm << "}\n";
 
-	// reference getter
-	stm << MemberType (a.member)
-		<< "& " << a.member.name () << " ()\n"
-		"{\n";
-	stm.indent ();
-	stm << "return _" << a.member.name () << ";\n";
-	stm.unindent ();
-	stm << "}\n";
+	if (a.member.kind () != Item::Kind::STATE_MEMBER) {
+		// reference getter
+		stm << MemberType (a.member)
+			<< "& " << a.member.name () << " ()\n"
+			"{\n";
+		stm.indent ();
+		stm << "return _" << a.member.name () << ";\n";
+		stm.unindent ();
+		stm << "}\n";
+	}
 
 	// setter
 	stm << "void " << a.member.name () << " (" << TypePrefix (a.member) << "ConstRef val)\n"

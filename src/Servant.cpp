@@ -356,9 +356,17 @@ void Servant::end (const ValueType& vt)
 
 			h_ << unindent
 				<< "protected:\n"
-				<< indent
-				// Default constructor
-				<< "ValueData ()";
+				<< indent;
+
+			for (auto p : members) {
+				if (!p->is_public ()) {
+					h_ << Accessors (*p)
+						<< empty_line;
+				}
+			}
+
+			// Default constructor
+			h_ << "ValueData ()";
 			if (!members.empty ()) {
 				h_ << " :\n"
 					<< indent;
@@ -383,11 +391,11 @@ void Servant::end (const ValueType& vt)
 			else
 				h_ << " {}\n";
 
+			// Member variables
 			h_ << endl << unindent
-				<< "protected:\n"
+				<< "private:\n"
 				<< indent;
 
-			// Member variables
 			for (auto p : members) {
 				h_ << MemberVariable (*p);
 			}
@@ -521,7 +529,7 @@ void Servant::end (const ValueType& vt)
 					<< "{\n"
 					<< indent;
 				for (auto m : all_members) {
-					h_ << "this->_" << m->name () << " = std::move (" << m->name () << ");\n";
+					h_ << "this->" << m->name () << "(std::move (" << m->name () << "));\n";
 				}
 				h_ << unindent
 					<< "}\n";

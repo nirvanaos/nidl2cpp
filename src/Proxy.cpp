@@ -37,7 +37,7 @@ using namespace AST;
 Code& operator << (Code& stm, const Proxy::WithAlias& t)
 {
 	if (t.type.tkind () == Type::Kind::NAMED_TYPE && t.type.named_type ().kind () == Item::Kind::TYPE_DEF)
-		stm << "Alias <&" << TypeCodeName (t.type.named_type ()) << '>';
+		stm << "Alias <&" << TC_Name (t.type.named_type ()) << '>';
 	else
 		stm << t.type;
 	return stm;
@@ -560,7 +560,8 @@ Code& Proxy::exp (const NamedItem& item)
 
 void Proxy::type_code_name (const NamedItem& item)
 {
-	cpp_ << "template <>\n"
+	cpp_ << empty_line
+		<< "template <>\n"
 		"const Char TypeCodeName <" << QName (item) << ">::name_ [] = \"" << static_cast <const string&> (item.name ()) << "\";\n";
 }
 
@@ -570,7 +571,6 @@ void Proxy::leaf (const Enum& item)
 		return;
 
 	cpp_.namespace_open ("CORBA/Internal");
-	cpp_.empty_line ();
 	type_code_name (item);
 	cpp_ << "\n"
 		"template <>\n"
@@ -675,6 +675,14 @@ void Proxy::implement_marshaling (const NamedItem& cont, const char* suffix,
 	}
 }
 
+void Proxy::state_member (const AST::StateMember& m)
+{
+	cpp_ << "{ \"" << static_cast <const string&> (m.name ()) << "\", Type <"
+		<< WithAlias (m) << ">::type_code, "
+		<< (m.is_public () ? "PUBLIC_MEMBER" : "PRIVATE_MEMBER")
+		<< " }";
+}
+
 void Proxy::end (const ValueType& vt)
 {
 	cpp_.namespace_open ("CORBA/Internal");
@@ -684,13 +692,72 @@ void Proxy::end (const ValueType& vt)
 			<< "void ValueData <" << QName (vt) << ">::_marshal (I_ptr <IORequest> rq)\n"
 			"{\n";
 		marshal_members ((const Members&)members, "marshal_in", "_", "this + 1");
-		cpp_ << "}\n"
+		cpp_ << "}\n\n"
 			"void ValueData <" << QName (vt) << ">::_unmarshal (I_ptr <IORequest> rq)\n"
 			"{\n";
 		unmarshal_members ((const Members&)members, "_", "this + 1");
 		cpp_ << "}\n";
 	}
+
+	type_code_name (vt);
+
+	if (!members.empty ()) {
+		cpp_ << empty_line
+			<< "template <>\n"
+			"const StateMember TypeCodeStateMembers <" << QName (vt) << ">::members_ [] = {\n";
+
+		cpp_.indent ();
+		auto it = members.begin ();
+		state_member (**it);
+		for (++it; it != members.end (); ++it) {
+			cpp_ << ",\n";
+			state_member (**it);
+		}
+		cpp_ << unindent
+			<< "\n};\n\n";
+	}
+
+	cpp_ << empty_line <<
+		"template <>\n"
+		"class TypeCodeValue <" << QName (vt) << "> : public TypeCodeValue";
+	if (vt.modifier () == ValueType::Modifier::ABSTRACT) {
+		cpp_ << "Abstract <" << QName (vt);
+	} else {
+		const char* mod = "VM_NONE";
+		switch (vt.modifier ()) {
+			case ValueType::Modifier::CUSTOM:
+				mod = "VM_CUSTOM";
+				break;
+			case ValueType::Modifier::TRUNCATABLE:
+				mod = "TRUNCATABLE";
+				break;
+		}
+		cpp_ << "Concrete <" << QName (vt) << ", " << mod << ", "
+			<< (members.empty () ? "false" : "true") << ", ";
+
+		const ValueType* concrete_base = nullptr;
+		if (!vt.bases ().empty ()) {
+			concrete_base = vt.bases ().front ();
+			if (concrete_base->modifier () == ValueType::Modifier::ABSTRACT)
+				concrete_base = nullptr;
+		}
+
+		if (concrete_base) {
+			cpp_ << "Type <" << QName (*concrete_base) << ">::type_code";
+		} else {
+			cpp_ << "nullptr";
+		}
+	}
+	cpp_ << ">\n"
+		"{};\n";
+
 	cpp_.namespace_close ();
+	cpp_ << "NIRVANA_EXPORT (" << export_name (vt) << ", " << QName (vt) << "::repository_id_, CORBA"
+	<< (vt.modifier () != ValueType::Modifier::ABSTRACT ?
+		"::Internal::PseudoBase, CORBA::Internal::ValueFactory <"
+		:
+		"::ValueType, CORBA::Internal::TypeCodeValue <")
+	<< QName (vt) << ">)\n";
 }
 
 void Proxy::marshal_members (const Members& members, const char* func, const char* prefix, const char* cend)

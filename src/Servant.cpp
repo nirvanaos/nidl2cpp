@@ -584,17 +584,62 @@ void Servant::end (const ValueType& vt)
 			<< "},\n"
 			"{ // EPV\n"
 			<< indent;
-		auto f = factories.begin ();
-		h_ << "S::_" << (*f)->name ();
-		for (++f; f != factories.end (); ++f) {
-			h_ << ",\nS::_" << (*f)->name ();
-		}
-		h_ << unindent
-			<< "\n}"
-			<< unindent
-			<< "\n};\n";
-	}
 
+		{
+			auto f = factories.begin ();
+			h_ << "S::_" << (*f)->name ();
+			for (++f; f != factories.end (); ++f) {
+				h_ << ",\nS::_" << (*f)->name ();
+			}
+			h_ << unindent
+				<< "\n}"
+				<< unindent
+				<< "\n};\n\n";
+		}
+
+		h_ << "template <class Impl>\n"
+			"class ValueCreator <Impl, " << QName (vt) << "> :\n"
+			<< indent <<
+			"public ValueFactoryImpl <ValueCreator <Impl, " << QName (vt) << ">, " << QName (vt) << FACTORY_SUFFIX ">,\n"
+			"public ValueCreatorBase <Impl>\n"
+			<< unindent <<
+			"{\n"
+			"public:\n"
+			<< indent;
+
+		for (auto f : factories) {
+			h_ << "static I_ref <" << QName (vt) << "> " << f->name () << " (";
+			{
+				auto it = f->begin ();
+				if (it != f->end ()) {
+					h_ << Var (**it) << ' ' << (*it)->name ();
+					++it;
+					for (; it != f->end (); ++it) {
+						h_ << ", " << Var (**it) << ' ' << (*it)->name ();
+					}
+				}
+			}
+			h_ << ")\n"
+				"{\n"
+				<< indent <<
+				"return make_reference <Impl> (";
+			{
+				auto it = f->begin ();
+				if (it != f->end ()) {
+					h_ << (*it)->name ();
+					++it;
+					for (; it != f->end (); ++it) {
+						h_ << ", " << (*it)->name ();
+					}
+				}
+			}
+			h_ << ");\n"
+				<< unindent <<
+				"}\n\n";
+		}
+
+		h_ << unindent << "};\n";
+	}
 }
 
 void Servant::implementation_suffix (const InterfaceKind ik)

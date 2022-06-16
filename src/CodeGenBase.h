@@ -240,16 +240,16 @@ struct ConstRef
 
 Code& operator << (Code& stm, const ConstRef& t);
 
-struct TypeCodeName
+struct TC_Name
 {
-	TypeCodeName (const AST::NamedItem& ni) :
+	TC_Name (const AST::NamedItem& ni) :
 		item (ni)
 	{}
 
 	const AST::NamedItem& item;
 };
 
-Code& operator << (Code& stm, const TypeCodeName& t);
+Code& operator << (Code& stm, const TC_Name& t);
 
 struct ServantParam
 {

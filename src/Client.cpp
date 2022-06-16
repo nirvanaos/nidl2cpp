@@ -106,7 +106,7 @@ void Client::type_code_def (const RepositoryId& rid)
 	if (!nested (item))
 		 cpp_ << " extern";
 	cpp_ << " const " << Namespace ("Nirvana") << "ImportInterfaceT <" << Namespace ("CORBA") << "TypeCode>\n"
-		<< TypeCodeName (item) << " = { Nirvana::OLF_IMPORT_INTERFACE, ";
+		<< TC_Name (item) << " = { Nirvana::OLF_IMPORT_INTERFACE, ";
 
 	switch (item.kind ()) {
 		case Item::Kind::INTERFACE:
@@ -305,7 +305,7 @@ void Client::type_code_func (const NamedItem& item)
 		<< "static I_ptr <TypeCode> type_code ()\n"
 		"{\n"
 		<< indent
-		<< "return " << TypeCodeName (item) << ";\n"
+		<< "return " << TC_Name (item) << ";\n"
 		<< unindent
 		<< "}\n\n";
 }
@@ -753,7 +753,17 @@ void Client::end (const ValueType& vt)
 		h_ << empty_line
 			<< "class " << vt.name () << FACTORY_SUFFIX " : public "
 			<< Namespace ("CORBA/Internal") << "ClientInterface <" << vt.name () << ", CORBA::ValueFactoryBase>\n"
-			"{};\n";
+			"{\n"
+			<< indent <<
+			"static const ::Nirvana::ImportInterfaceT <" << vt.name () << FACTORY_SUFFIX "> _factory;\n"
+			<< unindent <<
+			"};\n";
+	
+		cpp_ << empty_line
+			<< "NIRVANA_OLF_SECTION_N (" << (export_count_++) << ')';
+		cpp_ << " const " << Namespace ("Nirvana") << "ImportInterfaceT <" << QName (vt) << FACTORY_SUFFIX ">\n"
+			<< QName (vt) << FACTORY_SUFFIX "::_factory = { Nirvana::OLF_IMPORT_INTERFACE, "
+			<< QName (vt) << "::repository_id_, " << QName (vt) << FACTORY_SUFFIX "::repository_id_ };\n";
 	}
 }
 

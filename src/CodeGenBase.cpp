@@ -518,7 +518,7 @@ Code& operator << (Code& stm, const ConstRef& t)
 	return stm << TypePrefix (t.type) << "ConstRef";
 }
 
-Code& operator << (Code& stm, const TypeCodeName& t)
+Code& operator << (Code& stm, const TC_Name& t)
 {
 	return stm << ParentName (t.item) << "_tc_" << static_cast <const string&> (t.item.name ());
 }

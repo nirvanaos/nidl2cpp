@@ -96,6 +96,7 @@ private:
 
 	void type_code_members (const AST::NamedItem& item, const Members& members);
 	void type_code_name (const AST::NamedItem& item);
+	void state_member (const AST::StateMember& m);
 
 	Code& exp (const AST::NamedItem& item);
 

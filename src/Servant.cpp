@@ -596,11 +596,13 @@ void Servant::end (const ValueType& vt)
 				<< unindent
 				<< "\n};\n\n";
 		}
+	}
 
-		h_ << "template <class Impl>\n"
-			"class ValueCreator <Impl, " << QName (vt) << "> :\n"
-			<< indent <<
-			"public ValueFactoryImpl <ValueCreator <Impl, " << QName (vt) << ">, " << QName (vt) << FACTORY_SUFFIX ">,\n"
+	h_ << "template <class Impl>\n"
+		"class ValueCreator <Impl, " << QName (vt) << "> :\n"
+		<< indent;
+	if (!factories.empty ()) {
+		h_ << "public ValueFactoryImpl <ValueCreator <Impl, " << QName (vt) << ">, " << QName (vt) << FACTORY_SUFFIX ">,\n"
 			"public ValueCreatorBase <Impl>\n"
 			<< unindent <<
 			"{\n"
@@ -639,7 +641,12 @@ void Servant::end (const ValueType& vt)
 		}
 
 		h_ << unindent << "};\n";
+	} else {
+		h_ << "public ValueCreatorNoFactory <Impl>\n"
+			<< unindent <<
+			"{};\n";
 	}
+
 }
 
 void Servant::implementation_suffix (const InterfaceKind ik)

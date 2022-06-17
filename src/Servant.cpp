@@ -612,10 +612,10 @@ void Servant::end (const ValueType& vt)
 			{
 				auto it = f->begin ();
 				if (it != f->end ()) {
-					h_ << Var (**it) << ' ' << (*it)->name ();
+					h_ << ServantParam (**it) << ' ' << (*it)->name ();
 					++it;
 					for (; it != f->end (); ++it) {
-						h_ << ", " << Var (**it) << ' ' << (*it)->name ();
+						h_ << ", " << ServantParam (**it) << ' ' << (*it)->name ();
 					}
 				}
 			}

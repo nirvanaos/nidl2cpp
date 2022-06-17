@@ -752,8 +752,10 @@ void Client::end (const ValueType& vt)
 		h_.namespace_open (vt);
 		h_ << empty_line
 			<< "class " << vt.name () << FACTORY_SUFFIX " : public "
-			<< Namespace ("CORBA/Internal") << "ClientInterface <" << vt.name () << ", CORBA::ValueFactoryBase>\n"
+			<< Namespace ("CORBA/Internal") << "ClientInterface <" << vt.name ()
+			<< FACTORY_SUFFIX ", CORBA::ValueFactoryBase>\n"
 			"{\n"
+			"public:\n"
 			<< indent <<
 			"static const ::Nirvana::ImportInterfaceT <" << vt.name () << FACTORY_SUFFIX "> _factory;\n"
 			<< unindent <<

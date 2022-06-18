@@ -324,6 +324,18 @@ void Servant::end (const ValueType& vt)
 			"S::template _wide_val <" << QName (*b) << ", " << QName (vt) << '>';
 	}
 
+	const Interface* concrete_itf = get_concrete_supports (vt);
+	if (concrete_itf) {
+		h_ << ",\n"
+			"S::template _wide_val <" << QName (*concrete_itf) << ", " << QName (vt) << '>';
+
+		Interfaces bases = concrete_itf->get_all_bases ();
+		for (auto b : bases) {
+			h_ << ",\n"
+				"S::template _wide_val <" << QName (*b) << ", " << QName (vt) << '>';
+		}
+	}
+
 	h_ << endl
 		<< unindent
 		<< "}";
@@ -421,7 +433,6 @@ void Servant::end (const ValueType& vt)
 
 				<< "public ValueTraits <S>,\n";
 
-			const Interface* concrete_itf = get_concrete_supports (vt);
 			if (concrete_itf)
 				h_ << "public ValueImplBase <S, ValueBase>,\n"
 				"public Servant <S, " << QName (*concrete_itf) << '>';

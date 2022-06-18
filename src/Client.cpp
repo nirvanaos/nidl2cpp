@@ -340,6 +340,8 @@ void Client::end_interface (const ItemContainer& container)
 	bool att_byref = false;
 	bool pseudo_interface = false;
 	Bases bases;
+	const Interface* concrete_itf = nullptr;
+	Bases supports;
 	if (container.kind () == Item::Kind::INTERFACE) {
 
 		const Interface& itf = static_cast <const Interface&> (container);
@@ -368,10 +370,23 @@ void Client::end_interface (const ItemContainer& container)
 	} else {
 		const ValueType& vt = static_cast <const ValueType&> (container);
 		att_byref = true;
+		if (concrete_itf = get_concrete_supports (vt)) {
+			supports.push_back (concrete_itf);
+			Interfaces itf_bases = concrete_itf->get_all_bases ();
+			supports.insert (supports.end (), itf_bases.begin (), itf_bases.end ());
+		}
+
 		h_ << "NIRVANA_BASE_ENTRY (ValueBase, CORBA_ValueBase)\n";
+
 		bases = get_all_bases (vt);
 		bridge_bases (bases);
+		bridge_bases (supports);
 		h_ << "NIRVANA_BRIDGE_EPV\n";
+		/*
+		if (concrete_itf) {
+			h_ << "Interface* (*_this) (Bridge <" << QName (vt) << ">*, Interface*);\n";
+		}
+*/
 	}
 
 	for (auto it = container.begin (); it != container.end (); ++it) {
@@ -427,7 +442,10 @@ void Client::end_interface (const ItemContainer& container)
 		"{\n"
 		"public:\n"
 		<< indent;
-
+/*
+	if (concrete_itf)
+		h_ << "I_ref <" << QName (*concrete_itf) << "> _this ();\n";
+*/
 	for (auto it = container.begin (); it != container.end (); ++it) {
 		const Item& item = **it;
 		switch (item.kind ()) {
@@ -465,7 +483,15 @@ void Client::end_interface (const ItemContainer& container)
 	}
 
 	h_ << unindent << "};\n";
-
+/*
+	if (concrete_itf) {
+		h_ << "\ntemplate <class T>\n"
+			"I_ref <" << QName (*concrete_itf) << "> Client <T, " << QName (container) << ">::_this ()\n"
+			"{\n"
+			<< indent;
+		environment (Raises ());
+	}
+*/
 	// Client operations
 
 	for (auto it = container.begin (); it != container.end (); ++it) {
@@ -478,9 +504,8 @@ void Client::end_interface (const ItemContainer& container)
 				h_ << "\ntemplate <class T>\n";
 
 				h_ << VRet (op) << " Client <T, " << QName (container) << ">::" << Signature (op) << "\n"
-					"{\n";
-
-				h_.indent ();
+					"{\n"
+					<< indent;
 
 				environment (op.raises ());
 				h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n";
@@ -498,8 +523,8 @@ void Client::end_interface (const ItemContainer& container)
 				if (op.tkind () != Type::Kind::VOID)
 					h_ << "return _ret;\n";
 
-				h_.unindent ();
-				h_ << "}\n";
+				h_ << unindent
+					<< "}\n";
 
 			} break;
 
@@ -578,8 +603,9 @@ void Client::end_interface (const ItemContainer& container)
 	// Interface definition
 	h_.namespace_open (container);
 	h_ << empty_line
-		<< "class " << container.name () << " : public "
-		<< Namespace ("CORBA/Internal") << "ClientInterface <" << container.name ();
+		<< "class " << container.name () << " :\n"
+		<< indent <<
+		"public " << Namespace ("CORBA/Internal") << "ClientInterface <" << container.name ();
 	for (auto b : bases) {
 		h_ << ", " << QName (*b);
 	}
@@ -597,17 +623,17 @@ void Client::end_interface (const ItemContainer& container)
 	} else {
 		const ValueType& vt = static_cast <const ValueType&> (container);
 		h_ << ", " << Namespace ("CORBA") << "ValueBase";
-		for (auto itf : vt.supports ()) {
-			if (
-				itf->interface_kind () == InterfaceKind::UNCONSTRAINED
-				||
-				itf->interface_kind () == InterfaceKind::LOCAL
-				) {
-				h_ << ", " << Namespace ("CORBA") << "Object";
+		if (!supports.empty ()) {
+			h_ << ">,\n"
+				"public " << Namespace ("CORBA/Internal") << "ClientSupports <" << container.name ();
+
+			for (auto itf : supports) {
+				h_ << ", " << QName (*itf);
 			}
 		}
 	}
 	h_ << ">\n"
+		<< unindent <<
 		"{\n"
 		"public:\n"
 		<< indent;

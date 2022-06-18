@@ -396,8 +396,11 @@ void CodeGenBase::get_all_bases (const Interface& ai,
 
 const Interface* CodeGenBase::get_concrete_supports (const ValueType& vt)
 {
-	if (!vt.supports ().empty () && vt.supports ().front ()->interface_kind () != InterfaceKind::ABSTRACT)
-		return vt.supports ().front ();
+	if (!vt.supports ().empty ()) {
+		const Interface* itf = vt.supports ().front ();
+		if (itf->interface_kind () != InterfaceKind::ABSTRACT)
+			return itf;
+	}
 	for (auto pb : vt.bases ()) {
 		const Interface* itf = get_concrete_supports (*pb);
 		if (itf)

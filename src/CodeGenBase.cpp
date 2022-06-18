@@ -363,9 +363,8 @@ void CodeGenBase::get_all_bases (const ValueType& vt,
 {
 	for (auto pb : vt.bases ()) {
 		if (bset.insert (pb).second) {
-			// Derived must be first
-			get_all_bases (*pb, bset, bvec);
 			bvec.push_back (pb);
+			get_all_bases (*pb, bset, bvec);
 		}
 	}
 	if (!vt.supports ().empty ()) {

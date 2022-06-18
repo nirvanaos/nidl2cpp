@@ -463,12 +463,19 @@ void Servant::end (const ValueType& vt)
 				h_ << "public ValueImpl <S, ValueBase>";
 
 			bool abstract_base = false;
-			for (auto b : all_bases) {
+			vector <const ValueType*> concrete_bases;
+			for (auto it = all_bases.rbegin (); it != all_bases.rend (); ++it) {
+				auto b = *it;
 				h_ << ",\n"
 					"public ";
-				if (b->kind () == Item::Kind::VALUE_TYPE)
+				if (b->kind () == Item::Kind::VALUE_TYPE) {
 					h_ << "Value";
-				else {
+
+					const ValueType& vt = static_cast <const ValueType&> (*b);
+					if (vt.modifier () != ValueType::Modifier::ABSTRACT)
+						concrete_bases.push_back (&vt);
+
+				} else {
 					assert (static_cast <const Interface&> (*b).interface_kind () == InterfaceKind::ABSTRACT);
 					abstract_base = true;
 					h_ << "Interface";
@@ -496,6 +503,7 @@ void Servant::end (const ValueType& vt)
 				"{\n"
 				<< indent
 				<< "return FindInterface <" << QName (vt);
+
 			for (auto b : all_bases) {
 				h_ << ", " << QName (*b);
 			}
@@ -505,15 +513,6 @@ void Servant::end (const ValueType& vt)
 
 			if (abstract_base)
 				h_ << "using InterfaceImpl <S, AbstractBase>::_get_abstract_base;\n\n";
-
-			vector <const ValueType*> concrete_bases;
-			for (auto b : all_bases) {
-				if (b->kind () == Item::Kind::VALUE_TYPE) {
-					const ValueType& vt = static_cast <const ValueType&> (*b);
-					if (vt.modifier () != ValueType::Modifier::ABSTRACT)
-						concrete_bases.push_back (&vt);
-				}
-			}
 
 			h_ << "void _marshal (I_ptr <IORequest> rq)\n"
 				"{\n"
@@ -563,7 +562,7 @@ void Servant::end (const ValueType& vt)
 					<< "{\n"
 					<< indent;
 				for (auto m : all_members) {
-					h_ << "this->" << m->name () << "(std::move (" << m->name () << "));\n";
+					h_ << "this->" << m->name () << " (std::move (" << m->name () << "));\n";
 				}
 				h_ << unindent
 					<< "}\n";

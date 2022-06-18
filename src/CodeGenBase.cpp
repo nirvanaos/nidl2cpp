@@ -350,7 +350,7 @@ CodeGenBase::Bases CodeGenBase::get_all_bases (const ValueType& vt)
 		Interfaces exclude = itf->get_all_bases ();
 		for (auto it = bvec.begin (); it != bvec.end ();) {
 			if (find (exclude.begin (), exclude.end (), *it) != exclude.end ())
-				bvec.erase (it);
+				it = bvec.erase (it);
 			else
 				++it;
 		}

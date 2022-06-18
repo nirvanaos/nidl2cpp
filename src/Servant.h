@@ -57,7 +57,7 @@ protected:
 private:
 	void skeleton_begin (const AST::ItemContainer& item, const char* suffix = "");
 	void skeleton_end (const AST::ItemContainer& item, const char* suffix = "");
-	void epv ();
+	void epv (bool val_with_concrete_itf = false);
 
 	void servant_param (const AST::Parameter& param)
 	{

@@ -382,11 +382,9 @@ void Client::end_interface (const ItemContainer& container)
 		bridge_bases (bases);
 		bridge_bases (supports);
 		h_ << "NIRVANA_BRIDGE_EPV\n";
-		/*
-		if (concrete_itf) {
+
+		if (concrete_itf)
 			h_ << "Interface* (*_this) (Bridge <" << QName (vt) << ">*, Interface*);\n";
-		}
-*/
 	}
 
 	for (auto it = container.begin (); it != container.end (); ++it) {
@@ -442,10 +440,10 @@ void Client::end_interface (const ItemContainer& container)
 		"{\n"
 		"public:\n"
 		<< indent;
-/*
+
 	if (concrete_itf)
 		h_ << "I_ref <" << QName (*concrete_itf) << "> _this ();\n";
-*/
+
 	for (auto it = container.begin (); it != container.end (); ++it) {
 		const Item& item = **it;
 		switch (item.kind ()) {
@@ -483,15 +481,21 @@ void Client::end_interface (const ItemContainer& container)
 	}
 
 	h_ << unindent << "};\n";
-/*
+
 	if (concrete_itf) {
 		h_ << "\ntemplate <class T>\n"
 			"I_ref <" << QName (*concrete_itf) << "> Client <T, " << QName (container) << ">::_this ()\n"
 			"{\n"
 			<< indent;
 		environment (Raises ());
+		h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n"
+			"Type <" << QName (*concrete_itf) << ">::C_ret _ret = (_b._epv ().epv._this) (&_b, &_env);\n"
+			"_env.check ();\n"
+			"return _ret;\n"
+			<< unindent <<
+			"}\n";
 	}
-*/
+
 	// Client operations
 
 	for (auto it = container.begin (); it != container.end (); ++it) {

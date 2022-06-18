@@ -55,6 +55,20 @@ void Servant::begin (const ValueType& vt)
 {
 	attributes_by_ref_ = true;
 	skeleton_begin (vt);
+
+	const Interface* concrete_itf = get_concrete_supports (vt);
+	if (concrete_itf) {
+		h_ << "static Interface* __this (Bridge <" << QName (vt) << ">* _b, Interface* _env)\n"
+			"{\n"
+			<< indent <<
+			"try {\n"
+			<< indent <<
+			"return Type <" << QName (*concrete_itf) << ">::ret (S::_implementation (_b)._this ());\n";
+		catch_block ();
+		h_ << "return nullptr;\n";
+		h_ << unindent
+			<< "}\n\n";
+	}
 }
 
 void Servant::skeleton_begin (const ItemContainer& item, const char* suffix)
@@ -91,16 +105,25 @@ void Servant::skeleton_end (const ItemContainer& item, const char* suffix)
 		<< "}";
 }
 
-void Servant::epv ()
+void Servant::epv (bool val_with_concrete_itf)
 {
-	if (!epv_.empty ()) {
+	if (!epv_.empty () || val_with_concrete_itf) {
 		h_ << ",\n"
 			"{ // EPV\n"
 			<< indent;
+
+		if (val_with_concrete_itf) {
+			h_ << "__this";
+		}
+		
 		auto n = epv_.begin ();
-		h_ << "S::" << *n;
-		for (++n; n != epv_.end (); ++n) {
-			h_ << ",\nS::" << *n;
+		if (n != epv_.end ()) {
+			if (!val_with_concrete_itf) {
+				h_ << "S::" << *(n++);
+			}
+			for (; n != epv_.end (); ++n) {
+				h_ << ",\nS::" << *n;
+			}
 		}
 		h_ << unindent
 			<< "\n}";
@@ -341,7 +364,7 @@ void Servant::end (const ValueType& vt)
 		<< "}";
 
 	// EPV
-	epv ();
+	epv (concrete_itf);
 
 	// Servant implementations
 	if (!options ().no_servant) {

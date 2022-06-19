@@ -266,7 +266,7 @@ void Proxy::end (const Interface& itf)
 	if (!bases.empty ()) {
 		cpp_ << endl;
 		cpp_.indent ();
-		cpp_ << "Object::_ptr_type obj = static_cast <Object*> (proxy_manager->get_object (Object::repository_id_));\n";
+		cpp_ << "Object::_ptr_type obj = static_cast <Object*> (proxy_manager->get_object (RepIdOf <Object>::repository_id_));\n";
 		for (auto p : bases) {
 			cpp_ << "ProxyBaseInterface <" << QName (*p) << ">::init (obj);\n";
 		}
@@ -462,9 +462,10 @@ void Proxy::end (const Interface& itf)
 
 	cpp_ << "const Char* const Proxy <" << QName (itf) << ">::__interfaces [] = {\n"
 		<< indent
-		<< QName (itf) << "::repository_id_";
+		<< "RepIdOf <" << QName (itf) << ">::repository_id_";
 	for (auto p : bases) {
-		cpp_ << ",\n" << QName (*p) << "::repository_id_";
+		cpp_ << ",\n"
+			<< "RepIdOf <" << QName (*p) << ">::repository_id_";
 	}
 	cpp_ << unindent
 		<< "\n};\n"
@@ -481,8 +482,8 @@ void Proxy::end (const Interface& itf)
 		<< "};\n";
 
 	cpp_.namespace_close ();
-	cpp_ << "NIRVANA_EXPORT (" << export_name (itf) << ", " << QName (itf)
-		<< "::repository_id_, CORBA::Internal::PseudoBase, CORBA::Internal::ProxyFactoryImpl <" << QName (itf) << ">)\n";
+	cpp_ << "NIRVANA_EXPORT (" << export_name (itf) << ", CORBA::Internal::RepIdOf <" << QName (itf)
+		<< ">::repository_id_, CORBA::Internal::PseudoBase, CORBA::Internal::ProxyFactoryImpl <" << QName (itf) << ">)\n";
 }
 
 void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
@@ -752,7 +753,7 @@ void Proxy::end (const ValueType& vt)
 		"{};\n";
 
 	cpp_.namespace_close ();
-	cpp_ << "NIRVANA_EXPORT (" << export_name (vt) << ", " << QName (vt) << "::repository_id_, CORBA"
+	cpp_ << "NIRVANA_EXPORT (" << export_name (vt) << ", CORBA::Internal::RepIdOf <" << QName (vt) << ">::repository_id_, CORBA"
 	<< (vt.modifier () != ValueType::Modifier::ABSTRACT ?
 		"::Internal::PseudoBase, CORBA::Internal::ValueFactory <"
 		:

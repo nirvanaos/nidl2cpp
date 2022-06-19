@@ -113,10 +113,10 @@ void Client::type_code_def (const RepositoryId& rid)
 			cpp_ << '"' << rid.repository_id () << '"';
 			break;
 		default:
-			cpp_ << "CORBA::Internal::RepIdOf <" << QName (item) << ">::id_";
+			cpp_ << "CORBA::Internal::RepIdOf <" << QName (item) << ">::id";
 			break;
 	}
-	cpp_ << ", CORBA::Internal::RepIdOf <CORBA::TypeCode>::id_ };\n\n";
+	cpp_ << ", CORBA::Internal::RepIdOf <CORBA::TypeCode>::id };\n\n";
 }
 
 bool Client::nested (const NamedItem& item)
@@ -791,7 +791,7 @@ void Client::end (const ValueType& vt)
 			<< "NIRVANA_OLF_SECTION_N (" << (export_count_++) << ')';
 		cpp_ << " const " << Namespace ("Nirvana") << "ImportInterfaceT <" << QName (vt) << FACTORY_SUFFIX ">\n"
 			<< QName (vt) << FACTORY_SUFFIX "::_factory = { Nirvana::OLF_IMPORT_INTERFACE, CORBA::Internal::RepIdOf <"
-			<< QName (vt) << ">::id_, CORBA::Internal::RepIdOf <" << QName (vt) << FACTORY_SUFFIX ">::id_ };\n";
+			<< QName (vt) << ">::id, CORBA::Internal::RepIdOf <" << QName (vt) << FACTORY_SUFFIX ">::id };\n";
 	}
 }
 
@@ -832,14 +832,14 @@ void Client::native_itf_template (const Operation& op)
 				<< "return " << op.name () << " (";
 			it = op.begin ();
 			if (par_iid == *it)
-				h_ << "RepIdOf <I>::id_";
+				h_ << "RepIdOf <I>::id";
 			else
 				h_ << (*it)->name ();
 			++it;
 			for (; it != op.end (); ++it) {
 				h_ << ", ";
 				if (par_iid == *it)
-					h_ << "RepIdOf <I>::id_";
+					h_ << "RepIdOf <I>::id";
 				else
 					h_ << (*it)->name ();
 			}
@@ -1046,7 +1046,7 @@ void Client::rep_id_of (const RepositoryId& rid)
 		h_.namespace_open ("CORBA/Internal");
 		h_ << empty_line
 			<< "template <>\n"
-			"const Char RepIdOf <" << QName (item) << ">::id_ [] = \""
+			"const Char RepIdOf <" << QName (item) << ">::id [] = \""
 			<< rid.repository_id () << "\";\n\n";
 	}
 }

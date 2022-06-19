@@ -98,7 +98,7 @@ void Servant::skeleton_end (const ItemContainer& item, const char* suffix)
 		<< indent
 		<< "{ // header\n"
 		<< indent
-		<< "RepIdOf <" << QName (item) << suffix << ">::id_,\n"
+		<< "RepIdOf <" << QName (item) << suffix << ">::id,\n"
 		"S::template __duplicate <" << QName (item) << suffix << ">,\n"
 		"S::template __release <" << QName (item) << suffix << ">\n"
 		<< unindent

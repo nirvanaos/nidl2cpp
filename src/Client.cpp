@@ -1357,13 +1357,67 @@ void Client::implement (const Enum& item)
 		h_.namespace_open (item);
 		h_ <<
 			"#ifdef LEGACY_CORBA_CPP\n"
-			"typedef " << item.name () << "& " << static_cast <const string&> (item.name ()) << "_out;\n"
+			"typedef " << item.name () << "& " << static_cast <const string&> (item.name ())
+			<< "_out;\n"
 			"#endif\n";
 	}
 	type_code_def (item);
 }
 
-void Client::leaf (const AST::ValueBox& item)
+void Client::leaf (const ValueBox& vb)
 {
-	throw runtime_error ("Not yet implemented");
+	h_.namespace_open (vb);
+	h_ << empty_line
+		<< "class " << vb.name () << " : public CORBA::Internal::ValueBox <"
+		<< vb.name () << ", " << static_cast <const Type&> (vb) << ">\n"
+		"{\n";
+	if (options ().legacy)
+		h_ << "#ifdef LEGACY_CORBA_CPP\n"
+		"public:\n"
+		"#else\n";
+	h_ << "private:\n"
+		<< indent <<
+		"template <class T1, class ... Args>\n"
+		"friend CORBA::servant_reference <T1> CORBA::make_reference (Args ...);\n";
+	if (options ().legacy) {
+		h_ << unindent <<
+			"#endif\n"
+			<< indent;
+	}
+
+	h_ << vb.name () << " ()\n"
+		"{}\n\n"
+		<< vb.name () << "(const BoxedType& v) :\n"
+		"value_ (v)\n"
+		"{}\n\n"
+		<< vb.name () << "(BoxedType&& v) :\n"
+		"value_ (std::move (v))\n"
+		"{}\n\n"
+		<< unindent <<
+		"private:\n"
+		<< indent <<
+		"friend class CORBA::Internal::ValueBox <" << vb.name () << ", "
+		<< static_cast <const Type&> (vb) << ">;\n"
+		"\n"
+		"BoxedType value_;\n"
+		<< unindent <<
+		"};\n\n";
+
+	type_code_decl (vb);
+	if (options ().legacy) {
+		h_ << "\n#ifdef LEGACY_CORBA_CPP\n"
+			"typedef " << vb.name () << "::_ptr_type " << vb.name () << "_ptr\n"
+			"typedef " << vb.name () << "::_var_type " << vb.name () << "_var\n"
+			"#endif\n";
+	}
+
+	rep_id_of (vb);
+
+	h_ << empty_line
+		<< "template <>\n"
+		"struct Type <" << QName (vb) << "> : TypeValueBox <" << QName (vb) << ">\n"
+		"{\n" << indent;
+	type_code_func (vb);
+	h_ << unindent <<
+		"};\n";
 }

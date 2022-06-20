@@ -1404,10 +1404,12 @@ void Client::leaf (const ValueBox& vb)
 		"};\n\n";
 
 	type_code_decl (vb);
+	type_code_def (vb);
+
 	if (options ().legacy) {
 		h_ << "\n#ifdef LEGACY_CORBA_CPP\n"
-			"typedef " << vb.name () << "::_ptr_type " << vb.name () << "_ptr\n"
-			"typedef " << vb.name () << "::_var_type " << vb.name () << "_var\n"
+			"typedef " << vb.name () << "::_ptr_type " << vb.name () << "_ptr;\n"
+			"typedef " << vb.name () << "::_var_type " << vb.name () << "_var;\n"
 			"#endif\n";
 	}
 

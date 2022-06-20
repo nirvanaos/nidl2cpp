@@ -67,6 +67,7 @@ protected:
 	virtual void leaf (const AST::Enum& item);
 
 	virtual void end (const AST::ValueType& item);
+	virtual void leaf (const AST::ValueBox& item);
 
 private:
 	static bool is_custom (const AST::Operation& op);

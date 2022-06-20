@@ -761,6 +761,18 @@ void Proxy::end (const ValueType& vt)
 	<< QName (vt) << ">)\n";
 }
 
+void Proxy::leaf (const ValueBox& vb)
+{
+	cpp_.namespace_open ("CORBA/Internal");
+
+	type_code_name (vb);
+
+	cpp_.namespace_close ();
+	cpp_ << "NIRVANA_EXPORT (" << export_name (vb) << ", CORBA::Internal::RepIdOf <" << QName (vb) << ">::id, CORBA"
+		<< "::Internal::PseudoBase, CORBA::Internal::ValueBoxFactory <"
+		<< QName (vb) << ">)\n";
+}
+
 void Proxy::marshal_members (const Members& members, const char* func, const char* prefix, const char* cend)
 {
 	cpp_.indent ();

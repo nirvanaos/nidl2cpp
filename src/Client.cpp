@@ -1387,10 +1387,10 @@ void Client::leaf (const ValueBox& vb)
 
 	h_ << vb.name () << " ()\n"
 		"{}\n\n"
-		<< vb.name () << "(const BoxedType& v) :\n"
+		<< vb.name () << " (const BoxedType& v) :\n"
 		"value_ (v)\n"
 		"{}\n\n"
-		<< vb.name () << "(BoxedType&& v) :\n"
+		<< vb.name () << " (BoxedType&& v) :\n"
 		"value_ (std::move (v))\n"
 		"{}\n\n"
 		<< unindent <<

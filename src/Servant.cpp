@@ -37,7 +37,7 @@ void Servant::end (const Root&)
 
 void Servant::leaf (const Include& item)
 {
-	if (!options ().no_POA && !options ().no_servant) {
+	if (!options ().no_servant) {
 		h_ << "#include " << (item.system () ? '<' : '"')
 			<< path (path (item.file ()).replace_extension ("").string () + options ().servant_suffix).replace_extension ("h").string ()
 			<< (item.system () ? '>' : '"')
@@ -195,7 +195,7 @@ void Servant::end (const Interface& itf)
 			h_ << "{};\n";
 		}
 
-		if (!options ().no_POA && itf.interface_kind () != InterfaceKind::PSEUDO) {
+		if (itf.interface_kind () != InterfaceKind::PSEUDO) {
 			// POA implementation
 			h_ << empty_line
 				<< "template <>\n"
@@ -288,7 +288,7 @@ void Servant::end (const Interface& itf)
 		h_.namespace_close ();
 
 		if (options ().legacy && itf.interface_kind () != InterfaceKind::PSEUDO
-			&& (!options ().no_POA || itf.interface_kind () != InterfaceKind::ABSTRACT)) {
+			&& itf.interface_kind () != InterfaceKind::ABSTRACT) {
 
 			h_ << endl << "#ifdef LEGACY_CORBA_CPP\n";
 			const NamedItem* ns = itf.parent ();
@@ -303,9 +303,8 @@ void Servant::end (const Interface& itf)
 					h_ << "namespace " << *it << " {\n";
 				}
 
-				if (!options ().no_POA)
-					h_ << "\ntypedef " << Namespace ("CORBA/Internal")
-					<< "ServantPOA <" << QName (itf) << "> " << itf.name () << ";\n";
+				h_ << "\ntypedef " << Namespace ("CORBA/Internal")
+				<< "ServantPOA <" << QName (itf) << "> " << itf.name () << ";\n";
 
 				if (itf.interface_kind () != InterfaceKind::ABSTRACT)
 					h_ << "template <class T> using " << itf.name () << "_tie = "
@@ -316,9 +315,8 @@ void Servant::end (const Interface& itf)
 				}
 			} else {
 
-				if (!options ().no_POA)
-					h_ << "typedef " << Namespace ("CORBA/Internal")
-					<< "ServantPOA <" << QName (itf) << "> POA_" << static_cast <const string&> (itf.name ()) << ";\n";
+				h_ << "typedef " << Namespace ("CORBA/Internal")
+				<< "ServantPOA <" << QName (itf) << "> POA_" << static_cast <const string&> (itf.name ()) << ";\n";
 
 				if (itf.interface_kind () != InterfaceKind::ABSTRACT)
 					h_ << "template <class T> using POA_" << static_cast <const string&> (itf.name ()) << "_tie = "

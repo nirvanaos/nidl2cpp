@@ -15,4 +15,4 @@ To build under Visual C++ use *nirvanaos/nidl2cpp.vc* supermodule.
 IDL compiler front-end library: https://github.com/nirvanaos/idlfe
 
 ## Does not implemented yet
-* Value types
+* Unions

@@ -54,7 +54,6 @@ void Compiler::print_usage_info (const char* exe_name)
 		"\t-proxy_suffix <suffix>  The suffix for proxy file name. Default is _p.\n"
 		"\t-legacy                 Generate code compatible with C++ language mapping 1.3.\n"
 		"                          To enable compatibility define macro LEGACY_CORBA_CPP\n"
-		"\t-no_POA                 Do not generate standard CORBA virtual servant implementation\n"
 		"\t-no_servant             Do not generate servant implementations\n";
 }
 
@@ -105,8 +104,6 @@ bool Compiler::parse_command_line (CmdLine& args)
 		proxy_suffix = args.parameter (arg);
 	else if ((arg = option (args.arg (), "legacy")))
 		legacy = true;
-	else if ((arg = option (args.arg (), "no_POA")))
-		no_POA = true;
 	else if ((arg = option (args.arg (), "no_servant")))
 		no_servant = true;
 

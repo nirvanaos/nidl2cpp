@@ -37,7 +37,6 @@ public:
 		server (true),
 		proxy (true),
 		legacy (false),
-		no_POA (false),
 		no_servant (false),
 		no_client_cpp (false)
 	{}
@@ -48,7 +47,6 @@ public:
 	std::string proxy_suffix;
 	bool client, server, proxy;
 	bool legacy;
-	bool no_POA;
 	bool no_servant;
 	bool no_client_cpp;
 };

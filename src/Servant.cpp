@@ -292,7 +292,7 @@ void Servant::end (const Interface& itf)
 		if (options ().legacy && itf.interface_kind () != InterfaceKind::PSEUDO
 			&& itf.interface_kind () != InterfaceKind::ABSTRACT) {
 
-			h_ << endl << "#ifdef LEGACY_CORBA_CPP\n";
+			h_ << "\n#ifdef LEGACY_CORBA_CPP\n";
 			const NamedItem* ns = itf.parent ();
 			if (ns) {
 				ScopedName sn = ns->scoped_name ();

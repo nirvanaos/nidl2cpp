@@ -623,11 +623,9 @@ void Proxy::end (const Struct& item)
 
 	implement_marshaling (item, "", members, "_");
 	if (options ().legacy) {
-		cpp_ << endl
-			<< "#else\n";
+		cpp_ << "\n#else\n";
 		implement_marshaling (item, "", members, "");
-		cpp_ << endl
-			<< "#endif\n";
+		cpp_ << "\n#endif\n";
 	}
 
 	cpp_.namespace_close ();

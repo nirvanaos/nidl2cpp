@@ -983,9 +983,7 @@ void Client::end (const Exception& item)
 			<< "};\n\n";
 
 		if (options ().legacy) {
-			h_ << unindent
-				<< "#ifndef LEGACY_CORBA_CPP\n"
-				<< indent;
+			h_ << "#ifndef LEGACY_CORBA_CPP\n";
 		}
 
 		constructors (item.name (), members, "_");
@@ -997,16 +995,10 @@ void Client::end (const Exception& item)
 		member_variables (members);
 
 		if (options ().legacy) {
-			h_ << endl
-				<< unindent
-				<< "#else\n"
-				<< indent;
+			h_ << "\n#else\n";
 			constructors (item.name (), members, "");
 			member_variables_legacy (members);
-			h_ << endl
-				<< unindent
-				<< "#endif\n"
-				<< indent;
+			h_ << "\n#endif\n";
 		}
 
 		h_ << unindent
@@ -1204,9 +1196,7 @@ void Client::end (const Struct& item)
 	Members members = get_members (item);
 
 	if (options ().legacy) {
-		h_ << unindent
-			<< "#ifndef LEGACY_CORBA_CPP\n"
-			<< indent;
+		h_ << "#ifndef LEGACY_CORBA_CPP\n";
 	}
 
 	constructors (item.name (), members, "_");
@@ -1221,13 +1211,9 @@ void Client::end (const Struct& item)
 	member_variables (members);
 
 	if (options ().legacy) {
-		h_ << unindent
-			<< "#else\n"
-			<< indent;
+		h_ << "#else\n";
 		member_variables_legacy (members);
-		h_ << unindent
-			<< "#endif\n"
-			<< indent;
+		h_ << "#endif\n";
 	}
 
 	h_ << unindent

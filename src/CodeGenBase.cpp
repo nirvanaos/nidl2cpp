@@ -247,6 +247,7 @@ bool CodeGenBase::is_ref_type (const Type& type)
 				case Item::Kind::INTERFACE:
 				case Item::Kind::VALUE_TYPE_DECL:
 				case Item::Kind::VALUE_TYPE:
+				case Item::Kind::VALUE_BOX:
 					return true;
 
 				case Item::Kind::NATIVE:

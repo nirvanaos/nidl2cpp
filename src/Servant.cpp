@@ -26,6 +26,8 @@
 #include "pch.h"
 #include "Servant.h"
 
+#define SKELETON_FUNC_PREFIX "_s_"
+
 using namespace std;
 using namespace std::filesystem;
 using namespace AST;
@@ -58,7 +60,7 @@ void Servant::begin (const ValueType& vt)
 
 	const Interface* concrete_itf = get_concrete_supports (vt);
 	if (concrete_itf) {
-		h_ << "static Interface* __this (Bridge <" << QName (vt) << ">* _b, Interface* _env)\n"
+		h_ << "static Interface* " SKELETON_FUNC_PREFIX "this (Bridge <" << QName (vt) << ">* _b, Interface* _env)\n"
 			"{\n"
 			<< indent <<
 			"try {\n"
@@ -113,7 +115,7 @@ void Servant::epv (bool val_with_concrete_itf)
 			<< indent;
 
 		if (val_with_concrete_itf) {
-			h_ << "__this";
+			h_ << SKELETON_FUNC_PREFIX "this";
 		}
 		
 		auto n = epv_.begin ();
@@ -576,7 +578,7 @@ void Servant::end (const ValueType& vt)
 		skeleton_begin (vt, FACTORY_SUFFIX);
 
 		for (auto f : factories) {
-			h_ << "static Interface* _" << f->name () << "(Bridge <" << QName (vt)
+			h_ << "static Interface* " SKELETON_FUNC_PREFIX << f->name () << "(Bridge <" << QName (vt)
 				<< FACTORY_SUFFIX ">* _b";
 			for (auto p : *f) {
 				h_ << ", " << ABI_param (*p) << ' ' << p->name ();
@@ -618,9 +620,9 @@ void Servant::end (const ValueType& vt)
 
 		{
 			auto f = factories.begin ();
-			h_ << "S::_" << (*f)->name ();
+			h_ << "S::" SKELETON_FUNC_PREFIX << (*f)->name ();
 			for (++f; f != factories.end (); ++f) {
-				h_ << ",\nS::_" << (*f)->name ();
+				h_ << ",\nS::" SKELETON_FUNC_PREFIX << (*f)->name ();
 			}
 			h_ << unindent
 				<< "\n}"
@@ -708,7 +710,7 @@ void Servant::leaf (const Operation& op)
 	h_ << "static " << ABI_ret (op);
 
 	{
-		string name = "_";
+		string name = SKELETON_FUNC_PREFIX;
 		name += op.name ();
 		h_ << ' ' << name << " (Bridge <" << QName (itf) << ">* _b";
 		epv_.push_back (move (name));
@@ -764,7 +766,7 @@ void Servant::attribute (const Member& m)
 
 	h_ << "static " << ABI_ret (m, attributes_by_ref_);
 	{
-		string name = "__get_";
+		string name = SKELETON_FUNC_PREFIX "get_";
 		name += m.name ();
 		h_ << ' ' << name << " (Bridge <" << QName (itf) << ">* _b, Interface* _env)\n"
 			"{\n";
@@ -787,7 +789,7 @@ void Servant::attribute (const Member& m)
 
 	if (!(m.kind () == Item::Kind::ATTRIBUTE && static_cast <const Attribute&> (m).readonly ())) {
 		{
-			string name = "__set_";
+			string name = SKELETON_FUNC_PREFIX "set_";
 			name += m.name ();
 			h_ << "static void " << name << " (Bridge <" << QName (itf) << ">* _b, "
 				<< ABI_param (m) << " val, Interface* _env)\n"
@@ -807,7 +809,7 @@ void Servant::attribute (const Member& m)
 
 	if (m.kind () == Item::Kind::STATE_MEMBER && is_var_len (m)) {
 		{
-			string name = "__move_";
+			string name = SKELETON_FUNC_PREFIX "move_";
 			name += m.name ();
 			h_ << "static void " << name << " (Bridge <" << QName (itf) << ">* _b, "
 				<< ABI_param (m, Parameter::Attribute::INOUT) << " val, Interface* _env)\n"

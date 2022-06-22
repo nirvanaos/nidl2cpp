@@ -317,7 +317,10 @@ Code& operator << (Code& stm, const Type& t)
 			for (size_t cnt = arr.dimensions ().size (); cnt; --cnt) {
 				stm << "std::array <";
 			}
-			stm << static_cast <const Type&> (arr);
+			if (CodeGenBase::is_ref_type (arr))
+				stm << TypePrefix (arr) << "Var";
+			else
+				stm << static_cast <const Type&> (arr);
 			for (auto dim = arr.dimensions ().rbegin (); dim != arr.dimensions ().rend (); ++dim) {
 				stm << ", " << *dim << '>';
 			}

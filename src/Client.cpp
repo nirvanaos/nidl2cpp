@@ -171,7 +171,7 @@ void Client::backward_compat_var (const NamedItem& item)
 	if (options ().legacy) {
 		h_ <<
 			"#ifdef LEGACY_CORBA_CPP\n"
-			"typedef " << Namespace ("CORBA/Internal") << "Type <" << item.name () << ">::C_var " << static_cast <const string&> (item.name ()) << "_var;\n"
+			"typedef " << Namespace ("CORBA/Internal") << "T_var <" << item.name () << "> " << static_cast <const string&> (item.name ()) << "_var;\n"
 			"typedef " << static_cast <const string&> (item.name ()) << "_var& " << static_cast <const string&> (item.name ()) << "_out;\n"
 			"#endif\n";
 	}
@@ -274,9 +274,9 @@ void Client::forward_interface (const NamedItem& item)
 		h_.namespace_open (item);
 		h_ <<
 			"#ifdef LEGACY_CORBA_CPP\n"
-			"typedef " << Namespace ("CORBA/Internal") << "Type <" << item.name () << ">::C_ptr "
+			"typedef " << Namespace ("CORBA/Internal") << "I_ptr <" << item.name () << "> "
 			<< static_cast <const string&> (item.name ()) << "_ptr;\n"
-			"typedef " << Namespace ("CORBA/Internal") << "Type <" << item.name () << ">::C_var "
+			"typedef " << Namespace ("CORBA/Internal") << "I_var <" << item.name () << "> "
 			<< static_cast <const string&> (item.name ()) << "_var;\n"
 			"typedef " << static_cast <const string&> (item.name ()) << "_var& "
 			<< static_cast <const string&> (item.name ()) << "_out;\n"
@@ -651,7 +651,7 @@ void Client::end_interface (const ItemContainer& container)
 					h_ << "using " << Namespace ("CORBA/Internal") << "Definitions <"
 					<< container.name () << ">::_tc_" << static_cast <const string&> (def.name ()) << ";\n";
 
-				if (options ().legacy) {
+				if (options ().legacy && item->kind () != Item::Kind::EXCEPTION) {
 					h_ << "#ifdef LEGACY_CORBA_CPP\n"
 						"using " << Namespace ("CORBA/Internal") << "Definitions <" << container.name () << ">::" << def.name () << "_var;\n"
 						"using " << Namespace ("CORBA/Internal") << "Definitions <" << container.name () << ">::" << def.name () << "_out;\n";
@@ -1236,7 +1236,8 @@ void Client::end (const Struct& item)
 	// Type code
 	type_code_decl (item);
 
-	backward_compat_var (item);
+	if (is_var_len (members))
+		backward_compat_var (item);
 
 	if (!nested (item))
 		implement (item);

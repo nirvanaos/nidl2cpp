@@ -302,9 +302,14 @@ Code& operator << (Code& stm, const Type& t)
 			const Sequence& seq = t.sequence ();
 			stm.namespace_prefix ("CORBA/Internal");
 			if (seq.bound ())
-				stm << "BoundedSequence <" << static_cast <const Type&> (t.sequence ()) << ", " << seq.bound ();
+				stm << "Bounded";
+			stm << "Sequence <";
+			if (CodeGenBase::is_ref_type (seq))
+				stm << TypePrefix (seq) << "Var";
 			else
-				stm << "Sequence <" << static_cast <const Type&> (t.sequence ());
+				stm << static_cast <const Type&> (seq);
+			if (seq.bound ())
+				stm << ", " << seq.bound ();
 			stm << '>';
 		} break;
 		case Type::Kind::ARRAY: {

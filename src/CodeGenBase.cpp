@@ -624,7 +624,7 @@ Code& operator << (Code& stm, const MemberDefault& m)
 			const NamedItem& nt = td.named_type ();
 			if (nt.kind () == Item::Kind::ENUM) {
 				const Enum& en = static_cast <const Enum&> (nt);
-				stm << QName (*en.front ());
+				stm << QName (en) << "::" << QName (*en.front ());
 			}
 		} break;
 	}

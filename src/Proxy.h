@@ -103,7 +103,9 @@ private:
 
 	void implement_marshaling (const AST::NamedItem& cont, const char* suffix, const Members& members, const char* prefix);
 	void marshal_members (const Members& members, const char* func, const char* prefix, const char* end);
+	void marshal_member (const AST::Member& m, const char* func, const char* prefix);
 	void unmarshal_members (const Members& members, const char* prefix, const char* end);
+	void unmarshal_member (const AST::Member& m, const char* prefix);
 
 private:
 	Code cpp_;

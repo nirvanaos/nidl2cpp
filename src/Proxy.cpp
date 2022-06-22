@@ -755,7 +755,7 @@ void Proxy::end (const ValueType& vt)
 	cpp_.namespace_close ();
 	cpp_ << "NIRVANA_EXPORT (" << export_name (vt) << ", CORBA::Internal::RepIdOf <" << QName (vt) << ">::id, CORBA"
 	<< (vt.modifier () != ValueType::Modifier::ABSTRACT ?
-		"::Internal::PseudoBase, CORBA::Internal::ValueFactory <"
+		"::Internal::PseudoBase, CORBA::Internal::ValueFactoryImpl <"
 		:
 		"::ValueType, CORBA::Internal::TypeCodeValue <")
 	<< QName (vt) << ">)\n";
@@ -773,6 +773,11 @@ void Proxy::leaf (const ValueBox& vb)
 		<< QName (vb) << ">)\n";
 }
 
+void Proxy::marshal_member (const Member& m, const char* func, const char* prefix)
+{
+	cpp_ << TypePrefix (m) << func << " (" << prefix << m.name () << ", rq);\n";
+}
+
 void Proxy::marshal_members (const Members& members, const char* func, const char* prefix, const char* cend)
 {
 	cpp_.indent ();
@@ -780,7 +785,7 @@ void Proxy::marshal_members (const Members& members, const char* func, const cha
 	for (Members::const_iterator m = members.begin (); m != members.end ();) {
 		// Marshal variable-length members
 		while (is_var_len (**m)) {
-			cpp_ << TypePrefix (**m) << func << " (" << prefix << (*m)->name () << ", rq);\n";
+			marshal_member (**m, func, prefix);
 			if (members.end () == ++m)
 				break;
 		}
@@ -791,16 +796,24 @@ void Proxy::marshal_members (const Members& members, const char* func, const cha
 				++m;
 			} while (m != members.end () && !is_var_len (**m));
 
-			cpp_ << "marshal_members (&" << prefix << (*begin)->name () << ", ";
-			if (m != members.end ())
-				cpp_ << "&" << prefix << (*m)->name ();
-			else
-				cpp_ << cend;
-			cpp_ << ", rq);\n";
+			if (m > begin + 1) {
+				cpp_ << "marshal_members (&" << prefix << (*begin)->name () << ", ";
+				if (m != members.end ())
+					cpp_ << "&" << prefix << (*m)->name ();
+				else
+					cpp_ << cend;
+				cpp_ << ", rq);\n";
+			} else
+				marshal_member (**begin, func, prefix);
 		}
 	}
 
 	cpp_.unindent ();
+}
+
+void Proxy::unmarshal_member (const Member& m, const char* prefix)
+{
+	cpp_ << TypePrefix (m) << "unmarshal (rq, " << prefix << m.name () << ");\n";
 }
 
 void Proxy::unmarshal_members (const Members& members, const char* prefix, const char* cend)
@@ -809,7 +822,7 @@ void Proxy::unmarshal_members (const Members& members, const char* prefix, const
 	for (Members::const_iterator m = members.begin (); m != members.end ();) {
 		// Unmarshal variable-length members
 		while (is_var_len (**m)) {
-			cpp_ << TypePrefix (**m) << "unmarshal (rq, " << prefix << (*m)->name () << ");\n";
+			unmarshal_member (**m, prefix);
 			if (members.end () == ++m)
 				break;
 		}
@@ -821,27 +834,30 @@ void Proxy::unmarshal_members (const Members& members, const char* prefix, const
 			} while (m != members.end () && !is_var_len (**m));
 			auto end = m;
 
-			cpp_ << "if (unmarshal_members (rq, &" << prefix << (*begin)->name ();
-			if (end != members.end ())
-				cpp_ << ", &" << prefix << (*end)->name ();
-			else
-				cpp_ << ", " << cend;
-			cpp_ << ")) {\n"
-				<< indent;
+			if (end > begin + 1) {
+				cpp_ << "if (unmarshal_members (rq, &" << prefix << (*begin)->name ();
+				if (end != members.end ())
+					cpp_ << ", &" << prefix << (*end)->name ();
+				else
+					cpp_ << ", " << cend;
+				cpp_ << ")) {\n"
+					<< indent;
 
-			// Swap bytes
-			m = begin;
-			do {
-				cpp_ << TypePrefix (**m) << "byteswap (" << prefix << (*m)->name () << ");\n";
-			} while (end != ++m);
-			cpp_ << unindent
-				<< "}\n";
+				// Swap bytes
+				m = begin;
+				do {
+					cpp_ << TypePrefix (**m) << "byteswap (" << prefix << (*m)->name () << ");\n";
+				} while (end != ++m);
+				cpp_ << unindent
+					<< "}\n";
 
-			// If some members have check, check them
-			m = begin;
-			do {
-				cpp_ << TypePrefix (**m) << "check (" << prefix << (*m)->name () << ");\n";
-			} while (end != ++m);
+				// If some members have check, check them
+				m = begin;
+				do {
+					cpp_ << TypePrefix (**m) << "check ((const " << TypePrefix (**m) << "ABI&)" << prefix << (*m)->name () << ");\n";
+				} while (end != ++m);
+			} else
+				unmarshal_member (**begin, prefix);
 		}
 	}
 	cpp_.unindent ();

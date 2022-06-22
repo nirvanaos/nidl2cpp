@@ -169,7 +169,6 @@ void Client::leaf (const TypeDef& item)
 void Client::backward_compat_var (const NamedItem& item)
 {
 	if (options ().legacy) {
-		h_.namespace_open (item);
 		h_ <<
 			"#ifdef LEGACY_CORBA_CPP\n"
 			"typedef " << Namespace ("CORBA/Internal") << "Type <" << item.name () << ">::C_var " << static_cast <const string&> (item.name ()) << "_var;\n"
@@ -637,22 +636,39 @@ void Client::end_interface (const ItemContainer& container)
 		"{\n"
 		"public:\n"
 		<< indent;
-	for (auto it = container.begin (); it != container.end (); ++it) {
-		const Item& item = **it;
-		switch (item.kind ()) {
+	for (auto item : container) {
+		switch (item->kind ()) {
 			case Item::Kind::OPERATION:
 			case Item::Kind::ATTRIBUTE:
 			case Item::Kind::STATE_MEMBER:
 			case Item::Kind::VALUE_FACTORY:
 				break;
 			default: {
-				const NamedItem& def = static_cast <const NamedItem&> (item);
-				h_ << "using " << Namespace ("CORBA/Internal") << "Definitions <" << container.name () << ">::" << def.name () << ";\n";
+				const NamedItem& def = static_cast <const NamedItem&> (*item);
+				h_ << "using " << Namespace ("CORBA/Internal") << "Definitions <"
+					<< container.name () << ">::" << def.name () << ";\n";
 				if (!pseudo_interface && RepositoryId::cast (&def))
-					h_ << "using " << Namespace ("CORBA/Internal") << "Definitions <" << container.name () << ">::_tc_" << def.name () << ";\n";
+					h_ << "using " << Namespace ("CORBA/Internal") << "Definitions <"
+					<< container.name () << ">::_tc_" << static_cast <const string&> (def.name ()) << ";\n";
+
+				if (options ().legacy) {
+					h_ << "#ifdef LEGACY_CORBA_CPP\n"
+						"using " << Namespace ("CORBA/Internal") << "Definitions <" << container.name () << ">::" << def.name () << "_var;\n"
+						"using " << Namespace ("CORBA/Internal") << "Definitions <" << container.name () << ">::" << def.name () << "_out;\n";
+
+					if (item->kind () == Item::Kind::TYPE_DEF) {
+						const TypeDef& td = static_cast <const TypeDef&> (*item);
+						if (td.tkind () == Type::Kind::NAMED_TYPE && is_ref_type (td))
+							h_ << "using " << Namespace ("CORBA/Internal") << "Definitions <" << container.name () << ">::" << def.name () << "_ptr;\n";
+					}
+
+					h_ << "#endif\n";
+				}
+
 			}
 		}
 	}
+
 	h_ << unindent
 		<< "};\n";
 }
@@ -1220,6 +1236,8 @@ void Client::end (const Struct& item)
 	// Type code
 	type_code_decl (item);
 
+	backward_compat_var (item);
+
 	if (!nested (item))
 		implement (item);
 }
@@ -1228,7 +1246,6 @@ void Client::implement (const Struct& item)
 {
 	Members members = get_members (item);
 	define_structured_type (item, members);
-	backward_compat_var (item);
 	type_code_def (item);
 	implement_nested_items (item);
 }

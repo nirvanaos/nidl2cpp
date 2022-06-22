@@ -633,7 +633,7 @@ void Servant::end (const ValueType& vt)
 		"class ValueCreator <Impl, " << QName (vt) << "> :\n"
 		<< indent;
 	if (!factories.empty ()) {
-		h_ << "public ValueFactoryImpl <ValueCreator <Impl, " << QName (vt) << ">, " << QName (vt) << FACTORY_SUFFIX ">,\n"
+		h_ << "public ValueCreatorImpl <ValueCreator <Impl, " << QName (vt) << ">, " << QName (vt) << FACTORY_SUFFIX ">,\n"
 			"public ValueCreatorBase <Impl>\n"
 			<< unindent <<
 			"{\n"

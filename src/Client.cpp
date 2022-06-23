@@ -1262,6 +1262,41 @@ void Client::end (const Union& item)
 {
 	UnionElements elements = get_elements (item);
 
+	bool var_len = false;
+	for (auto el : elements) {
+		if (is_var_len (*el)) {
+			var_len = true;
+			break;
+		}
+	}
+
+	if (var_len) {
+		h_ << "~" << item.name () << " ();\n";
+
+		cpp_.namespace_open (item);
+		cpp_ << QName (item) << "::~" << item.name () << " ()\n"
+			"{\n"
+			<< indent <<
+			"switch (__d) {\n" << indent;
+		for (auto el : elements) {
+			if (is_var_len (*el)) {
+				for (const auto& label : el->labels ()) {
+					cpp_ << "case " << label << ":\n";
+				}
+				if (el->is_default ())
+					cpp_ << "default:\n";
+				cpp_ << indent << Namespace ("CORBA/Internal") << "destruct (_u._" << el->name () << ");\n";
+				if (!el->is_default ())
+					cpp_ << "break;\n";
+				cpp_ << unindent;
+			}
+		}
+		cpp_ << unindent <<
+			"}\n"
+			<< unindent <<
+			"}\n";
+	}
+
 	h_ <<
 		"void _d (" << item.discriminator_type () << " d);\n" <<
 		item.discriminator_type () << " _d () const\n"
@@ -1276,8 +1311,10 @@ void Client::end (const Union& item)
 		"private:\n"
 		<< indent <<
 		item.discriminator_type () << " __d;\n"
-		"union\n"
-		"{\n" << indent;
+		"union _U\n"
+		"{\n" << indent <<
+		"~_U ()\n"
+		"{}\n\n";
 
 	for (auto e : elements) {
 		h_ << MemberVariable (*e);

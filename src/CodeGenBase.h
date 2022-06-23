@@ -41,23 +41,13 @@ public:
 
 	typedef std::vector <const AST::Member*> Members;
 
-	static Members get_members (const AST::Struct& cont)
-	{
-		return get_members (cont, AST::Item::Kind::MEMBER);
-	}
-
-	static Members get_members (const AST::Exception& cont)
-	{
-		return get_members (cont, AST::Item::Kind::MEMBER);
-	}
-
-	static Members get_members (const AST::Union& cont)
-	{
-		return get_members (cont, AST::Item::Kind::UNION_ELEMENT);
-	}
+	static Members get_members (const AST::ItemContainer& cont);
 
 	typedef std::vector <const AST::StateMember*> StateMembers;
 	static StateMembers get_members (const AST::ValueType& cont);
+
+	typedef std::vector <const AST::UnionElement*> UnionElements;
+	static UnionElements get_elements (const AST::Union& cont);
 
 	// Value and abstract bases of value base
 	typedef std::vector <const AST::ItemContainer*> Bases;
@@ -77,6 +67,8 @@ public:
 	static bool is_native (const AST::Type& type);
 	static bool is_boolean (const AST::Type& t);
 	static bool may_have_check (const AST::Type& type);
+	static bool may_have_check (const AST::NamedItem& cont, const AST::Type& type, bool& recursive_seq);
+	static bool is_recursive_seq (const AST::NamedItem& cont, const AST::Type& type);
 
 	const Options& options () const
 	{
@@ -109,18 +101,18 @@ protected:
 
 	virtual void leaf (const AST::Enum& item) {}
 
-	virtual void leaf (const AST::UnionDecl&);
-	virtual void begin (const AST::Union&);
-	virtual void end (const AST::Union&);
-	virtual void leaf (const AST::UnionElement&);
+	virtual void leaf (const AST::UnionDecl&) {}
+	virtual void begin (const AST::Union&) {}
+	virtual void end (const AST::Union&) {}
+	virtual void leaf (const AST::UnionElement&) {}
 
 	virtual void leaf (const AST::ValueTypeDecl&) {}
 	virtual void begin (const AST::ValueType&) {}
 	virtual void end (const AST::ValueType&) {}
 
-	virtual void leaf (const AST::StateMember&);
-	virtual void leaf (const AST::ValueFactory&);
-	virtual void leaf (const AST::ValueBox&);
+	virtual void leaf (const AST::StateMember&) {}
+	virtual void leaf (const AST::ValueFactory&) {}
+	virtual void leaf (const AST::ValueBox&) {}
 
 private:
 	static bool pred (const char* l, const char* r)
@@ -128,8 +120,6 @@ private:
 		return strcmp (l, r) < 0;
 	}
 
-	static Members get_members (const AST::ItemContainer& cont, AST::Item::Kind member_kind);
-	
 	static bool is_native_interface (const AST::NamedItem& type);
 
 	static void get_all_bases (const AST::ValueType& vt,

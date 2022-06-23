@@ -1082,12 +1082,13 @@ void Client::define_structured_type (const RepositoryId& rid,
 
 	// Type
 	h_ << "template <>\n"
-		"struct Type < " << QName (item) << suffix << "> : ";
+		"struct Type < " << QName (item) << suffix << "> :\n" << indent;
 
 	if (var_len) {
 		h_ << "TypeVarLen < " << QName (item) << suffix << ", ";
-		has_check (members);
+		has_check (item, members);
 		h_ << ">\n"
+			<< unindent <<
 			"{\n"
 			<< indent;
 
@@ -1100,11 +1101,12 @@ void Client::define_structured_type (const RepositoryId& rid,
 			<< "};\n";
 	} else {
 		h_ << "TypeFixLen < " << QName (item) << suffix << ">\n"
+			<< unindent <<
 			"{\n"
 			<< indent
 
 			<< "static const bool has_check = ";
-		has_check (members);
+		has_check (item, members);
 		h_ << ";\n";
 
 		implement_type (item, members);
@@ -1147,32 +1149,36 @@ void Client::implement_type (const AST::NamedItem& cont, const Members& members)
 
 }
 
-void Client::has_check (const Members& members)
+void Client::has_check (const NamedItem& cont, const Members& members)
 {
+	bool recursive_seq = false;
 	auto check_member = members.begin ();
 	for (; check_member != members.end (); ++check_member) {
-		if (may_have_check (**check_member))
+		if (may_have_check (cont, **check_member, recursive_seq))
 			break;
 	}
 	if (check_member != members.end ()) {
+		h_ << endl << indent;
 		h_ << TypePrefix (**(check_member++)) << "has_check";
 		for (; check_member != members.end (); ++check_member) {
-			if (may_have_check (**check_member))
+			if (may_have_check (cont, **check_member, recursive_seq))
 				break;
 		}
 		if (check_member != members.end ()) {
-			h_ << '\n'
-				<< indent;
 			do {
-				h_ << "| " << TypePrefix (**(check_member++)) << "has_check";
+				h_ << "\n|| " << TypePrefix (**(check_member++)) << "has_check";
 				for (; check_member != members.end (); ++check_member) {
-					if (may_have_check (**check_member))
+					if (may_have_check (cont, **check_member, recursive_seq))
 						break;
 				}
 			} while (check_member != members.end ());
-			h_.unindent ();
 		}
-	} else
+		if (recursive_seq)
+			h_ << "\n|| CHECK_SEQUENCES";
+		h_.unindent ();
+	} else if (recursive_seq)
+		h_ << "CHECK_SEQUENCES";
+	else
 		h_ << "false";
 }
 
@@ -1234,6 +1240,62 @@ void Client::implement (const Struct& item)
 	Members members = get_members (item);
 	define_structured_type (item, members);
 	type_code_def (item);
+	implement_nested_items (item);
+}
+
+void Client::leaf (const UnionDecl& item)
+{
+	forward_decl (item);
+}
+
+void Client::begin (const Union& item)
+{
+	h_namespace_open (item);
+	h_ << empty_line
+		<< "class " << item.name () << "\n"
+		"{\n"
+		"public:\n"
+		<< indent;
+}
+
+void Client::end (const Union& item)
+{
+	UnionElements elements = get_elements (item);
+
+	h_ <<
+		"void _d (" << item.discriminator_type () << " d);\n" <<
+		item.discriminator_type () << " _d () const\n"
+		"{\n"
+		<< indent <<
+		"return __d;\n"
+		<< unindent <<
+		"}\n";
+
+	h_
+		<< unindent <<
+		"private:\n"
+		<< indent <<
+		item.discriminator_type () << " __d;\n"
+		"union\n"
+		"{\n" << indent;
+
+	for (auto e : elements) {
+		h_ << MemberVariable (*e);
+	}
+
+	h_ << unindent <<
+		"} _u;\n"
+	<< unindent <<
+		"};\n";
+
+	// Type code
+	type_code_decl (item);
+
+}
+
+void Client::implement (const Union& item)
+{
+	// TODO:: Implement
 	implement_nested_items (item);
 }
 
@@ -1316,12 +1378,6 @@ void Client::member_variables_legacy (const Members& members)
 		}
 		h_ << ' ' << m->name () << ";\n";
 	}
-}
-
-void Client::implement (const Union& item)
-{
-	// TODO:: Implement
-	implement_nested_items (item);
 }
 
 void Client::leaf (const Enum& item)

@@ -128,12 +128,12 @@ bool CodeGenBase::is_keyword (const Identifier& id)
 	return binary_search (protected_names_, std::end (protected_names_), id.c_str (), pred);
 }
 
-CodeGenBase::Members CodeGenBase::get_members (const ItemContainer& cont, Item::Kind member_kind)
+CodeGenBase::Members CodeGenBase::get_members (const ItemContainer& cont)
 {
 	Members ret;
 	for (auto it = cont.begin (); it != cont.end (); ++it) {
 		const Item& item = **it;
-		if (item.kind () == member_kind)
+		if (item.kind () == Item::Kind::MEMBER)
 			ret.push_back (&static_cast <const Member&> (item));
 	}
 	return ret;
@@ -197,12 +197,31 @@ bool CodeGenBase::is_var_len (const Members& members)
 	return false;
 }
 
-bool CodeGenBase::may_have_check (const AST::Type& type)
+bool CodeGenBase::may_have_check (const Type& type)
 {
 	const Type& t = type.dereference_type ();
 	return
 		((Type::Kind::NAMED_TYPE == t.tkind () && t.named_type ().kind () == Item::Kind::UNION))
 		|| is_var_len (t) || is_enum (t);
+}
+
+bool CodeGenBase::is_recursive_seq (const NamedItem& cont, const Type& type)
+{
+	const Type& t = type.dereference_type ();
+	if (Type::Kind::SEQUENCE == t.tkind ()) {
+		const Type& ts = t.sequence ().dereference_type ();
+		return Type::Kind::NAMED_TYPE == ts.tkind () && &ts.named_type () == &cont;
+	}
+	return false;
+}
+
+bool CodeGenBase::may_have_check (const NamedItem& cont, const Type& type, bool& recursive_seq)
+{
+	if (is_recursive_seq (cont, type)) {
+		recursive_seq = true;
+		return false;
+	} else
+		return may_have_check (type);
 }
 
 bool CodeGenBase::is_pseudo (const NamedItem& item)
@@ -296,38 +315,6 @@ bool CodeGenBase::is_boolean (const AST::Type& t)
 	return dt.tkind () == Type::Kind::BASIC_TYPE && dt.basic_type () == BasicType::BOOLEAN;
 }
 
-void CodeGenBase::leaf (const UnionDecl&)
-{
-	throw runtime_error ("Not yet implemented");
-}
-
-void CodeGenBase::begin (const Union&)
-{
-	throw runtime_error ("Not yet implemented");
-}
-
-void CodeGenBase::end (const Union&)
-{
-	throw runtime_error ("Not yet implemented");
-}
-
-void CodeGenBase::leaf (const UnionElement&)
-{
-	throw runtime_error ("Not yet implemented");
-}
-
-void CodeGenBase::leaf (const StateMember&)
-{
-}
-
-void CodeGenBase::leaf (const ValueFactory&)
-{
-}
-
-void CodeGenBase::leaf (const ValueBox&)
-{
-}
-
 CodeGenBase::StateMembers CodeGenBase::get_members (const ValueType& cont)
 {
 	StateMembers ret;
@@ -335,6 +322,17 @@ CodeGenBase::StateMembers CodeGenBase::get_members (const ValueType& cont)
 		const Item& item = **it;
 		if (item.kind () == Item::Kind::STATE_MEMBER)
 			ret.push_back (&static_cast <const StateMember&> (item));
+	}
+	return ret;
+}
+
+CodeGenBase::UnionElements CodeGenBase::get_elements (const Union& cont)
+{
+	UnionElements ret;
+	for (auto it = cont.begin (); it != cont.end (); ++it) {
+		const Item& item = **it;
+		if (item.kind () == Item::Kind::UNION_ELEMENT)
+			ret.push_back (&static_cast <const UnionElement&> (item));
 	}
 	return ret;
 }

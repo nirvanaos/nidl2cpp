@@ -100,6 +100,10 @@ protected:
 
 	virtual void leaf (const AST::ValueBox& item);
 
+	virtual void leaf (const AST::UnionDecl& item);
+	virtual void begin (const AST::Union&);
+	virtual void end (const AST::Union&);
+
 private:
 	void forward_guard (const AST::NamedItem& item);
 	void forward_define (const AST::NamedItem& item);
@@ -119,7 +123,7 @@ private:
 	void member_variables (const Members& members);
 	void member_variables_legacy (const Members& members);
 	void implement_type (const AST::NamedItem& cont, const Members& members);
-	void has_check (const Members& members);
+	void has_check (const AST::NamedItem& cont, const Members& members);
 	static bool nested (const AST::NamedItem& item);
 	void h_namespace_open (const AST::NamedItem& item);
 

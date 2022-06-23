@@ -433,7 +433,7 @@ Code& operator << (Code& stm, const ParentName& qn)
 		} else {
 			if (Item::Kind::INTERFACE == pk || Item::Kind::VALUE_TYPE == pk) {
 				stm.namespace_prefix ("CORBA/Internal");
-				stm << "Definitions <" << QName (*parent) << '>';
+				stm << "Decls <" << QName (*parent) << '>';
 			} else {
 				stm << QName (*parent);
 			}

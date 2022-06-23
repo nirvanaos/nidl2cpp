@@ -79,7 +79,7 @@ void Servant::skeleton_begin (const ItemContainer& item, const char* suffix)
 	h_ << empty_line
 
 		<< "template <class S>\n"
-		"class Skeleton <S, " << QName (item) << suffix << "> : public Definitions <"
+		"class Skeleton <S, " << QName (item) << suffix << "> : public Decls <"
 		<< QName (item) << ">\n"
 		"{\n"
 		"public:\n"

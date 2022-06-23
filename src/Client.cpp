@@ -313,14 +313,14 @@ void Client::begin_interface (const ItemContainer& container)
 	h_.namespace_open ("CORBA/Internal");
 	h_ << empty_line
 		<< "template <>\n"
-		"struct Definitions <" << QName (container) << ">\n"
+		"struct Decls <" << QName (container) << ">\n"
 		"{\n"
 		<< indent;
 }
 
 void Client::end_interface (const ItemContainer& container)
 {
-	// Close struct Definitions
+	// Close struct Decls
 	h_ << unindent
 		<< "};\n";
 
@@ -429,7 +429,7 @@ void Client::end_interface (const ItemContainer& container)
 		"class Client <T, " << QName (container) << "> :\n"
 		<< indent
 		<< "public T,\n"
-		"public Definitions <" << QName (container) << ">\n"
+		"public Decls <" << QName (container) << ">\n"
 		<< unindent
 		<<
 		"{\n"
@@ -645,21 +645,21 @@ void Client::end_interface (const ItemContainer& container)
 				break;
 			default: {
 				const NamedItem& def = static_cast <const NamedItem&> (*item);
-				h_ << "using " << Namespace ("CORBA/Internal") << "Definitions <"
+				h_ << "using " << Namespace ("CORBA/Internal") << "Decls <"
 					<< container.name () << ">::" << def.name () << ";\n";
 				if (!pseudo_interface && RepositoryId::cast (&def))
-					h_ << "using " << Namespace ("CORBA/Internal") << "Definitions <"
+					h_ << "using " << Namespace ("CORBA/Internal") << "Decls <"
 					<< container.name () << ">::_tc_" << static_cast <const string&> (def.name ()) << ";\n";
 
 				if (options ().legacy && item->kind () != Item::Kind::EXCEPTION) {
 					h_ << "#ifdef LEGACY_CORBA_CPP\n"
-						"using " << Namespace ("CORBA/Internal") << "Definitions <" << container.name () << ">::" << def.name () << "_var;\n"
-						"using " << Namespace ("CORBA/Internal") << "Definitions <" << container.name () << ">::" << def.name () << "_out;\n";
+						"using " << Namespace ("CORBA/Internal") << "Decls <" << container.name () << ">::" << def.name () << "_var;\n"
+						"using " << Namespace ("CORBA/Internal") << "Decls <" << container.name () << ">::" << def.name () << "_out;\n";
 
 					if (item->kind () == Item::Kind::TYPE_DEF) {
 						const TypeDef& td = static_cast <const TypeDef&> (*item);
 						if (td.tkind () == Type::Kind::NAMED_TYPE && is_ref_type (td))
-							h_ << "using " << Namespace ("CORBA/Internal") << "Definitions <" << container.name () << ">::" << def.name () << "_ptr;\n";
+							h_ << "using " << Namespace ("CORBA/Internal") << "Decls <" << container.name () << ">::" << def.name () << "_ptr;\n";
 					}
 
 					h_ << "#endif\n";
@@ -760,7 +760,7 @@ void Client::end (const ValueType& vt)
 			"class Client <T, " << QName (vt) << FACTORY_SUFFIX "> :\n"
 			<< indent
 			<< "public T,\n"
-			"public Definitions <" << QName (vt) << ">\n"
+			"public Decls <" << QName (vt) << ">\n"
 			<< unindent
 			<<
 			"{\n"

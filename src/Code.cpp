@@ -342,13 +342,15 @@ Code& operator << (Code& stm, const Variant& var)
 
 		case Variant::VT::ENUM_ITEM: {
 			const EnumItem& item = var.as_enum_item ();
-			ScopedName sn = item.scoped_name ();
-			sn.insert (sn.begin () + sn.size () - 1, item.enum_type ().name ());
-			stm << sn.stringize ();
+			stm << QName (item.enum_type ()) << "::" << item.name ();
 		} break;
 
 		case Variant::VT::CONSTANT:
 			stm << QName (var.as_constant ());
+			break;
+
+		case Variant::VT::BOOLEAN:
+			stm << (var.as_bool () ? "true" : "false");
 			break;
 
 		default:

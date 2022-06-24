@@ -1270,11 +1270,88 @@ void Client::end (const Union& item)
 		}
 	}
 
-	if (var_len) {
-		h_ << "~" << item.name () << " ();\n";
+	const Variant* init_d;
+	const UnionElement* init_el;
+	if (init_el = item.default_element ()) {
+		init_d = &item.default_label ();
+	} else if (item.default_label ().empty ()) {
+		init_el = elements.front ();
+		init_d = &init_el->labels ().front ();
+	} else {
+		init_el = nullptr;
+		init_d = &item.default_label ();
+	}
 
+	assert (init_d);
+
+	// Constructor
+	h_ << item.name () << " () NIRVANA_NOEXCEPT";
+	if (init_el) {
+		h_ << ";\n";
 		cpp_.namespace_open (item);
-		cpp_ << QName (item) << "::~" << item.name () << " ()\n"
+		cpp_ << QName (item) << "::" << item.name () << " () NIRVANA_NOEXCEPT :\n"
+			<< indent <<
+			"__d (" << *init_d << ")\n"
+			<< unindent <<
+			"{\n"
+			<< indent <<
+			Namespace ("CORBA/Internal") << "construct (_u._" << init_el->name () << ");\n"
+			<< unindent <<
+			"}\n";
+	} else {
+		h_ << " :\n"
+			<< indent <<
+			"__d (" << *init_d << ")\n"
+			<< unindent <<
+			"{}\n";
+	}
+
+	// Destructor
+	h_ << "~" << item.name () << " ()\n"
+		"{\n"
+		<< indent << "_destruct ();\n" << unindent <<
+		"}\n\n"
+
+	// _d ();
+
+		"void _d (" << item.discriminator_type () << " d);\n" <<
+		item.discriminator_type () << " _d () const NIRVANA_NOEXCEPT\n"
+		"{\n"
+		<< indent <<
+		"return __d;\n"
+		<< unindent <<
+		"}\n\n";
+/*
+	cpp_.namespace_open (item);
+	cpp_ << "void " << QName (item) << "::_d (" << item.discriminator_type ()
+		<< " d)\n"
+		"{\n" << indent;
+
+	for (auto it = elements.begin (); it != elements.end (); ++it) {
+		if (it->l)
+	}
+*/
+	if (!init_el) {
+		// Implicit default
+		h_ << "void _default () NIRVANA_NOEXCEPT\n"
+			"{\n"
+			<< indent <<
+			"_destruct ();\n"
+			"__d = " << *init_d << ";\n"
+			<< unindent <<
+			"}\n\n";
+	}
+
+	h_
+		<< unindent <<
+		"private:\n"
+		<< indent <<
+		"void _destruct () NIRVANA_NOEXCEPT";
+
+	if (var_len) {
+		h_ << ";\n";
+		cpp_.namespace_open (item);
+		cpp_ << "void " << QName (item) << "::_destruct () NIRVANA_NOEXCEPT\n"
 			"{\n"
 			<< indent <<
 			"switch (__d) {\n" << indent;
@@ -1295,26 +1372,18 @@ void Client::end (const Union& item)
 			"}\n"
 			<< unindent <<
 			"}\n";
+	} else {
+		h_ << "\n"
+			"{}\n";
 	}
 
-	h_ <<
-		"void _d (" << item.discriminator_type () << " d);\n" <<
-		item.discriminator_type () << " _d () const\n"
-		"{\n"
-		<< indent <<
-		"return __d;\n"
-		<< unindent <<
-		"}\n";
-
-	h_
-		<< unindent <<
-		"private:\n"
-		<< indent <<
+	h_ << endl <<
 		item.discriminator_type () << " __d;\n"
 		"union _U\n"
 		"{\n" << indent <<
-		"~_U ()\n"
-		"{}\n\n";
+		"_U () {}\n"
+		"~_U () {}\n"
+		"\n";
 
 	for (auto e : elements) {
 		h_ << MemberVariable (*e);

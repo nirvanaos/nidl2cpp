@@ -1092,7 +1092,7 @@ void Client::define_structured_type (const RepositoryId& rid,
 			"{\n"
 			<< indent;
 
-		implement_type (item, members);
+		implement_type (item, members, suffix);
 		
 		if (!*suffix && !is_pseudo (item))
 			type_code_func (item);
@@ -1109,7 +1109,7 @@ void Client::define_structured_type (const RepositoryId& rid,
 		has_check (item, members);
 		h_ << ";\n";
 
-		implement_type (item, members);
+		implement_type (item, members, suffix);
 		
 		if (!*suffix && !is_pseudo (item))
 			type_code_func (item);
@@ -1119,26 +1119,17 @@ void Client::define_structured_type (const RepositoryId& rid,
 	}
 }
 
-void Client::implement_type (const AST::NamedItem& cont, const Members& members)
+void Client::implement_type (const AST::NamedItem& cont, const Members& members, const char* suffix)
 {
 	for (auto m : members) {
 		if (is_native (*m))
 			return;
 	}
 
-	// Implement check()
+	// Declare check()
+	h_ << "static void check (const ABI& val);\n";
 
-	h_ << "static void check (const ABI& val)\n"
-		"{\n"
-		<< indent;
-	for (auto member : members) {
-		if (may_have_check (*member))
-			h_ << TypePrefix (*member) << "check (val." << member->name () << ");\n";
-	}
-	h_ << unindent
-		<< "}\n";
-
-	// Implement marshaling
+	// Declare marshaling
 	if (is_var_len (members)) {
 		h_ << "\n"
 			"static void marshal_in (const Var&, IORequest::_ptr_type);\n"
@@ -1146,6 +1137,18 @@ void Client::implement_type (const AST::NamedItem& cont, const Members& members)
 			"static void unmarshal (IORequest::_ptr_type, Var&);\n";
 	} else
 		h_ << "static void byteswap (Var&) NIRVANA_NOEXCEPT;\n";
+
+	// Implement check()
+	cpp_.namespace_open ("CORBA/Internal");
+	cpp_ << "void Type <" << QName (cont) << suffix << ">::check (const ABI & val)\n"
+		"{\n"
+		<< indent;
+	for (auto member : members) {
+		if (may_have_check (*member))
+			cpp_ << TypePrefix (*member) << "check (val." << member->name () << ");\n";
+	}
+	cpp_ << unindent
+		<< "}\n";
 
 }
 

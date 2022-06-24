@@ -122,7 +122,7 @@ private:
 	void accessors (const Members& members);
 	void member_variables (const Members& members);
 	void member_variables_legacy (const Members& members);
-	void implement_type (const AST::NamedItem& cont, const Members& members);
+	void implement_type (const AST::NamedItem& cont, const Members& members, const char* suffix = "");
 	void has_check (const AST::NamedItem& cont, const Members& members);
 	static bool nested (const AST::NamedItem& item);
 	void h_namespace_open (const AST::NamedItem& item);

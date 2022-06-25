@@ -303,13 +303,18 @@ bool CodeGenBase::is_native (const Type& type)
 		return false;
 }
 
-bool CodeGenBase::is_enum (const Type& type)
+const AST::Enum* CodeGenBase::is_enum (const Type& type)
 {
 	const Type& t = type.dereference_type ();
-	return t.tkind () == Type::Kind::NAMED_TYPE && t.named_type ().kind () == Item::Kind::ENUM;
+	if (t.tkind () == Type::Kind::NAMED_TYPE) {
+		const auto& nt = t.named_type ();
+		if (nt.kind () == Item::Kind::ENUM)
+			return &static_cast <const Enum&> (nt);
+	}
+	return nullptr;
 }
 
-bool CodeGenBase::is_boolean (const AST::Type& t)
+bool CodeGenBase::is_boolean (const Type& t)
 {
 	const Type& dt = t.dereference_type ();
 	return dt.tkind () == Type::Kind::BASIC_TYPE && dt.basic_type () == BasicType::BOOLEAN;
@@ -569,39 +574,31 @@ Code& operator << (Code& stm, const Accessors& a)
 {
 	// const getter
 	stm << ConstRef (a.member) << ' ' << a.member.name () << " () const\n"
-		"{\n";
-	stm.indent ();
-	stm << "return _" << a.member.name () << ";\n";
-	stm.unindent ();
-	stm << "}\n";
+		"{\n" << indent <<
+		"return _" << a.member.name () << ";\n"
+		<< unindent << "}\n";
 
 	if (a.member.kind () != Item::Kind::STATE_MEMBER) {
 		// reference getter
 		stm << MemberType (a.member)
 			<< "& " << a.member.name () << " ()\n"
-			"{\n";
-		stm.indent ();
-		stm << "return _" << a.member.name () << ";\n";
-		stm.unindent ();
-		stm << "}\n";
+			"{\n" << indent <<
+			"return _" << a.member.name () << ";\n"
+			<< unindent << "}\n";
 	}
 
 	// setter
-	stm << "void " << a.member.name () << " (" << TypePrefix (a.member) << "ConstRef val)\n"
-		"{\n";
-	stm.indent ();
-	stm << '_' << a.member.name () << " = val;\n";
-	stm.unindent ();
-	stm << "}\n";
+	stm << "void " << a.member.name () << " (" << ConstRef (a.member) << " val)\n"
+		"{\n" << indent <<
+		'_' << a.member.name () << " = val;\n"
+		<< unindent << "}\n";
 
 	if (CodeGenBase::is_var_len (a.member)) {
 		// The move setter
 		stm << "void " << a.member.name () << " (" << Var (a.member) << "&& val)\n"
-			"{\n";
-		stm.indent ();
-		stm << '_' << a.member.name () << " = std::move (val);\n";
-		stm.unindent ();
-		stm << "}\n";
+			"{\n" << indent <<
+			'_' << a.member.name () << " = std::move (val);\n"
+			<< unindent << "}\n";
 	}
 
 	return stm;
@@ -612,11 +609,16 @@ Code& operator << (Code& stm, const MemberDefault& m)
 	stm << m.prefix << m.member.name () << " (";
 	const Type& td = m.member.dereference_type ();
 	switch (td.tkind ()) {
+		
 		case Type::Kind::BASIC_TYPE:
 			if (td.basic_type () == BasicType::BOOLEAN)
-				stm << Namespace ("CORBA") << "FALSE";
+				stm << "false";
 			else if (td.basic_type () < BasicType::OBJECT)
 				stm << "0";
+			break;
+
+		case Type::Kind::FIXED:
+			stm << "0";
 			break;
 
 		case Type::Kind::NAMED_TYPE: {

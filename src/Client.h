@@ -137,6 +137,8 @@ private:
 
 	void bridge_bases (const Bases& bases);
 
+	void init_union (const AST::UnionElement& init_el);
+
 	static size_t version (const std::string& rep_id);
 
 private:

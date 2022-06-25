@@ -1265,14 +1265,6 @@ void Client::end (const Union& item)
 {
 	UnionElements elements = get_elements (item);
 
-	bool var_len = false;
-	for (auto el : elements) {
-		if (is_var_len (*el)) {
-			var_len = true;
-			break;
-		}
-	}
-
 	const Variant* init_d;
 	const UnionElement* init_el;
 	if (init_el = item.default_element ()) {
@@ -1297,9 +1289,11 @@ void Client::end (const Union& item)
 			"__d (" << *init_d << ")\n"
 			<< unindent <<
 			"{\n"
-			<< indent <<
-			Namespace ("CORBA/Internal") << "construct (_u._" << init_el->name () << ");\n"
-			<< unindent <<
+			<< indent;
+
+		init_union (*init_el);
+
+		cpp_ << unindent <<
 			"}\n";
 	} else {
 		h_ << " :\n"
@@ -1319,23 +1313,21 @@ void Client::end (const Union& item)
 
 		"void _d (" << item.discriminator_type () << " d);\n" <<
 		item.discriminator_type () << " _d () const NIRVANA_NOEXCEPT\n"
-		"{\n"
-		<< indent <<
+		"{\n" << indent <<
 		"return __d;\n"
-		<< unindent <<
-		"}\n\n";
-/*
-	cpp_.namespace_open (item);
-	cpp_ << "void " << QName (item) << "::_d (" << item.discriminator_type ()
-		<< " d)\n"
-		"{\n" << indent;
+		<< unindent << "}\n\n";
 
-	for (auto it = elements.begin (); it != elements.end (); ++it) {
-		if (it->l)
-	}
-*/
+	cpp_.namespace_open (item);
+	cpp_ << empty_line <<
+		"void " << item.name () << "::_d (" << item.discriminator_type () << " d)\n"
+		"{\n" << indent <<
+		"if (_switch (d) != _switch (__d))\n" << indent <<
+		"throw " << Namespace ("CORBA") << "BAD_PARAM ();\n"
+		<< unindent
+		<< unindent << "}\n\n";
+
+	// _default ();
 	if (!init_el) {
-		// Implicit default
 		h_ << "void _default () NIRVANA_NOEXCEPT\n"
 			"{\n"
 			<< indent <<
@@ -1345,41 +1337,188 @@ void Client::end (const Union& item)
 			"}\n\n";
 	}
 
+	// Accessors
+
+	for (auto el : elements) {
+
+		h_.empty_line ();
+		cpp_.empty_line ();
+
+		const Variant& label = el->is_default () ? *init_d : el->labels ().front ();
+		bool multi = el->is_default () || el->labels ().size () > 1;
+
+		// const getter
+		h_ << ConstRef (*el) << ' ' << el->name () << " () const\n"
+			"{\n" << indent <<
+			"return const_cast <" << item.name () << "&> (*this)." << el->name () << " ();\n"
+			<< unindent << "}\n";
+
+		// ref getter
+		h_ << MemberType (*el) << "& " << el->name () << " ();\n"
+		// setter
+			"void " << el->name () << " (" << ConstRef (*el) << " val";
+		if (multi)
+			h_ << ", " << item.discriminator_type () << " = " << label;
+		h_ << ");\n";
+
+		// ref getter
+		cpp_ << MemberType (*el) << "& " << item.name () << "::" << el->name () << " ()\n"
+			"{\n" << indent <<
+			"if (_switch (__d) != " << label << ")\n" << indent <<
+			"throw " << Namespace ("CORBA") << "BAD_PARAM ();\n"
+			<< unindent <<
+			"return _u._" << el->name () << ";\n"
+			<< unindent << "}\n"
+
+		// setter
+			<< "void " << item.name () << "::" << el->name () << " (" << ConstRef (*el) << " val";
+		if (multi)
+			cpp_ << ", " << item.discriminator_type () << " label";
+		cpp_ << ")\n"
+			"{\n" << indent;
+
+		if (multi)
+			cpp_ << "if (_switch (label) != " << label << ")\n" << indent <<
+			"throw " << Namespace ("CORBA") << "BAD_PARAM ();\n" << unindent;
+
+		cpp_ << "if (_switch (__d) != " << label << ") {\n" << indent <<
+			"_destruct ();\n" <<
+			Namespace ("CORBA/Internal") << "construct (_u._" << el->name () << ", val);\n"
+			"__d = ";
+		if (multi)
+			cpp_ << "label";
+		else
+			cpp_ << label;
+		cpp_ << ";\n"
+			<< unindent << "} else\n" << indent <<
+			"_u._" << el->name () << " = val;\n"
+			<< unindent
+			<< unindent << "}\n";
+
+		if (is_var_len (*el)) {
+			// The move setter
+			h_ << "void " << el->name () << " (" << Var (*el) << "&& val";
+			if (multi)
+				h_ << ", " << item.discriminator_type () << " = " << label;
+			h_ << ");\n";
+
+			cpp_ << "void " << item.name () << "::" << el->name () << " (" << Var (*el) << "&& val";
+			if (multi)
+				cpp_ << ", " << item.discriminator_type () << " label";
+			cpp_ << ")\n"
+				"{\n" << indent;
+
+			if (multi)
+				cpp_ << "if (_switch (label) != " << label << ")\n" << indent <<
+				"throw " << Namespace ("CORBA") << "BAD_PARAM ();\n" << unindent;
+
+			cpp_ << "if (_switch (__d) != " << label << ") {\n" << indent <<
+				"_destruct ();\n" <<
+				Namespace ("CORBA/Internal") << "construct (_u._" << el->name () << ", std::move (val));"
+				"__d = ";
+			if (multi)
+				cpp_ << "label";
+			else
+				cpp_ << label;
+			cpp_ << ";\n"
+				<< unindent << "} else\n" << indent <<
+				"_u._" << el->name () << " = std::move (val);\n"
+				<< unindent
+				<< unindent << "}\n";
+		}
+	}
+
+	// _destruct ()
+
 	h_
 		<< unindent <<
 		"private:\n"
 		<< indent <<
 		"void _destruct () NIRVANA_NOEXCEPT";
 
+	bool var_len = false;
+	for (auto el : elements) {
+		if (is_var_len (*el)) {
+			var_len = true;
+			break;
+		}
+	}
+
 	if (var_len) {
 		h_ << ";\n";
 		cpp_.namespace_open (item);
-		cpp_ << "void " << QName (item) << "::_destruct () NIRVANA_NOEXCEPT\n"
+		cpp_ << empty_line <<
+			"void " << item.name () << "::_destruct () NIRVANA_NOEXCEPT\n"
 			"{\n"
 			<< indent <<
 			"switch (__d) {\n" << indent;
 		for (auto el : elements) {
-			if (is_var_len (*el)) {
-				for (const auto& label : el->labels ()) {
-					cpp_ << "case " << label << ":\n";
-				}
-				if (el->is_default ())
-					cpp_ << "default:\n";
-				cpp_ << indent << Namespace ("CORBA/Internal") << "destruct (_u._" << el->name () << ");\n";
-				if (!el->is_default ())
-					cpp_ << "break;\n";
-				cpp_ << unindent;
+			for (const auto& label : el->labels ()) {
+				cpp_ << "case " << label << ":\n";
 			}
+			if (el->is_default ())
+				cpp_ << "default:\n";
+			cpp_ << indent << Namespace ("CORBA/Internal") << "destruct (_u._" << el->name () << ");\n";
+			if (!el->is_default ())
+				cpp_ << "break;\n";
+			cpp_ << unindent;
 		}
-		cpp_ << unindent <<
-			"}\n"
-			<< unindent <<
-			"}\n";
+		cpp_ << unindent << "}\n" // switch
+
+			"__d = " << *init_d << ";\n";
+		// _destruct() must leave union in a consistent state
+		if (init_el && is_var_len (*init_el))
+			init_union (*init_el);
+		cpp_ << unindent << "}\n";
+
 	} else {
 		h_ << "\n"
 			"{}\n";
 	}
 
+	// _switch ()
+
+	h_ << "static " << item.discriminator_type () << " _switch (" << item.discriminator_type ()
+		<< " d) NIRVANA_NOEXCEPT";
+	if (is_boolean (item.discriminator_type ()))
+		h_ << "\n"
+		"{\n"
+		<< indent <<
+		"return d;\n"
+		<< unindent <<
+		"}\n";
+	else {
+		h_ << ";\n";
+		cpp_.namespace_open (item);
+		cpp_ << empty_line << item.discriminator_type () << ' ' << item.name ()
+			<< "::_switch (" << item.discriminator_type () << " d) NIRVANA_NOEXCEPT\n"
+			"{\n"
+			<< indent <<
+			"switch (d) {\n";
+
+		for (auto e : elements) {
+			if (!e->is_default ()) {
+				for (const auto& l : e->labels ()) {
+					cpp_ << "case " << l << ":\n";
+				}
+				cpp_ << indent <<
+					"return " << e->labels ().front () << ";\n"
+					<< unindent;
+			}
+		}
+
+		if (!item.default_label ().empty ())
+			cpp_ << "default:\n"
+			<< indent <<
+			"return " << item.default_label () << ";\n"
+			<< unindent;
+
+		cpp_ << "}\n"
+			<< unindent <<
+			"}\n";
+	}
+
+	// Data
 	h_ << endl <<
 		item.discriminator_type () << " __d;\n"
 		"union _U\n"
@@ -1400,6 +1539,15 @@ void Client::end (const Union& item)
 	// Type code
 	type_code_decl (item);
 
+}
+
+void Client::init_union (const UnionElement& init_el)
+{
+	const Enum* en = is_enum (init_el);
+	if (en)
+		cpp_ << "_u._" << init_el.name () << " = " << QName (*en) << "::" << QName (*(*en).front ());
+	else
+		cpp_ << Namespace ("CORBA/Internal") << "construct (_u._" << init_el.name () << ");\n";
 }
 
 void Client::implement (const Union& item)

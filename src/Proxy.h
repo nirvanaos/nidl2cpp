@@ -64,6 +64,7 @@ protected:
 
 	virtual void end (const AST::Exception& item);
 	virtual void end (const AST::Struct& item);
+	virtual void end (const AST::Union& item);
 	virtual void leaf (const AST::Enum& item);
 
 	virtual void end (const AST::ValueType& item);
@@ -106,6 +107,8 @@ private:
 	void marshal_member (const AST::Member& m, const char* func, const char* prefix);
 	void unmarshal_members (const Members& members, const char* prefix, const char* end);
 	void unmarshal_member (const AST::Member& m, const char* prefix);
+
+	void marshal_union (const AST::Union& u, const UnionElements& elements, bool out);
 
 private:
 	Code cpp_;

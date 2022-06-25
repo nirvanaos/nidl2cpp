@@ -39,9 +39,27 @@ public:
 	static bool is_keyword (const AST::Identifier& id);
 	inline static const char protected_prefix_ [] = "_cxx_";
 
+	const Options& options () const
+	{
+		return options_;
+	}
+
 	typedef std::vector <const AST::Member*> Members;
 
-	static Members get_members (const AST::ItemContainer& cont);
+	static Members get_members (const AST::Struct& cont)
+	{
+		return get_members (cont, AST::Item::Kind::MEMBER);
+	}
+
+	static Members get_members (const AST::Exception& cont)
+	{
+		return get_members (cont, AST::Item::Kind::MEMBER);
+	}
+
+	static Members get_members (const AST::Union& cont)
+	{
+		return get_members (cont, AST::Item::Kind::UNION_ELEMENT);
+	}
 
 	typedef std::vector <const AST::StateMember*> StateMembers;
 	static StateMembers get_members (const AST::ValueType& cont);
@@ -67,13 +85,17 @@ public:
 	static bool is_native (const AST::Type& type);
 	static bool is_boolean (const AST::Type& t);
 	static bool may_have_check (const AST::Type& type);
-	static bool may_have_check (const AST::NamedItem& cont, const AST::Type& type, bool& recursive_seq);
-	static bool is_recursive_seq (const AST::NamedItem& cont, const AST::Type& type);
 
-	const Options& options () const
+	enum class RecursiveSeq
 	{
-		return options_;
-	}
+		NO,
+		YES,
+		BOUNDED
+	};
+
+	static bool may_have_check_skip_recursive (const AST::NamedItem& cont, const AST::Type& type);
+	static RecursiveSeq is_recursive_seq (const AST::NamedItem& cont, const AST::Type& type);
+	void init_union (Code& stm, const AST::UnionElement& init_el, const char* prefix = "");
 
 protected:
 	CodeGenBase (const Options& options) :
@@ -121,6 +143,8 @@ private:
 	}
 
 	static bool is_native_interface (const AST::NamedItem& type);
+
+	static Members get_members (const AST::ItemContainer& cont, AST::Item::Kind kind);
 
 	static void get_all_bases (const AST::ValueType& vt,
 		std::unordered_set <const AST::ItemContainer*>& bset, Bases& bvec);

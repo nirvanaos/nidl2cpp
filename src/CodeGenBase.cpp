@@ -128,12 +128,12 @@ bool CodeGenBase::is_keyword (const Identifier& id)
 	return binary_search (protected_names_, std::end (protected_names_), id.c_str (), pred);
 }
 
-CodeGenBase::Members CodeGenBase::get_members (const ItemContainer& cont)
+CodeGenBase::Members CodeGenBase::get_members (const ItemContainer& cont, Item::Kind kind)
 {
 	Members ret;
 	for (auto it = cont.begin (); it != cont.end (); ++it) {
 		const Item& item = **it;
-		if (item.kind () == Item::Kind::MEMBER)
+		if (item.kind () == kind)
 			ret.push_back (&static_cast <const Member&> (item));
 	}
 	return ret;
@@ -205,22 +205,22 @@ bool CodeGenBase::may_have_check (const Type& type)
 		|| is_var_len (t) || is_enum (t);
 }
 
-bool CodeGenBase::is_recursive_seq (const NamedItem& cont, const Type& type)
+CodeGenBase::RecursiveSeq CodeGenBase::is_recursive_seq (const NamedItem& cont, const Type& type)
 {
 	const Type& t = type.dereference_type ();
 	if (Type::Kind::SEQUENCE == t.tkind ()) {
 		const Type& ts = t.sequence ().dereference_type ();
-		return Type::Kind::NAMED_TYPE == ts.tkind () && &ts.named_type () == &cont;
+		if (Type::Kind::NAMED_TYPE == ts.tkind () && &ts.named_type () == &cont)
+			return t.sequence ().bound () ? RecursiveSeq::YES : RecursiveSeq::BOUNDED;
 	}
-	return false;
+	return RecursiveSeq::NO;
 }
 
-bool CodeGenBase::may_have_check (const NamedItem& cont, const Type& type, bool& recursive_seq)
+bool CodeGenBase::may_have_check_skip_recursive (const NamedItem& cont, const Type& type)
 {
-	if (is_recursive_seq (cont, type)) {
-		recursive_seq = true;
+	if (is_recursive_seq (cont, type) != RecursiveSeq::NO)
 		return false;
-	} else
+	else
 		return may_have_check (type);
 }
 
@@ -421,6 +421,18 @@ CodeGenBase::Factories CodeGenBase::get_factories (const ValueType& vt)
 			factories.push_back (&static_cast <const ValueFactory&> (item));
 	}
 	return factories;
+}
+
+void CodeGenBase::init_union (Code& stm, const UnionElement& init_el,
+	const char* prefix)
+{
+	const Enum* en = is_enum (init_el);
+	if (en)
+		stm << prefix << "_u._" << init_el.name () << " = " << QName (*en) << "::"
+		<< QName (*(*en).front ()) << ";\n";
+	else
+		stm << Namespace ("CORBA/Internal") << "construct (" << prefix << "_u._"
+		<< init_el.name () << ");\n";
 }
 
 Code& operator << (Code& stm, const QName& qn)

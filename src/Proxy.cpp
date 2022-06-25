@@ -860,3 +860,75 @@ void Proxy::unmarshal_members (const Members& members, const char* prefix, const
 	}
 	cpp_.unindent ();
 }
+
+void Proxy::end (const Union& item)
+{
+	if (is_pseudo (item))
+		return;
+
+	cpp_.namespace_open ("CORBA/Internal");
+
+	type_code_name (item);
+
+	UnionElements elements = get_elements (item);
+
+	type_code_members (item, (const Members&)elements);
+
+	// Marshaling
+	marshal_union (item, elements, false);
+	if (is_var_len ((const Members&)elements))
+		marshal_union (item, elements, true);
+	cpp_ << empty_line <<
+		"void Type <" << QName (item)
+		<< ">::unmarshal (IORequest::_ptr_type rq, Var& v)\n"
+		"{\n" << indent <<
+		"v._destruct ();\n" <<
+		TypePrefix (item.discriminator_type ()) << "unmarshal (rq, v.__d);\n"
+		"switch (v.__d) {\n";
+	for (auto el : elements) {
+		if (el->is_default ())
+			cpp_ << "default:\n";
+		else
+			for (const auto& l : el->labels ()) {
+				cpp_ << "case " << l << ":\n";
+			}
+		cpp_.indent ();
+		init_union (cpp_, *el, "v.");
+		cpp_ << TypePrefix (*el) << "unmarshal (rq, v._u._" << el->name () << ");\n"
+			"break;\n" << unindent;
+	}
+	cpp_ << "}\n"
+		<< unindent << "}\n";
+
+	cpp_.namespace_close ();
+
+	// Export TypeCode
+	exp (item) << "TypeCodeStruct <" << QName (item) << ">)\n";
+}
+
+void Proxy::marshal_union (const AST::Union& u, const UnionElements& elements, bool out)
+{
+	const char* func = out ? "marshal_out" : "marshal_in";
+
+	cpp_ << empty_line <<
+		"void Type <" << QName (u) << ">::" << func << " (";
+	if (!out)
+		cpp_ << "const ";
+	cpp_ << "Var& v, IORequest::_ptr_type rq)\n"
+		"{\n" << indent <<
+		TypePrefix (u.discriminator_type ()) << func << " (v.__d, rq);\n"
+		"switch (v.__d) {\n";
+	for (auto el : elements) {
+		if (el->is_default ())
+			cpp_ << "default:\n";
+		else
+			for (const auto& l : el->labels ()) {
+				cpp_ << "case " << l << ":\n";
+			}
+		cpp_.indent ();
+		cpp_ << TypePrefix (*el) << func << " (v._u._" << el->name () << ", rq);\n"
+			"break;\n" << unindent;
+	}
+	cpp_ << "}\n"
+		<< unindent << "}\n";
+}

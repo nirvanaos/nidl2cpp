@@ -116,16 +116,14 @@ private:
 	void type_code_decl (const AST::NamedItem& item);
 	void type_code_def (const AST::RepositoryId& rid);
 	void rep_id_of (const AST::RepositoryId& rid);
-	void define_structured_type (const AST::RepositoryId& rid, const Members& members,
-		const char* suffix = "", bool force_var_len = false);
+	void define_structured_type (const AST::RepositoryId& rid, const Members& members);
 	void type_code_func (const AST::NamedItem& item);
 	void constructors (const AST::Identifier& name, const Members& members,
 		const char* prefix);
 	void accessors (const Members& members);
 	void member_variables (const Members& members);
 	void member_variables_legacy (const Members& members);
-	void implement_type (const AST::NamedItem& cont, const Members& members,
-		bool force_var_len, const char* suffix = "");
+	void implement_type (const AST::NamedItem& cont, const Members& members);
 	void has_check (const AST::NamedItem& cont, const Members& members);
 	static bool nested (const AST::NamedItem& item);
 	void h_namespace_open (const AST::NamedItem& item);

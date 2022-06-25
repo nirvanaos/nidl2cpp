@@ -1034,7 +1034,7 @@ void Client::implement (const Exception& item)
 {
 	Members members = get_members (item);
 	if (!members.empty ())
-		define_structured_type (item, members, "::_Data");
+		define_structured_type (item, members);
 	else
 		rep_id_of (item);
 	type_code_def (item);
@@ -1059,12 +1059,15 @@ void Client::rep_id_of (const RepositoryId& rid)
 	}
 }
 
-void Client::define_structured_type (const RepositoryId& rid,
-	const Members& members, const char* suffix, bool force_var_len)
+void Client::define_structured_type (const RepositoryId& rid, const Members& members)
 {
 	rep_id_of (rid);
 
 	const NamedItem& item = rid.item ();
+
+	const char* suffix = "";
+	if (item.kind () == Item::Kind::EXCEPTION)
+		suffix = "::_Data";
 
 	bool var_len = is_var_len (members);
 	if (var_len) {
@@ -1092,17 +1095,10 @@ void Client::define_structured_type (const RepositoryId& rid,
 			"{\n"
 			<< indent;
 
-		implement_type (item, members, true, suffix);
-		
-		if (!*suffix && !is_pseudo (item))
-			type_code_func (item);
-
-		h_ << unindent
-			<< "};\n";
 	} else {
 		h_ << "TypeFixLen <" << QName (item) << suffix << ">";
 
-		if (force_var_len)
+		if (item.kind () == Item::Kind::UNION)
 			h_ << ",\n"
 			"TypeVarLenHelper <" << QName (item) << suffix << ", " << QName (item) << suffix << ">";
 		else
@@ -1116,36 +1112,62 @@ void Client::define_structured_type (const RepositoryId& rid,
 		has_check (item, members);
 		h_ << ";\n";
 
-		if (force_var_len) {
+		if (item.kind () == Item::Kind::UNION) {
 			h_ << "static const bool fixed_len = false;\n"
-				"using TypeVarLenHelper <" << QName (item) << suffix << ", " << QName (item) << suffix << ">::marshal_in_a;\n"
-				"using TypeVarLenHelper <" << QName (item) << suffix << ", " << QName (item) << suffix << ">::marshal_out_a;\n"
-				"using TypeVarLenHelper <" << QName (item) << suffix << ", " << QName (item) << suffix << ">::unmarshal_a;\n";
+				"\n"
+				"using TypeVarLenHelper <" << QName (item) << suffix << ", "
+				<< QName (item) << suffix << ">::marshal_in_a;\n"
+				"using TypeVarLenHelper <" << QName (item) << suffix << ", "
+				<< QName (item) << suffix << ">::marshal_out_a;\n"
+				"using TypeVarLenHelper <" << QName (item) << suffix << ", "
+				<< QName (item) << suffix << ">::unmarshal_a;\n";
 		}
-
-		implement_type (item, members, force_var_len, suffix);
-		
-		if (!*suffix && !is_pseudo (item))
-			type_code_func (item);
-
-		h_ << unindent
-			<< "};\n";
 	}
+
+	if (item.kind () == Item::Kind::UNION) {
+		const Union& u = static_cast <const Union&> (item);
+
+		int default_index;
+		if (u.default_element ()) {
+			default_index = 0;
+			for (auto m : members) {
+				if (m == u.default_element ())
+					break;
+				++default_index;
+			}
+		} else
+			default_index = -1;
+
+		h_ << "typedef " << u.discriminator_type () << " DiscriminatorType;\n"
+			"static const Long default_index_ = " << default_index << ";\n\n";
+	}
+
+	implement_type (item, members);
+
+	if (!*suffix && !is_pseudo (item))
+		type_code_func (item);
+
+	h_ << unindent
+		<< "};\n";
 }
 
-void Client::implement_type (const AST::NamedItem& cont, const Members& members, bool force_var_len, const char* suffix)
+void Client::implement_type (const AST::NamedItem& cont, const Members& members)
 {
 	for (auto m : members) {
 		if (is_native (*m))
 			return;
 	}
 
+	const char* suffix = "";
+	if (cont.kind () == Item::Kind::EXCEPTION)
+		suffix = "::_Data";
+
 	// Declare check()
 	h_ << "static void check (const ABI& val);\n";
 
 	// Declare marshaling
 	bool var_len = is_var_len (members);
-	if (var_len || force_var_len) {
+	if (var_len || cont.kind () == Item::Kind::UNION) {
 		h_ << "\n"
 			"static void marshal_in (const Var&, IORequest::_ptr_type);\n";
 
@@ -1266,8 +1288,7 @@ void Client::end (const Struct& item)
 
 void Client::implement (const Struct& item)
 {
-	Members members = get_members (item);
-	define_structured_type (item, members);
+	define_structured_type (item, get_members (item));
 	type_code_def (item);
 	implement_nested_items (item);
 }
@@ -1293,7 +1314,7 @@ void Client::end (const Union& item)
 
 	const Variant* init_d;
 	const UnionElement* init_el;
-	if (init_el = item.default_element ()) {
+	if ((init_el = item.default_element ())) {
 		init_d = &item.default_label ();
 	} else if (item.default_label ().empty ()) {
 		init_el = elements.front ();
@@ -1354,12 +1375,14 @@ void Client::end (const Union& item)
 		"{\n" << indent <<
 		"_destruct ();\n"
 		"_assign (src);\n"
+		"return *this;\n"
 		<< unindent << "}\n"
 
 		<< item.name () << "& operator = (" << item.name () << "&& src) NIRVANA_NOEXCEPT\n"
 		"{\n" << indent <<
 		"_destruct ();\n"
 		"_assign (std::move (src));\n"
+		"return *this;\n"
 		<< unindent << "}\n"
 
 	// _d ();
@@ -1644,8 +1667,7 @@ void Client::assign_union (const AST::Union& item, const UnionElements& elements
 
 void Client::implement (const Union& item)
 {
-	Members members = get_members (item);
-	define_structured_type (item, members, "", true);
+	define_structured_type (item, get_members (item));
 	type_code_def (item);
 	implement_nested_items (item);
 }

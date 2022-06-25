@@ -874,6 +874,19 @@ void Proxy::end (const Union& item)
 
 	type_code_members (item, (const Members&)elements);
 
+	cpp_ << "template <>\n"
+		"const TypeCodeUnion <" << QName (item) << ">::DiscriminatorType TypeCodeUnion <" << QName (item) << ">::labels_ [] = {\n"
+		<< indent;
+
+	auto it = elements.begin ();
+	assert (it != elements.end ());
+	cpp_ << ((*it)->is_default () ? item.default_label () : (*it)->labels ().front ());
+	for (++it; it != elements.end (); ++it) {
+		cpp_ << ",\n" << ((*it)->is_default () ? item.default_label () : (*it)->labels ().front ());
+	}
+	cpp_ << "\n"
+		<< unindent << "};\n";
+
 	// Marshaling
 	marshal_union (item, elements, false);
 	if (is_var_len ((const Members&)elements))
@@ -903,7 +916,7 @@ void Proxy::end (const Union& item)
 	cpp_.namespace_close ();
 
 	// Export TypeCode
-	exp (item) << "TypeCodeStruct <" << QName (item) << ">)\n";
+	exp (item) << "TypeCodeUnion <" << QName (item) << ">)\n";
 }
 
 void Proxy::marshal_union (const AST::Union& u, const UnionElements& elements, bool out)

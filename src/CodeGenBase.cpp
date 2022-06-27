@@ -205,20 +205,33 @@ bool CodeGenBase::may_have_check (const Type& type)
 		|| is_var_len (t) || is_enum (t);
 }
 
-CodeGenBase::RecursiveSeq CodeGenBase::is_recursive_seq (const NamedItem& cont, const Type& type)
+bool CodeGenBase::is_recursive_seq (const NamedItem& cont, const Type& type)
 {
 	const Type& t = type.dereference_type ();
 	if (Type::Kind::SEQUENCE == t.tkind ()) {
 		const Type& ts = t.sequence ().dereference_type ();
 		if (Type::Kind::NAMED_TYPE == ts.tkind () && &ts.named_type () == &cont)
-			return t.sequence ().bound () ? RecursiveSeq::YES : RecursiveSeq::BOUNDED;
+			return true;
 	}
-	return RecursiveSeq::NO;
+	return false;
+}
+
+bool CodeGenBase::is_bounded (const AST::Type& type)
+{
+	const Type& t = type.dereference_type ();
+	switch (t.tkind ()) {
+		case Type::Kind::SEQUENCE:
+			return t.sequence ().bound () != 0;
+		case Type::Kind::STRING:
+		case Type::Kind::WSTRING:
+			return t.string_bound () != 0;
+	}
+	return false;
 }
 
 bool CodeGenBase::may_have_check_skip_recursive (const NamedItem& cont, const Type& type)
 {
-	if (is_recursive_seq (cont, type) != RecursiveSeq::NO)
+	if (is_recursive_seq (cont, type))
 		return false;
 	else
 		return may_have_check (type);
@@ -428,10 +441,10 @@ void CodeGenBase::init_union (Code& stm, const UnionElement& init_el,
 {
 	const Enum* en = is_enum (init_el);
 	if (en)
-		stm << prefix << "_u._" << init_el.name () << " = " << QName (*en) << "::"
+		stm << prefix << "_u." << init_el.name () << " = " << QName (*en) << "::"
 		<< QName (*(*en).front ()) << ";\n";
 	else
-		stm << Namespace ("CORBA/Internal") << "construct (" << prefix << "_u._"
+		stm << Namespace ("CORBA/Internal") << "construct (" << prefix << "_u."
 		<< init_el.name () << ");\n";
 }
 
@@ -587,7 +600,7 @@ Code& operator << (Code& stm, const Accessors& a)
 	// const getter
 	stm << ConstRef (a.member) << ' ' << a.member.name () << " () const\n"
 		"{\n" << indent <<
-		"return _" << a.member.name () << ";\n"
+		"return _" << static_cast <const string&> (a.member.name ()) << ";\n"
 		<< unindent << "}\n";
 
 	if (a.member.kind () != Item::Kind::STATE_MEMBER) {
@@ -595,21 +608,21 @@ Code& operator << (Code& stm, const Accessors& a)
 		stm << MemberType (a.member)
 			<< "& " << a.member.name () << " ()\n"
 			"{\n" << indent <<
-			"return _" << a.member.name () << ";\n"
+			"return _" << static_cast <const string&> (a.member.name ()) << ";\n"
 			<< unindent << "}\n";
 	}
 
 	// setter
 	stm << "void " << a.member.name () << " (" << ConstRef (a.member) << " val)\n"
 		"{\n" << indent <<
-		'_' << a.member.name () << " = val;\n"
+		'_' << static_cast <const string&> (a.member.name ()) << " = val;\n"
 		<< unindent << "}\n";
 
 	if (CodeGenBase::is_var_len (a.member)) {
 		// The move setter
 		stm << "void " << a.member.name () << " (" << Var (a.member) << "&& val)\n"
 			"{\n" << indent <<
-			'_' << a.member.name () << " = std::move (val);\n"
+			'_' << static_cast <const string&> (a.member.name ()) << " = std::move (val);\n"
 			<< unindent << "}\n";
 	}
 

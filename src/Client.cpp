@@ -1066,19 +1066,31 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 	const NamedItem& item = rid.item ();
 
 	const char* suffix = "";
+	const Union* u = nullptr;
 	if (item.kind () == Item::Kind::EXCEPTION)
 		suffix = "::_Data";
+	else if (item.kind () == Item::Kind::UNION)
+		u = &static_cast <const Union&> (item);
 
 	bool var_len = is_var_len (members);
+
 	if (var_len) {
 		// ABI
 		h_ << "template <>\n"
 			"struct ABI <" << QName (item) << suffix << ">\n"
 			"{\n"
 			<< indent;
-		for (auto member : members) {
-			h_ << TypePrefix (*member) << "ABI " << member->name () << ";\n";
-		}
+		if (u) {
+			h_ << TypePrefix (u->discriminator_type ()) << "ABI __d;\n"
+				"union {\n";
+			for (auto m : members) {
+				h_ << TypePrefix (*m) << "ABI " << m->name () << ";\n";
+			}
+			h_ << "} _u;\n";
+		} else
+			for (auto m : members) {
+				h_ << TypePrefix (*m) << "ABI _" << static_cast <const string&> (m->name ()) << ";\n";
+			}
 		h_ << unindent
 			<< "};\n\n";
 	}
@@ -1087,9 +1099,10 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 	h_ << "template <>\n"
 		"struct Type <" << QName (item) << suffix << "> :\n" << indent;
 
+	bool check;
 	if (var_len) {
 		h_ << "TypeVarLen <" << QName (item) << suffix << ", ";
-		has_check (item, members);
+		check = has_check (item, members);
 		h_ << ">\n"
 			<< unindent <<
 			"{\n"
@@ -1105,11 +1118,10 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 			h_ << endl;
 
 		h_ << unindent <<
-			"{\n"
-			<< indent
+			"{\n" << indent
 
 			<< "static const bool has_check = ";
-		has_check (item, members);
+		check = has_check (item, members);
 		h_ << ";\n";
 
 		if (item.kind () == Item::Kind::UNION) {
@@ -1124,113 +1136,141 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 		}
 	}
 
-	if (item.kind () == Item::Kind::UNION) {
-		const Union& u = static_cast <const Union&> (item);
-
+	if (u) {
 		int default_index;
-		if (u.default_element ()) {
+		if (u->default_element ()) {
 			default_index = 0;
 			for (auto m : members) {
-				if (m == u.default_element ())
+				if (m == u->default_element ())
 					break;
 				++default_index;
 			}
 		} else
 			default_index = -1;
 
-		h_ << "typedef " << u.discriminator_type () << " DiscriminatorType;\n"
+		h_ << "typedef " << u->discriminator_type () << " DiscriminatorType;\n"
 			"static const Long default_index_ = " << default_index << ";\n\n";
 	}
 
-	implement_type (item, members);
+	bool native_member = false;
+	for (auto m : members) {
+		if (is_native (*m)) {
+			native_member = true;
+			break;
+		}
+	}
 
-	if (!*suffix && !is_pseudo (item))
+	if (!native_member) {
+		// Declare marshaling
+		if (var_len || u) {
+			h_ << "\n"
+				"static void marshal_in (const Var&, IORequest::_ptr_type);\n";
+
+			if (var_len)
+				h_ << "static void marshal_out (Var&, IORequest::_ptr_type);\n";
+
+			h_ << "static void unmarshal (IORequest::_ptr_type, Var&);\n";
+		} else
+			h_ << "static void byteswap (Var&) NIRVANA_NOEXCEPT;\n";
+
+		if (check) {
+			// Declare check()
+			h_ << "static void check (const ABI& val);\n";
+
+			// Implement check()
+			cpp_.namespace_open ("CORBA/Internal");
+			cpp_ << "void Type <" << QName (item) << suffix << ">::check (const ABI& val)\n"
+				"{\n"
+				<< indent;
+			if (!u) {
+				for (auto m : members) {
+					if (may_have_check (*m))
+						cpp_ << TypePrefix (*m) << "check (val._" << static_cast <const string&> (m->name ()) << ");\n";
+				}
+			} else {
+				cpp_ << TypePrefix (u->discriminator_type ()) << "check (val.__d);\n"
+				"switch (val.__d) {\n";
+				for (auto m : members) {
+					element_case (static_cast <const UnionElement&> (*m));
+					cpp_ << indent <<
+						TypePrefix (*m) << "check (val._u." << m->name () << ");\n"
+						<< unindent;
+				}
+				cpp_ << "}\n";
+			}
+			cpp_ << unindent
+				<< "}\n";
+		}
+	}
+
+	if (item.kind () != Item::Kind::EXCEPTION && !is_pseudo (item))
 		type_code_func (item);
 
 	h_ << unindent
 		<< "};\n";
 }
 
-void Client::implement_type (const AST::NamedItem& cont, const Members& members)
+bool Client::has_check (const NamedItem& cont, const Members& members)
 {
+	bool recursive_seq = false;
+
 	for (auto m : members) {
-		if (is_native (*m))
-			return;
+		recursive_seq |= is_recursive_seq (cont, *m);
+		if (is_bounded (*m)) {
+			h_ << "true";
+			return true;
+		}
 	}
 
-	const char* suffix = "";
-	if (cont.kind () == Item::Kind::EXCEPTION)
-		suffix = "::_Data";
-
-	// Declare check()
-	h_ << "static void check (const ABI& val);\n";
-
-	// Declare marshaling
-	bool var_len = is_var_len (members);
-	if (var_len || cont.kind () == Item::Kind::UNION) {
-		h_ << "\n"
-			"static void marshal_in (const Var&, IORequest::_ptr_type);\n";
-
-		if (var_len)
-			h_ << "static void marshal_out (Var&, IORequest::_ptr_type);\n";
-
-		h_ << "static void unmarshal (IORequest::_ptr_type, Var&);\n";
-	} else
-		h_ << "static void byteswap (Var&) NIRVANA_NOEXCEPT;\n";
-
-	// Implement check()
-	cpp_.namespace_open ("CORBA/Internal");
-	cpp_ << "void Type <" << QName (cont) << suffix << ">::check (const ABI & val)\n"
-		"{\n"
-		<< indent;
-	for (auto member : members) {
-		if (may_have_check (*member))
-			cpp_ << TypePrefix (*member) << "check (val." << member->name () << ");\n";
+	bool enum_discriminator = false;
+	if (cont.kind () == Item::Kind::UNION) {
+		const Union& u = static_cast <const Union&> (cont);
+		if (is_enum (u.discriminator_type ()))
+			enum_discriminator = true;
 	}
-	cpp_ << unindent
-		<< "}\n";
 
-}
+	bool check = false;
 
-void Client::has_check (const NamedItem& cont, const Members& members)
-{
-	RecursiveSeq recursive_seq = RecursiveSeq::NO;
-	for (auto m : members) {
-		RecursiveSeq rs = is_recursive_seq (cont, *m);
-		if (recursive_seq < rs)
-			recursive_seq = rs;
+	auto check_member = members.begin ();
+	for (; check_member != members.end (); ++check_member) {
+		if (may_have_check_skip_recursive (cont, **check_member))
+			break;
 	}
-	if (recursive_seq < RecursiveSeq::BOUNDED) {
-		auto check_member = members.begin ();
+	if (check_member != members.end ()) {
+		h_ << endl << indent;
+		h_ << TypePrefix (**(check_member++)) << "has_check";
 		for (; check_member != members.end (); ++check_member) {
 			if (may_have_check_skip_recursive (cont, **check_member))
 				break;
 		}
 		if (check_member != members.end ()) {
-			h_ << endl << indent;
-			h_ << TypePrefix (**(check_member++)) << "has_check";
-			for (; check_member != members.end (); ++check_member) {
-				if (may_have_check_skip_recursive (cont, **check_member))
-					break;
-			}
-			if (check_member != members.end ()) {
-				do {
-					h_ << "\n|| " << TypePrefix (**(check_member++)) << "has_check";
-					for (; check_member != members.end (); ++check_member) {
-						if (may_have_check_skip_recursive (cont, **check_member))
-							break;
-					}
-				} while (check_member != members.end ());
-			}
-			if (recursive_seq != RecursiveSeq::NO)
-				h_ << "\n|| CHECK_SEQUENCES";
-			h_.unindent ();
-		} else if (recursive_seq != RecursiveSeq::NO)
-			h_ << "CHECK_SEQUENCES";
-		else
-			h_ << "false";
-	} else
-		h_ << "true";
+			do {
+				h_ << "\n|| " << TypePrefix (**(check_member++)) << "has_check";
+				for (; check_member != members.end (); ++check_member) {
+					if (may_have_check_skip_recursive (cont, **check_member))
+						break;
+				}
+			} while (check_member != members.end ());
+		}
+		if (recursive_seq)
+			h_ << "\n|| CHECK_SEQUENCES";
+		h_.unindent ();
+		check = true;
+	} else if (recursive_seq) {
+		h_ << "CHECK_SEQUENCES";
+		check = true;
+	}
+	if (enum_discriminator) {
+		if (check)
+			h_ << " || ";
+		h_ << "CHECK_ENUMS";
+		check = true;
+	}
+
+	if (!check)
+		h_ << "false";
+
+	return check;
 }
 
 void Client::leaf (const StructDecl& item)
@@ -1442,7 +1482,7 @@ void Client::end (const Union& item)
 			"if (_switch (__d) != " << label << ")\n" << indent <<
 			"throw " << Namespace ("CORBA") << "BAD_PARAM ();\n"
 			<< unindent <<
-			"return _u._" << el->name () << ";\n"
+			"return _u." << el->name () << ";\n"
 			<< unindent << "}\n"
 
 		// setter
@@ -1458,7 +1498,7 @@ void Client::end (const Union& item)
 
 		cpp_ << "if (_switch (__d) != " << label << ") {\n" << indent <<
 			"_destruct ();\n" <<
-			Namespace ("CORBA/Internal") << "construct (_u._" << el->name () << ", val);\n"
+			Namespace ("CORBA/Internal") << "construct (_u." << el->name () << ", val);\n"
 			"__d = ";
 		if (multi)
 			cpp_ << "label";
@@ -1466,7 +1506,7 @@ void Client::end (const Union& item)
 			cpp_ << label;
 		cpp_ << ";\n"
 			<< unindent << "} else\n" << indent <<
-			"_u._" << el->name () << " = val;\n"
+			"_u." << el->name () << " = val;\n"
 			<< unindent
 			<< unindent << "}\n";
 
@@ -1489,7 +1529,7 @@ void Client::end (const Union& item)
 
 			cpp_ << "if (_switch (__d) != " << label << ") {\n" << indent <<
 				"_destruct ();\n" <<
-				Namespace ("CORBA/Internal") << "construct (_u._" << el->name () << ", std::move (val));"
+				Namespace ("CORBA/Internal") << "construct (_u." << el->name () << ", std::move (val));"
 				"__d = ";
 			if (multi)
 				cpp_ << "label";
@@ -1497,7 +1537,7 @@ void Client::end (const Union& item)
 				cpp_ << label;
 			cpp_ << ";\n"
 				<< unindent << "} else\n" << indent <<
-				"_u._" << el->name () << " = std::move (val);\n"
+				"_u." << el->name () << " = std::move (val);\n"
 				<< unindent
 				<< unindent << "}\n";
 		}
@@ -1522,14 +1562,9 @@ void Client::end (const Union& item)
 			<< indent <<
 			"switch (__d) {\n";
 		for (auto el : elements) {
-			if (el->is_default ())
-				cpp_ << "default:\n";
-			else
-				for (const auto& label : el->labels ()) {
-					cpp_ << "case " << label << ":\n";
-				}
+			element_case (*el);
 			cpp_ << indent
-				<< Namespace ("CORBA/Internal") << "destruct (_u._" << el->name () << ");\n"
+				<< Namespace ("CORBA/Internal") << "destruct (_u." << el->name () << ");\n"
 				"break;\n"
 				<< unindent;
 		}
@@ -1563,14 +1598,14 @@ void Client::end (const Union& item)
 	h_ << "\n"
 		"static " << item.discriminator_type () << " _switch (" <<
 		item.discriminator_type () << " d) NIRVANA_NOEXCEPT";
-	if (switch_is_trivial)
+	if (switch_is_trivial) {
 		h_ << "\n"
-		"{\n"
-		<< indent <<
-		"return d;\n"
-		<< unindent <<
-		"}\n";
-	else {
+			"{\n"
+			<< indent <<
+			"return d;\n"
+			<< unindent <<
+			"}\n";
+	} else {
 		h_ << ";\n";
 		cpp_ << empty_line << item.discriminator_type () << ' ' << item.name ()
 			<< "::_switch (" << item.discriminator_type () << " d) NIRVANA_NOEXCEPT\n"
@@ -1580,11 +1615,9 @@ void Client::end (const Union& item)
 
 		for (auto e : elements) {
 			if (!e->is_default ()) {
-				for (const auto& l : e->labels ()) {
-					cpp_ << "case " << l << ":\n";
-				}
-				cpp_ << indent <<
-					"return " << e->labels ().front () << ";\n"
+				element_case (*e);
+				cpp_ << indent << "return " <<
+					(e->is_default () ? item.default_label () : e->labels ().front ()) << ";\n"
 					<< unindent;
 			}
 		}
@@ -1610,7 +1643,7 @@ void Client::end (const Union& item)
 		"\n";
 
 	for (auto e : elements) {
-		h_ << MemberVariable (*e);
+		h_ << MemberType (*e) << ' ' << e->name () << ";\n";
 	}
 
 	h_ << unindent <<
@@ -1651,18 +1684,13 @@ void Client::assign_union (const AST::Union& item, const UnionElements& elements
 		"{\n" << indent <<
 		"switch (src.__d) {\n";
 	for (auto el : elements) {
-		if (el->is_default ())
-			cpp_ << "default:\n";
-		else
-			for (const auto& l : el->labels ()) {
-				cpp_ << "case " << l << ":\n";
-			}
+		element_case (*el);
 		cpp_ << indent
-			<< Namespace ("CORBA/Internal") << "construct (_u._" << el->name ()
+			<< Namespace ("CORBA/Internal") << "construct (_u." << el->name ()
 			<< ", ";
 		if (move)
 			cpp_ << "std::move (";
-		cpp_ << "src._u._" << el->name ();
+		cpp_ << "src._u." << el->name ();
 		if (move)
 			cpp_ << ')';
 		cpp_ << "); \n"
@@ -1671,6 +1699,16 @@ void Client::assign_union (const AST::Union& item, const UnionElements& elements
 	cpp_ << "}\n" // switch
 		"__d = src.__d;\n"
 		<< unindent << "}\n";
+}
+
+void Client::element_case (const UnionElement& el)
+{
+	if (el.is_default ())
+		cpp_ << "default:\n";
+	else
+		for (const auto& l : el.labels ()) {
+			cpp_ << "case " << l << ":\n";
+		}
 }
 
 void Client::implement (const Union& item)

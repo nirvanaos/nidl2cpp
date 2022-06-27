@@ -94,7 +94,8 @@ public:
 	};
 
 	static bool may_have_check_skip_recursive (const AST::NamedItem& cont, const AST::Type& type);
-	static RecursiveSeq is_recursive_seq (const AST::NamedItem& cont, const AST::Type& type);
+	static bool is_recursive_seq (const AST::NamedItem& cont, const AST::Type& type);
+	static bool is_bounded (const AST::Type& type);
 	void init_union (Code& stm, const AST::UnionElement& init_el, const char* prefix = "");
 
 protected:

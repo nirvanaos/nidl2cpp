@@ -123,8 +123,7 @@ private:
 	void accessors (const Members& members);
 	void member_variables (const Members& members);
 	void member_variables_legacy (const Members& members);
-	void implement_type (const AST::NamedItem& cont, const Members& members);
-	void has_check (const AST::NamedItem& cont, const Members& members);
+	bool has_check (const AST::NamedItem& cont, const Members& members);
 	static bool nested (const AST::NamedItem& item);
 	void h_namespace_open (const AST::NamedItem& item);
 
@@ -141,6 +140,7 @@ private:
 	static size_t version (const std::string& rep_id);
 
 	void assign_union (const AST::Union& item, const UnionElements& elements, bool move);
+	void element_case (const AST::UnionElement& el);
 
 private:
 	Header h_; // .h file

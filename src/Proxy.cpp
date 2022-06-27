@@ -773,7 +773,12 @@ void Proxy::leaf (const ValueBox& vb)
 
 void Proxy::marshal_member (const Member& m, const char* func, const char* prefix)
 {
-	cpp_ << TypePrefix (m) << func << " (" << prefix << m.name () << ", rq);\n";
+	cpp_ << TypePrefix (m) << func << " (" << prefix;
+	if (cpp_.last_char () == '_')
+		cpp_ << static_cast <const string&> (m.name ()); // No check for C++ keywords
+	else
+		cpp_ << m.name ();
+	cpp_ << ", rq);\n";
 }
 
 void Proxy::marshal_members (const Members& members, const char* func, const char* prefix, const char* cend)
@@ -811,7 +816,12 @@ void Proxy::marshal_members (const Members& members, const char* func, const cha
 
 void Proxy::unmarshal_member (const Member& m, const char* prefix)
 {
-	cpp_ << TypePrefix (m) << "unmarshal (rq, " << prefix << m.name () << ");\n";
+	cpp_ << TypePrefix (m) << "unmarshal (rq, " << prefix;
+	if (cpp_.last_char () == '_')
+		cpp_ << static_cast <const string&> (m.name ()); // No check for C++ keywords
+	else
+		cpp_ << m.name ();
+	cpp_ << ");\n";
 }
 
 void Proxy::unmarshal_members (const Members& members, const char* prefix, const char* cend)
@@ -907,7 +917,7 @@ void Proxy::end (const Union& item)
 			}
 		cpp_.indent ();
 		init_union (cpp_, *el, "v.");
-		cpp_ << TypePrefix (*el) << "unmarshal (rq, v._u._" << el->name () << ");\n"
+		cpp_ << TypePrefix (*el) << "unmarshal (rq, v._u." << el->name () << ");\n"
 			"break;\n" << unindent;
 	}
 	cpp_ << "}\n"
@@ -939,7 +949,7 @@ void Proxy::marshal_union (const AST::Union& u, const UnionElements& elements, b
 				cpp_ << "case " << l << ":\n";
 			}
 		cpp_.indent ();
-		cpp_ << TypePrefix (*el) << func << " (v._u._" << el->name () << ", rq);\n"
+		cpp_ << TypePrefix (*el) << func << " (v._u." << el->name () << ", rq);\n"
 			"break;\n" << unindent;
 	}
 	cpp_ << "}\n"

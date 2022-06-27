@@ -1401,7 +1401,7 @@ void Client::end (const Union& item)
 		<< unindent
 		<< unindent << "}\n\n";
 
-	// _default ();
+	// Union has implicit default, create _default () method;
 	if (!init_el) {
 		h_ << "void _default () NIRVANA_NOEXCEPT\n"
 			"{\n"
@@ -1537,7 +1537,7 @@ void Client::end (const Union& item)
 
 			"__d = " << *init_d << ";\n";
 		// _destruct() must leave union in a consistent state
-		if (init_el && is_var_len (*init_el))
+		if (init_el)
 			init_union (cpp_, *init_el);
 		cpp_ << unindent << "}\n\n";
 
@@ -1552,10 +1552,18 @@ void Client::end (const Union& item)
 
 	// _switch ()
 
+	bool switch_is_trivial = false;
+	if (is_boolean (item.discriminator_type ()))
+		switch_is_trivial = true;
+	else {
+		const Enum* en = is_enum (item.discriminator_type ());
+		switch_is_trivial = en && elements.size () >= en->size () - 1;
+	}
+
 	h_ << "\n"
 		"static " << item.discriminator_type () << " _switch (" <<
 		item.discriminator_type () << " d) NIRVANA_NOEXCEPT";
-	if (is_boolean (item.discriminator_type ()))
+	if (switch_is_trivial)
 		h_ << "\n"
 		"{\n"
 		<< indent <<

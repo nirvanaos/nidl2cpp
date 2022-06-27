@@ -1188,15 +1188,25 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 						cpp_ << TypePrefix (*m) << "check (val._" << static_cast <const string&> (m->name ()) << ");\n";
 				}
 			} else {
-				cpp_ << TypePrefix (u->discriminator_type ()) << "check (val.__d);\n"
-				"switch (val.__d) {\n";
+				cpp_ << TypePrefix (u->discriminator_type ()) << "check (val.__d);\n";
+				// If discriminator is enum, members may not have checks
+				bool check = false;
 				for (auto m : members) {
-					element_case (static_cast <const UnionElement&> (*m));
-					cpp_ << indent <<
-						TypePrefix (*m) << "check (val._u." << m->name () << ");\n"
-						<< unindent;
+					if (may_have_check (*m)) {
+						check = true;
+						break;
+					}
 				}
-				cpp_ << "}\n";
+				if (check) {
+					cpp_ << "switch (val.__d) {\n";
+					for (auto m : members) {
+						element_case (static_cast <const UnionElement&> (*m));
+						cpp_ << indent <<
+							TypePrefix (*m) << "check (val._u." << m->name () << ");\n"
+							<< unindent;
+					}
+					cpp_ << "}\n";
+				}
 			}
 			cpp_ << unindent
 				<< "}\n";

@@ -1082,11 +1082,15 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 			<< indent;
 		if (u) {
 			h_ << TypePrefix (u->discriminator_type ()) << "ABI __d;\n"
-				"union {\n";
-			for (auto m : members) {
+				"union _U\n"
+				"{\n" << indent <<
+				"_U () {}\n"
+				"~_U () {}\n"
+				"\n";
+				for (auto m : members) {
 				h_ << TypePrefix (*m) << "ABI " << m->name () << ";\n";
 			}
-			h_ << "} _u;\n";
+			h_ << unindent << "} _u;\n";
 		} else
 			for (auto m : members) {
 				h_ << TypePrefix (*m) << "ABI _" << static_cast <const string&> (m->name ()) << ";\n";
@@ -1203,6 +1207,7 @@ void Client::define_structured_type (const RepositoryId& rid, const Members& mem
 						element_case (static_cast <const UnionElement&> (*m));
 						cpp_ << indent <<
 							TypePrefix (*m) << "check (val._u." << m->name () << ");\n"
+							"break;\n"
 							<< unindent;
 					}
 					cpp_ << "}\n";

@@ -73,6 +73,7 @@ void Client::end (const Root&)
 
 void Client::leaf (const Include& item)
 {
+	h_.namespace_close ();
 	h_ << "#include " << (item.system () ? '<' : '"')
 		<< path (path (item.file ()).replace_extension ("").string ()
 			+ options ().client_suffix).replace_extension ("h").string ()
@@ -1564,11 +1565,9 @@ void Client::end (const Union& item)
 
 	// _destruct ()
 
-	h_
-		<< unindent <<
-		"private:\n"
-		<< indent <<
+	h_ << unindent << "\nprivate:\n" << indent <<
 		"friend struct " << Namespace ("CORBA/Internal") << "Type <" << item.name () << ">;\n"
+		"\n"
 		"void _destruct () NIRVANA_NOEXCEPT";
 
 	bool var_len = is_var_len ((const Members&)elements);

@@ -469,7 +469,7 @@ Code& operator << (Code& stm, const ParentName& qn)
 			}
 			stm << "::";
 		}
-	} else if (stm.cur_namespace ().empty ())
+	} else if (!stm.cur_namespace ().empty ())
 		stm << "::";
 	return stm;
 }

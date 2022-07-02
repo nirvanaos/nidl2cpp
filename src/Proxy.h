@@ -62,9 +62,9 @@ protected:
 	virtual void begin (const AST::Interface& itf) {}
 	virtual void end (const AST::Interface& itf);
 
-	virtual void end (const AST::Exception& item);
-	virtual void end (const AST::Struct& item);
-	virtual void end (const AST::Union& item);
+	virtual void leaf (const AST::Exception& item);
+	virtual void leaf (const AST::Struct& item);
+	virtual void leaf (const AST::Union& item);
 	virtual void leaf (const AST::Enum& item);
 
 	virtual void end (const AST::ValueType& item);
@@ -96,19 +96,19 @@ private:
 
 	void md_operation (const AST::Interface& itf, const OpMetadata& op);
 
-	void type_code_members (const AST::NamedItem& item, const Members& members);
+	void type_code_members (const AST::ItemWithId& item, const Members& members);
 	void type_code_name (const AST::NamedItem& item);
 	void state_member (const AST::StateMember& m);
 
 	Code& exp (const AST::NamedItem& item);
 
-	void implement_marshaling (const AST::NamedItem& cont, const char* suffix, const Members& members, const char* prefix);
+	void implement_marshaling (const AST::StructBase& item, const char* suffix, const char* prefix);
 	void marshal_members (const Members& members, const char* func, const char* prefix, const char* end);
 	void marshal_member (const AST::Member& m, const char* func, const char* prefix);
 	void unmarshal_members (const Members& members, const char* prefix, const char* end);
 	void unmarshal_member (const AST::Member& m, const char* prefix);
 
-	void marshal_union (const AST::Union& u, const UnionElements& elements, bool out);
+	void marshal_union (const AST::Union& u, bool out);
 
 private:
 	Code cpp_;

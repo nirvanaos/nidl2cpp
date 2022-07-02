@@ -44,31 +44,14 @@ public:
 		return options_;
 	}
 
-	typedef std::vector <const AST::Member*> Members;
-
-	static Members get_members (const AST::Struct& cont)
-	{
-		return get_members (cont, AST::Item::Kind::MEMBER);
-	}
-
-	static Members get_members (const AST::Exception& cont)
-	{
-		return get_members (cont, AST::Item::Kind::MEMBER);
-	}
-
-	static Members get_members (const AST::Union& cont)
-	{
-		return get_members (cont, AST::Item::Kind::UNION_ELEMENT);
-	}
+	typedef AST::ContainerT <AST::Member> Members;
+	typedef AST::ContainerT <AST::UnionElement> UnionElements;
 
 	typedef std::vector <const AST::StateMember*> StateMembers;
 	static StateMembers get_members (const AST::ValueType& cont);
 
-	typedef std::vector <const AST::UnionElement*> UnionElements;
-	static UnionElements get_elements (const AST::Union& cont);
-
 	// Value and abstract bases of value base
-	typedef std::vector <const AST::ItemContainer*> Bases;
+	typedef std::vector <const AST::IV_Base*> Bases;
 	static Bases get_all_bases (const AST::ValueType& vt);
 
 	static const AST::Interface* get_concrete_supports (const AST::ValueType& vt);
@@ -85,14 +68,6 @@ public:
 	static bool is_native (const AST::Type& type);
 	static bool is_boolean (const AST::Type& t);
 	static bool may_have_check (const AST::Type& type);
-
-	enum class RecursiveSeq
-	{
-		NO,
-		YES,
-		BOUNDED
-	};
-
 	static bool may_have_check_skip_recursive (const AST::NamedItem& cont, const AST::Type& type);
 	static bool is_recursive_seq (const AST::NamedItem& cont, const AST::Type& type);
 	static bool is_bounded (const AST::Type& type);
@@ -110,24 +85,19 @@ protected:
 	virtual void end (const AST::ModuleItems&) {}
 	virtual void leaf (const AST::Operation&) {}
 	virtual void leaf (const AST::Attribute&) {}
-	virtual void leaf (const AST::Member& item) {}
 
 	virtual void leaf (const AST::InterfaceDecl& item) {}
 	virtual void end (const AST::Interface& item) {}
 
 	virtual void leaf (const AST::Constant& item) {}
-	virtual void begin (const AST::Exception& item) {}
-	virtual void end (const AST::Exception& item) {}
+	virtual void leaf (const AST::Exception& item) {}
 	virtual void leaf (const AST::StructDecl& item) {}
-	virtual void begin (const AST::Struct& item) {}
-	virtual void end (const AST::Struct& item) {}
+	virtual void leaf (const AST::Struct& item) {}
 
 	virtual void leaf (const AST::Enum& item) {}
 
 	virtual void leaf (const AST::UnionDecl&) {}
-	virtual void begin (const AST::Union&) {}
-	virtual void end (const AST::Union&) {}
-	virtual void leaf (const AST::UnionElement&) {}
+	virtual void leaf (const AST::Union&) {}
 
 	virtual void leaf (const AST::ValueTypeDecl&) {}
 	virtual void begin (const AST::ValueType&) {}
@@ -145,12 +115,10 @@ private:
 
 	static bool is_native_interface (const AST::NamedItem& type);
 
-	static Members get_members (const AST::ItemContainer& cont, AST::Item::Kind kind);
-
 	static void get_all_bases (const AST::ValueType& vt,
-		std::unordered_set <const AST::ItemContainer*>& bset, Bases& bvec);
+		std::unordered_set <const AST::IV_Base*>& bset, Bases& bvec);
 	static void get_all_bases (const AST::Interface& ai,
-		std::unordered_set <const AST::ItemContainer*>& bset, Bases& bvec);
+		std::unordered_set <const AST::IV_Base*>& bset, Bases& bvec);
 
 private:
 	static const char* const protected_names_ [];

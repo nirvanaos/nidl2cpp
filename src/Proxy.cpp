@@ -541,7 +541,7 @@ void Proxy::md_member (const Type& t, const string& name)
 	cpp_ << "{ \"" << name << "\", Type <" << WithAlias (t) << ">::type_code }";
 }
 
-void Proxy::type_code_members (const NamedItem& item, const Members& members)
+void Proxy::type_code_members (const ItemWithId& item, const Members& members)
 {
 	assert (!members.empty ());
 	cpp_ << "template <>\n"
@@ -590,30 +590,26 @@ void Proxy::leaf (const Enum& item)
 	exp (item) << "TypeCodeEnum <" << QName (item) << ">)\n";
 }
 
-void Proxy::end (const Exception& item)
+void Proxy::leaf (const Exception& item)
 {
-	Members members = get_members (item);
-
-	if (!members.empty ()) {
+	if (!item.empty ()) {
 		cpp_.namespace_open ("CORBA/Internal");
-		type_code_members (item, members);
-		implement_marshaling (item, "::_Data", members, "_");
+		type_code_members (item, item);
+		implement_marshaling (item, "::_Data", "_");
 	}
 
 	cpp_.namespace_close ();
-	exp (item) << "TypeCodeException <" << QName (item) << ", " << (members.empty () ? "false" : "true") << ">)\n";
+	exp (item) << "TypeCodeException <" << QName (item) << ", " << (item.empty () ? "false" : "true") << ">)\n";
 }
 
-void Proxy::end (const Struct& item)
+void Proxy::leaf (const Struct& item)
 {
 	if (is_pseudo (item))
 		return;
 
-	Members members = get_members (item);
-
 	cpp_.namespace_open ("CORBA/Internal");
 	type_code_name (item);
-	type_code_members (item, members);
+	type_code_members (item, item);
 
 	cpp_.empty_line ();
 
@@ -621,10 +617,10 @@ void Proxy::end (const Struct& item)
 	if (options ().legacy)
 		cpp_ << "\n#ifndef LEGACY_CORBA_CPP\n";
 
-	implement_marshaling (item, "", members, "_");
+	implement_marshaling (item, "", "_");
 	if (options ().legacy) {
 		cpp_ << "\n#else\n";
-		implement_marshaling (item, "", members, "");
+		implement_marshaling (item, "", "");
 		cpp_ << "\n#endif\n";
 	}
 
@@ -634,43 +630,41 @@ void Proxy::end (const Struct& item)
 	exp (item) << "TypeCodeStruct <" << QName (item) << ">)\n";
 }
 
-void Proxy::implement_marshaling (const NamedItem& cont, const char* suffix,
-	const Members& members, const char* prefix)
+void Proxy::implement_marshaling (const StructBase& item, const char* suffix,
+	const char* prefix)
 {
-	if (is_var_len (members)) {
+	if (is_var_len (item)) {
 
 		string my_prefix = "v.";
 		my_prefix += prefix;
 
 		cpp_ << "\n"
-			"void Type <" << QName (cont) << suffix
+			"void Type <" << QName (item) << suffix
 			<< ">::marshal_in (const Var& v, IORequest::_ptr_type rq)\n"
 			"{\n";
-		marshal_members (members, "marshal_in", my_prefix.c_str (), "&v + 1");
+		marshal_members (item, "marshal_in", my_prefix.c_str (), "&v + 1");
 		cpp_ << "}\n\n"
-			"void Type <" << QName (cont) << suffix
+			"void Type <" << QName (item) << suffix
 			<< ">::marshal_out (Var& v, IORequest::_ptr_type rq)\n"
 			"{\n";
-		marshal_members (members, "marshal_out", my_prefix.c_str (), "&v + 1");
+		marshal_members (item, "marshal_out", my_prefix.c_str (), "&v + 1");
 		cpp_ << "}\n\n"
-			"void Type <" << QName (cont) << suffix
+			"void Type <" << QName (item) << suffix
 			<< ">::unmarshal (IORequest::_ptr_type rq, Var& v)\n"
 			"{\n";
 
-		unmarshal_members (members, my_prefix.c_str (), "&v + 1");
+		unmarshal_members (item, my_prefix.c_str (), "&v + 1");
 		cpp_ << "}\n";
 	} else {
 
 		cpp_ << "\n"
-			"void Type <" << QName (cont) << suffix
+			"void Type <" << QName (item) << suffix
 			<< ">::byteswap (Var& v) NIRVANA_NOEXCEPT\n"
-			"{\n"
-			<< indent;
-		for (auto m : members) {
+			"{\n" << indent;
+		for (const auto& m : item) {
 			cpp_ << TypePrefix (*m) << "byteswap (v." << prefix << m->name () << ");\n";
 		}
-		cpp_ << unindent
-			<< "}\n";
+		cpp_ << unindent << "}\n";
 	}
 }
 
@@ -871,7 +865,7 @@ void Proxy::unmarshal_members (const Members& members, const char* prefix, const
 	cpp_.unindent ();
 }
 
-void Proxy::end (const Union& item)
+void Proxy::leaf (const Union& item)
 {
 	if (is_pseudo (item))
 		return;
@@ -879,28 +873,25 @@ void Proxy::end (const Union& item)
 	cpp_.namespace_open ("CORBA/Internal");
 
 	type_code_name (item);
-
-	UnionElements elements = get_elements (item);
-
-	type_code_members (item, (const Members&)elements);
+	type_code_members (item, item);
 
 	cpp_ << "template <>\n"
 		"const TypeCodeUnion <" << QName (item) << ">::DiscriminatorType TypeCodeUnion <" << QName (item) << ">::labels_ [] = {\n"
 		<< indent;
 
-	auto it = elements.begin ();
-	assert (it != elements.end ());
+	auto it = item.begin ();
+	assert (it != item.end ());
 	cpp_ << ((*it)->is_default () ? item.default_label () : (*it)->labels ().front ());
-	for (++it; it != elements.end (); ++it) {
+	for (++it; it != item.end (); ++it) {
 		cpp_ << ",\n" << ((*it)->is_default () ? item.default_label () : (*it)->labels ().front ());
 	}
 	cpp_ << "\n"
 		<< unindent << "};\n";
 
 	// Marshaling
-	marshal_union (item, elements, false);
-	if (is_var_len ((const Members&)elements))
-		marshal_union (item, elements, true);
+	marshal_union (item, false);
+	if (is_var_len (item))
+		marshal_union (item, true);
 	cpp_ << empty_line <<
 		"void Type <" << QName (item)
 		<< ">::unmarshal (IORequest::_ptr_type rq, Var& v)\n"
@@ -908,7 +899,7 @@ void Proxy::end (const Union& item)
 		"v._destruct ();\n" <<
 		TypePrefix (item.discriminator_type ()) << "unmarshal (rq, v.__d);\n"
 		"switch (v.__d) {\n";
-	for (auto el : elements) {
+	for (const auto& el : item) {
 		if (el->is_default ())
 			cpp_ << "default:\n";
 		else
@@ -929,7 +920,7 @@ void Proxy::end (const Union& item)
 	exp (item) << "TypeCodeUnion <" << QName (item) << ">)\n";
 }
 
-void Proxy::marshal_union (const AST::Union& u, const UnionElements& elements, bool out)
+void Proxy::marshal_union (const AST::Union& u, bool out)
 {
 	const char* func = out ? "marshal_out" : "marshal_in";
 
@@ -941,7 +932,7 @@ void Proxy::marshal_union (const AST::Union& u, const UnionElements& elements, b
 		"{\n" << indent <<
 		TypePrefix (u.discriminator_type ()) << func << " (v.__d, rq);\n"
 		"switch (v.__d) {\n";
-	for (auto el : elements) {
+	for (const auto& el : u) {
 		if (el->is_default ())
 			cpp_ << "default:\n";
 		else

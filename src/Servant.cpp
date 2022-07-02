@@ -73,7 +73,7 @@ void Servant::begin (const ValueType& vt)
 	}
 }
 
-void Servant::skeleton_begin (const ItemContainer& item, const char* suffix)
+void Servant::skeleton_begin (const IV_Base& item, const char* suffix)
 {
 	h_.namespace_open ("CORBA/Internal");
 	h_ << empty_line
@@ -90,7 +90,7 @@ void Servant::skeleton_begin (const ItemContainer& item, const char* suffix)
 		<< indent;
 }
 
-void Servant::skeleton_end (const ItemContainer& item, const char* suffix)
+void Servant::skeleton_end (const IV_Base& item, const char* suffix)
 {
 	h_ << unindent
 		<< "};\n"

@@ -85,12 +85,10 @@ protected:
 
 	virtual void leaf (const AST::Constant& item);
 
-	virtual void begin (const AST::Exception& item);
-	virtual void end (const AST::Exception& item);
+	virtual void leaf (const AST::Exception& item);
 
 	virtual void leaf (const AST::StructDecl& item);
-	virtual void begin (const AST::Struct& item);
-	virtual void end (const AST::Struct& item);
+	virtual void leaf (const AST::Struct& item);
 
 	virtual void leaf (const AST::Enum& item);
 
@@ -101,33 +99,31 @@ protected:
 	virtual void leaf (const AST::ValueBox& item);
 
 	virtual void leaf (const AST::UnionDecl& item);
-	virtual void begin (const AST::Union&);
-	virtual void end (const AST::Union&);
+	virtual void leaf (const AST::Union&);
 
 private:
 	void forward_guard (const AST::NamedItem& item);
 	void forward_define (const AST::NamedItem& item);
 	void forward_decl (const AST::NamedItem& item);
 	void forward_interface (const AST::NamedItem& item);
-	void begin_interface (const AST::ItemContainer& item);
-	void end_interface (const AST::ItemContainer& item);
+	void begin_interface (const AST::IV_Base& item);
+	void end_interface (const AST::IV_Base& item);
 	void backward_compat_var (const AST::NamedItem& item);
 	void environment (const AST::Raises& raises);
 	void type_code_decl (const AST::NamedItem& item);
-	void type_code_def (const AST::RepositoryId& rid);
-	void rep_id_of (const AST::RepositoryId& rid);
-	void define_structured_type (const AST::RepositoryId& rid, const Members& members);
+	void type_code_def (const AST::ItemWithId& item);
+	void rep_id_of (const AST::ItemWithId& item);
+	void define_structured_type (const AST::ItemWithId& item);
 	void type_code_func (const AST::NamedItem& item);
-	void constructors (const AST::Identifier& name, const Members& members,
-		const char* prefix);
-	void accessors (const Members& members);
-	void member_variables (const Members& members);
-	void member_variables_legacy (const Members& members);
-	bool has_check (const AST::NamedItem& cont, const Members& members);
+	void constructors (const AST::StructBase& item, const char* prefix);
+	void accessors (const AST::StructBase& item);
+	void member_variables (const AST::StructBase& item);
+	void member_variables_legacy (const AST::StructBase& item);
+	bool has_check (const AST::ItemWithId& item);
 	static bool nested (const AST::NamedItem& item);
 	void h_namespace_open (const AST::NamedItem& item);
 
-	void implement_nested_items (const AST::ItemContainer& parent);
+	void implement_nested_items (const AST::IV_Base& parent);
 	void implement (const AST::Exception& item);
 	void implement (const AST::Struct& item);
 	void implement (const AST::Union& item);
@@ -139,7 +135,7 @@ private:
 
 	static size_t version (const std::string& rep_id);
 
-	void assign_union (const AST::Union& item, const UnionElements& elements, bool move);
+	void assign_union (const AST::Union& item, bool move);
 	void element_case (const AST::UnionElement& el);
 
 private:

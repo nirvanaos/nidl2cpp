@@ -128,17 +128,6 @@ bool CodeGenBase::is_keyword (const Identifier& id)
 	return binary_search (protected_names_, std::end (protected_names_), id.c_str (), pred);
 }
 
-CodeGenBase::Members CodeGenBase::get_members (const ItemContainer& cont, Item::Kind kind)
-{
-	Members ret;
-	for (auto it = cont.begin (); it != cont.end (); ++it) {
-		const Item& item = **it;
-		if (item.kind () == kind)
-			ret.push_back (&static_cast <const Member&> (item));
-	}
-	return ret;
-}
-
 bool CodeGenBase::is_var_len (const Type& type)
 {
 	const Type& t = type.dereference_type ();
@@ -175,11 +164,11 @@ bool CodeGenBase::is_var_len (const Type& type)
 					return is_native_interface (item);
 
 				case Item::Kind::STRUCT:
-					return is_var_len (get_members (static_cast <const Struct&> (item)));
-					break;
+					return is_var_len (static_cast <const Struct&> (item));
+
 				case Item::Kind::UNION:
-					return is_var_len (get_members (static_cast <const Union&> (item)));
-					break;
+					return is_var_len (static_cast <const Union&> (item));
+
 				default:
 					return false;
 			}
@@ -190,7 +179,7 @@ bool CodeGenBase::is_var_len (const Type& type)
 
 bool CodeGenBase::is_var_len (const Members& members)
 {
-	for (auto member : members) {
+	for (const auto& member : members) {
 		if (is_var_len (*member))
 			return true;
 	}
@@ -344,22 +333,11 @@ CodeGenBase::StateMembers CodeGenBase::get_members (const ValueType& cont)
 	return ret;
 }
 
-CodeGenBase::UnionElements CodeGenBase::get_elements (const Union& cont)
-{
-	UnionElements ret;
-	for (auto it = cont.begin (); it != cont.end (); ++it) {
-		const Item& item = **it;
-		if (item.kind () == Item::Kind::UNION_ELEMENT)
-			ret.push_back (&static_cast <const UnionElement&> (item));
-	}
-	return ret;
-}
-
 CodeGenBase::Bases CodeGenBase::get_all_bases (const ValueType& vt)
 {
 	Bases bvec;
 	{
-		unordered_set <const ItemContainer*> bset;
+		unordered_set <const IV_Base*> bset;
 		get_all_bases (vt, bset, bvec);
 	}
 	const Interface* itf = get_concrete_supports (vt);
@@ -376,7 +354,7 @@ CodeGenBase::Bases CodeGenBase::get_all_bases (const ValueType& vt)
 }
 
 void CodeGenBase::get_all_bases (const ValueType& vt,
-	unordered_set <const ItemContainer*>& bset, Bases& bvec)
+	unordered_set <const IV_Base*>& bset, Bases& bvec)
 {
 	for (auto pb : vt.bases ()) {
 		if (bset.insert (pb).second) {
@@ -400,7 +378,7 @@ void CodeGenBase::get_all_bases (const ValueType& vt,
 }
 
 void CodeGenBase::get_all_bases (const Interface& ai,
-	unordered_set <const ItemContainer*>& bset, Bases& bvec)
+	unordered_set <const IV_Base*>& bset, Bases& bvec)
 {
 	for (auto pb : ai.bases ()) {
 		if (bset.insert (pb).second) {

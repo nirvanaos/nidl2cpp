@@ -1298,6 +1298,9 @@ bool Client::has_check (const ItemWithId& item)
 void Client::leaf (const StructDecl& item)
 {
 	forward_decl (item);
+	const Struct& s = item.definition ();
+	if (!nested (item) && !is_var_len (s))
+		implement (s);
 }
 
 void Client::leaf (const Struct& item)
@@ -1307,6 +1310,8 @@ void Client::leaf (const Struct& item)
 	
 	if (is_var_len (item))
 		backward_compat_var (item);
+	else if (item.has_forward_dcl ())
+		return;
 
 	if (!nested (item))
 		implement (item);

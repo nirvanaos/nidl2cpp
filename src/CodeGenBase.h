@@ -32,6 +32,7 @@
 #include <unordered_set>
 
 #define FACTORY_SUFFIX "_factory"
+#define EXCEPTION_SUFFIX "::_Data"
 
 class CodeGenBase : public AST::CodeGen
 {

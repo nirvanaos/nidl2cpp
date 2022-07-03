@@ -102,7 +102,7 @@ private:
 
 	Code& exp (const AST::NamedItem& item);
 
-	void implement_marshaling (const AST::StructBase& item, const char* suffix, const char* prefix);
+	void implement_marshaling (const AST::StructBase& item, const char* prefix);
 	void marshal_members (const Members& members, const char* func, const char* prefix, const char* end);
 	void marshal_member (const AST::Member& m, const char* func, const char* prefix);
 	void unmarshal_members (const Members& members, const char* prefix, const char* end);

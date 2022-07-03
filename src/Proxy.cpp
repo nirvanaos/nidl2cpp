@@ -595,7 +595,7 @@ void Proxy::leaf (const Exception& item)
 	if (!item.empty ()) {
 		cpp_.namespace_open ("CORBA/Internal");
 		type_code_members (item, item);
-		implement_marshaling (item, "::_Data", "_");
+		implement_marshaling (item, "_");
 	}
 
 	cpp_.namespace_close ();
@@ -617,10 +617,10 @@ void Proxy::leaf (const Struct& item)
 	if (options ().legacy)
 		cpp_ << "\n#ifndef LEGACY_CORBA_CPP\n";
 
-	implement_marshaling (item, "", "_");
+	implement_marshaling (item, "_");
 	if (options ().legacy) {
 		cpp_ << "\n#else\n";
-		implement_marshaling (item, "", "");
+		implement_marshaling (item, "");
 		cpp_ << "\n#endif\n";
 	}
 
@@ -630,9 +630,12 @@ void Proxy::leaf (const Struct& item)
 	exp (item) << "TypeCodeStruct <" << QName (item) << ">)\n";
 }
 
-void Proxy::implement_marshaling (const StructBase& item, const char* suffix,
-	const char* prefix)
+void Proxy::implement_marshaling (const StructBase& item, const char* prefix)
 {
+	const char* suffix = "";
+	if (item.kind () == Item::Kind::EXCEPTION)
+		suffix = EXCEPTION_SUFFIX;
+
 	if (is_var_len (item)) {
 
 		string my_prefix = "v.";

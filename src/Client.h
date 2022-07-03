@@ -114,6 +114,7 @@ private:
 	void type_code_def (const AST::ItemWithId& item);
 	void rep_id_of (const AST::ItemWithId& item);
 	void define_structured_type (const AST::ItemWithId& item);
+	void define_ABI (const AST::ItemWithId& item);
 	void type_code_func (const AST::NamedItem& item);
 	void constructors (const AST::StructBase& item, const char* prefix);
 	void accessors (const AST::StructBase& item);

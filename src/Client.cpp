@@ -1133,7 +1133,7 @@ void Client::define_structured_type (const ItemWithId& item)
 			h_ << "static const bool has_check = true;\n";
 
 		if (u) {
-			h_ << "static const bool fixed_len = false;\n"
+			h_ << "static const bool is_CDR = false;\n"
 				"\n"
 				"using TypeVarLenHelper <" << QName (item) << ", "
 				<< QName (item) << suffix << ">::marshal_in_a;\n"

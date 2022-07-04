@@ -966,9 +966,13 @@ void Client::leaf (const Constant& item)
 
 void Client::define (const Exception& item)
 {
-	h_.namespace_open (item);
+	if (nested (item))
+		h_.namespace_open ("CORBA/Internal");
+	else
+		h_.namespace_open (item);
+
 	h_ << empty_line
-		<< "class " << item.name () << " : public " << Namespace ("CORBA") << "UserException\n"
+		<< "class " << QName (item) << " : public " << Namespace ("CORBA") << "UserException\n"
 		"{\n"
 		"public:\n"
 		<< indent
@@ -1302,8 +1306,8 @@ void Client::leaf (const Exception& item)
 
 void Client::implement (const Exception& item)
 {
+	define (item);
 	if (!item.empty ()) {
-		define (item);
 		if (is_var_len (item))
 			define_ABI (item);
 		define_structured_type (item);
@@ -1399,7 +1403,11 @@ void Client::implement (const Union& item)
 
 void Client::define (const Struct& item)
 {
-	h_.namespace_open (item);
+	if (nested (item))
+		h_.namespace_open ("CORBA/Internal");
+	else
+		h_.namespace_open (item);
+
 	h_ << empty_line
 		<< "class " << QName (item) << "\n"
 		"{\n"
@@ -1432,7 +1440,11 @@ void Client::define (const Struct& item)
 
 void Client::define (const Union& item)
 {
-	h_.namespace_open (item);
+	if (nested (item))
+		h_.namespace_open ("CORBA/Internal");
+	else
+		h_.namespace_open (item);
+
 	h_ << empty_line
 		<< "class " << QName (item) << "\n"
 		"{\n"

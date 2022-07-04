@@ -137,7 +137,8 @@ private:
 	void accessors (const AST::StructBase& item);
 	void member_variables (const AST::StructBase& item);
 	void member_variables_legacy (const AST::StructBase& item);
-	bool has_check (const AST::ItemWithId& item);
+	static bool has_check (const AST::ItemWithId& item);
+	static bool has_check (const AST::Type& type);
 	static bool is_nested (const AST::NamedItem& item);
 	void h_namespace_open (const AST::NamedItem& item);
 

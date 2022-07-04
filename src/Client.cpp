@@ -1106,11 +1106,11 @@ void Client::define_structured_type (const ItemWithId& item)
 	h_ << "template <>\n"
 		"struct Type <" << QName (item) << suffix << "> :\n" << indent;
 
-	bool check;
+	bool check = has_check (item);
 	if (var_len) {
-		h_ << "TypeVarLen <" << QName (item) << suffix << ", ";
-		check = has_check (item);
-		h_ << ">\n"
+		h_ << "TypeVarLen <" << QName (item) << suffix << ", "
+			<< (check ? "true" : "false")
+			<< ">\n"
 			<< unindent <<
 			"{\n"
 			<< indent;
@@ -1126,10 +1126,7 @@ void Client::define_structured_type (const ItemWithId& item)
 
 		h_ << unindent <<
 			"{\n" << indent
-
-			<< "static const bool has_check = ";
-		check = has_check (item);
-		h_ << ";\n";
+			<< "static const bool has_check = " << (check ? "true" : "false") << ";\n";
 
 		if (u) {
 			h_ << "static const bool fixed_len = false;\n"
@@ -1181,28 +1178,28 @@ void Client::define_structured_type (const ItemWithId& item)
 			"{\n" << indent;
 		if (!u) {
 			for (auto m : members) {
-				if (may_have_check (*m))
+				if (has_check (*m))
 					cpp_ << TypePrefix (*m) << "check (val._" << static_cast <const string&> (m->name ()) << ");\n";
 			}
 		} else {
-			bool check = false;
-			if (may_have_check (u->discriminator_type ())) {
+			bool member_check = false;
+			if (has_check (u->discriminator_type ())) {
 				cpp_ << TypePrefix (u->discriminator_type ()) << "check (val.__d);\n";
 				// If discriminator is enum, members may not have checks
 				for (auto m : members) {
-					if (may_have_check (*m)) {
-						check = true;
+					if (has_check (*m)) {
+						member_check = true;
 						break;
 					}
 				}
 			} else
-				check = true; // Some members definitely have check
-			if (check) {
+				member_check = true; // Some members definitely have check
+			if (member_check) {
 				cpp_ << "switch (val.__d) {\n";
 				for (auto m : members) {
 					element_case (static_cast <const UnionElement&> (*m));
 					cpp_.indent ();
-					if (may_have_check (*m))
+					if (has_check (*m))
 						cpp_ << TypePrefix (*m) << "check (val._u." << m->name () << ");\n";
 					cpp_ << "break;\n"
 						<< unindent;
@@ -1219,62 +1216,28 @@ void Client::define_structured_type (const ItemWithId& item)
 	h_ << unindent << "};\n";
 }
 
+bool Client::has_check (const Type& type)
+{
+	return is_var_len (type) || is_enum (type);
+}
+
 bool Client::has_check (const ItemWithId& item)
 {
-	bool enum_discriminator = false;
-	bool check = false;
-
 	const Members* members;
 	if (item.kind () == Item::Kind::UNION) {
 		const Union& u = static_cast <const Union&> (item);
 		if (is_enum (u.discriminator_type ()))
-			enum_discriminator = true;
-		members = &static_cast <const Members&> (u);
+			return true;
+		members = &static_cast <const StructBase&> (u);
 	} else
 		members = &static_cast <const StructBase&> (item);
 
 	for (auto m : *members) {
-		if (is_sequence (*m)) {
-			h_ << "true";
+		if (has_check (*m))
 			return true;
-		}
 	}
 
-	auto check_member = members->begin ();
-	for (; check_member != members->end (); ++check_member) {
-		if (may_have_check (**check_member))
-			break;
-	}
-	if (check_member != members->end ()) {
-		h_ << endl << indent;
-		h_ << TypePrefix (**(check_member++)) << "has_check";
-		for (; check_member != members->end (); ++check_member) {
-			if (may_have_check (**check_member))
-				break;
-		}
-		if (check_member != members->end ()) {
-			do {
-				h_ << "\n|| " << TypePrefix (**(check_member++)) << "has_check";
-				for (; check_member != members->end (); ++check_member) {
-					if (may_have_check (**check_member))
-						break;
-				}
-			} while (check_member != members->end ());
-		}
-		h_.unindent ();
-		check = true;
-	}
-	if (enum_discriminator) {
-		if (check)
-			h_ << " || ";
-		h_ << "CHECK_ENUMS";
-		check = true;
-	}
-
-	if (!check)
-		h_ << "false";
-
-	return check;
+	return false;
 }
 
 void Client::leaf (const Exception& item)

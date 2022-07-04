@@ -186,14 +186,6 @@ bool CodeGenBase::is_var_len (const Members& members)
 	return false;
 }
 
-bool CodeGenBase::may_have_check (const Type& type)
-{
-	const Type& t = type.dereference_type ();
-	return
-		((Type::Kind::NAMED_TYPE == t.tkind () && t.named_type ().kind () == Item::Kind::UNION))
-		|| is_var_len (t) || is_enum (t);
-}
-
 bool CodeGenBase::is_bounded (const AST::Type& type)
 {
 	const Type& t = type.dereference_type ();

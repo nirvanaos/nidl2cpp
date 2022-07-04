@@ -69,7 +69,6 @@ public:
 	static bool is_native (const AST::Type& type);
 	static bool is_native (const Members& members);
 	static bool is_boolean (const AST::Type& t);
-	static bool may_have_check (const AST::Type& type);
 
 	static bool is_sequence (const AST::Type& type)
 	{

@@ -194,17 +194,6 @@ bool CodeGenBase::may_have_check (const Type& type)
 		|| is_var_len (t) || is_enum (t);
 }
 
-bool CodeGenBase::is_recursive_seq (const NamedItem& cont, const Type& type)
-{
-	const Type& t = type.dereference_type ();
-	if (Type::Kind::SEQUENCE == t.tkind ()) {
-		const Type& ts = t.sequence ().dereference_type ();
-		if (Type::Kind::NAMED_TYPE == ts.tkind () && &ts.named_type () == &cont)
-			return true;
-	}
-	return false;
-}
-
 bool CodeGenBase::is_bounded (const AST::Type& type)
 {
 	const Type& t = type.dereference_type ();
@@ -216,14 +205,6 @@ bool CodeGenBase::is_bounded (const AST::Type& type)
 			return t.string_bound () != 0;
 	}
 	return false;
-}
-
-bool CodeGenBase::may_have_check_skip_recursive (const NamedItem& cont, const Type& type)
-{
-	if (is_recursive_seq (cont, type))
-		return false;
-	else
-		return may_have_check (type);
 }
 
 bool CodeGenBase::is_pseudo (const NamedItem& item)

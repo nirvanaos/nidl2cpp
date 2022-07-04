@@ -1221,7 +1221,6 @@ void Client::define_structured_type (const ItemWithId& item)
 
 bool Client::has_check (const ItemWithId& item)
 {
-	bool recursive_seq = false;
 	bool enum_discriminator = false;
 	bool check = false;
 
@@ -1235,8 +1234,7 @@ bool Client::has_check (const ItemWithId& item)
 		members = &static_cast <const StructBase&> (item);
 
 	for (auto m : *members) {
-		recursive_seq |= is_recursive_seq (item, *m);
-		if (is_bounded (*m)) {
+		if (is_sequence (*m)) {
 			h_ << "true";
 			return true;
 		}
@@ -1244,31 +1242,26 @@ bool Client::has_check (const ItemWithId& item)
 
 	auto check_member = members->begin ();
 	for (; check_member != members->end (); ++check_member) {
-		if (may_have_check_skip_recursive (item, **check_member))
+		if (may_have_check (**check_member))
 			break;
 	}
 	if (check_member != members->end ()) {
 		h_ << endl << indent;
 		h_ << TypePrefix (**(check_member++)) << "has_check";
 		for (; check_member != members->end (); ++check_member) {
-			if (may_have_check_skip_recursive (item, **check_member))
+			if (may_have_check (**check_member))
 				break;
 		}
 		if (check_member != members->end ()) {
 			do {
 				h_ << "\n|| " << TypePrefix (**(check_member++)) << "has_check";
 				for (; check_member != members->end (); ++check_member) {
-					if (may_have_check_skip_recursive (item, **check_member))
+					if (may_have_check (**check_member))
 						break;
 				}
 			} while (check_member != members->end ());
 		}
-		if (recursive_seq)
-			h_ << "\n|| CHECK_SEQUENCES";
 		h_.unindent ();
-		check = true;
-	} else if (recursive_seq) {
-		h_ << "CHECK_SEQUENCES";
 		check = true;
 	}
 	if (enum_discriminator) {

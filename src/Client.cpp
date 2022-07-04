@@ -1122,12 +1122,9 @@ void Client::define_structured_type (const ItemWithId& item)
 
 		if (u)
 			h_ << ",\n"
-			"TypeVarLenHelper <" << QName (item) << ", " << QName (item) << ">";
-		else
-			h_ << endl;
+			"MarshalHelper <" << QName (item) << ", " << QName (item) << ">";
 
-		h_ << unindent <<
-			"{\n" << indent;
+		h_ << unindent << "\n{\n" << indent;
 
 		if (check)
 			h_ << "static const bool has_check = true;\n";
@@ -1135,11 +1132,11 @@ void Client::define_structured_type (const ItemWithId& item)
 		if (u) {
 			h_ << "static const bool is_CDR = false;\n"
 				"\n"
-				"using TypeVarLenHelper <" << QName (item) << ", "
+				"using MarshalHelper <" << QName (item) << ", "
 				<< QName (item) << suffix << ">::marshal_in_a;\n"
-				"using TypeVarLenHelper <" << QName (item) << ", "
+				"using MarshalHelper <" << QName (item) << ", "
 				<< QName (item) << suffix << ">::marshal_out_a;\n"
-				"using TypeVarLenHelper <" << QName (item) << ", "
+				"using MarshalHelper <" << QName (item) << ", "
 				<< QName (item) << suffix << ">::unmarshal_a;\n";
 		}
 	}

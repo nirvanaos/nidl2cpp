@@ -1047,11 +1047,12 @@ void Client::rep_id_of (const ItemWithId& item)
 
 void Client::define_ABI (const StructBase& item)
 {
+	if (!is_var_len (item))
+		return;
+
 	const char* suffix = "";
 	if (item.kind () == Item::Kind::EXCEPTION)
 		suffix = EXCEPTION_SUFFIX;
-
-	assert (is_var_len (item));
 
 	// ABI
 	h_.namespace_open ("CORBA/Internal");
@@ -1064,9 +1065,11 @@ void Client::define_ABI (const StructBase& item)
 	h_ << unindent << "};\n\n";
 }
 
+inline
 void Client::define_ABI (const Union& item)
 {
-	assert (is_var_len (item));
+	if (!is_var_len (item))
+		return;
 
 	// ABI
 	h_.namespace_open ("CORBA/Internal");
@@ -1255,8 +1258,7 @@ void Client::implement (const Exception& item)
 {
 	define (item);
 	if (!item.empty ()) {
-		if (is_var_len (item))
-			define_ABI (item);
+		define_ABI (item);
 		define_structured_type (item);
 	} else
 		rep_id_of (item);
@@ -1267,21 +1269,11 @@ void Client::implement (const Exception& item)
 void Client::leaf (const StructDecl& item)
 {
 	forward_decl (item);
-	if (!is_nested (item)) {
-		const Struct& def = item.definition ();
-		if (!is_var_len (def))
-			implement (def);
-	}
 }
 
 void Client::leaf (const UnionDecl& item)
 {
 	forward_decl (item);
-	if (!is_nested (item)) {
-		const Union& def = item.definition ();
-		if (!is_var_len (def))
-			implement (def);
-	}
 }
 
 void Client::leaf (const Struct& item)
@@ -1289,15 +1281,11 @@ void Client::leaf (const Struct& item)
 	if (is_nested (item)) {
 		if (!item.has_forward_dcl ())
 			forward_decl (item);
-		return;
+	} else {
+		if (!item.has_forward_dcl ())
+			type_code_decl (item);
+		implement (item);
 	}
-
-	if (!item.has_forward_dcl ())
-		type_code_decl (item);
-	else if (!is_var_len (item))
-		return; // Fixed length, implemented in the forward declaration
-
-	implement (item);
 }
 
 void Client::leaf (const Union& item)
@@ -1305,47 +1293,27 @@ void Client::leaf (const Union& item)
 	if (is_nested (item)) {
 		if (!item.has_forward_dcl ())
 			forward_decl (item);
-		return;
+	} else {
+		if (!item.has_forward_dcl ())
+			type_code_decl (item);
+		implement (item);
 	}
-
-	if (!item.has_forward_dcl ())
-		type_code_decl (item);
-	else if (!is_var_len (item))
-		return; // Fixed length, implemented in the forward declaration
-
-	implement (item);
 }
 
 void Client::implement (const Struct& item)
 {
 	type_code_def (item);
-
-	if (is_var_len (item)) {
-		if (!is_nested (item) && !item.has_forward_dcl ())
-			forward_decl (item);
-		define_structured_type (item);
-		define (item);
-		define_ABI (item);
-	} else {
-		define (item);
-		define_structured_type (item);
-	}
+	define (item);
+	define_ABI (item);
+	define_structured_type (item);
 }
 
 void Client::implement (const Union& item)
 {
 	type_code_def (item);
-
-	if (is_var_len (item)) {
-		if (!is_nested (item) && !item.has_forward_dcl ())
-			forward_decl (item);
-		define_structured_type (item);
-		define (item);
-		define_ABI (item);
-	} else {
-		define (item);
-		define_structured_type (item);
-	}
+	define (item);
+	define_ABI (item);
+	define_structured_type (item);
 }
 
 void Client::define (const Struct& item)
@@ -1385,6 +1353,7 @@ void Client::define (const Struct& item)
 		<< "};\n";
 }
 
+inline
 void Client::define (const Union& item)
 {
 	if (is_nested (item))

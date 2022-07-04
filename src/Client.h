@@ -121,7 +121,7 @@ private:
 		forward_decl (item.definition ());
 	}
 
-	void forward_interface (const AST::NamedItem& item);
+	void forward_interface (const AST::ItemWithId& item);
 	void begin_interface (const AST::IV_Base& item);
 	void end_interface (const AST::IV_Base& item);
 	void backward_compat_var (const AST::NamedItem& item);

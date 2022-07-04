@@ -86,9 +86,10 @@ void Client::type_code_decl (const NamedItem& item)
 	if (is_pseudo (item))
 		return;
 
-	if (!nested (item))
+	if (!nested (item)) {
+		h_.namespace_open (item);
 		h_ << "extern ";
-	else
+	} else
 		h_ << "static ";
 	h_ << "const " << Namespace ("Nirvana") << "ImportInterfaceT <"
 		<< Namespace ("CORBA") << "TypeCode> _tc_"
@@ -184,6 +185,13 @@ void Client::forward_decl (const NamedItem& item)
 	h_ << empty_line
 		<< "class " << item.name () << ";\n";
 	type_code_decl (item);
+}
+
+void Client::forward_decl (const AST::StructBase& item)
+{
+	forward_decl (static_cast <const NamedItem&> (item));
+	if (item.kind () != Item::Kind::EXCEPTION && is_var_len (item))
+		backward_compat_var (item);
 }
 
 void Client::forward_guard (const NamedItem& item)
@@ -956,9 +964,9 @@ void Client::leaf (const Constant& item)
 	h_ << ";\n";
 }
 
-void Client::leaf (const Exception& item)
+void Client::define (const Exception& item)
 {
-	h_namespace_open (item);
+	h_.namespace_open (item);
 	h_ << empty_line
 		<< "class " << item.name () << " : public " << Namespace ("CORBA") << "UserException\n"
 		"{\n"
@@ -1016,26 +1024,8 @@ void Client::leaf (const Exception& item)
 	}
 	h_ << unindent << "};\n";
 
-	// Type code
-	type_code_decl (item);
-
-	if (!nested (item))
-		implement (item);
-}
-
-void Client::implement (const Exception& item)
-{
-	if (!item.empty ()) {
-		define_structured_type (item);
-		if (is_var_len (item))
-			define_ABI (item);
-	} else
-		rep_id_of (item);
-
-	type_code_def (item);
-
 	// Define exception
-	assert (cpp_.cur_namespace ().empty ());
+	cpp_.namespace_close ();
 	cpp_ << empty_line
 		<< "NIRVANA_EXCEPTION_DEF (" << ParentName (item) << ", " << item.name () << ")\n\n";
 }
@@ -1051,39 +1041,44 @@ void Client::rep_id_of (const ItemWithId& item)
 	}
 }
 
-void Client::define_ABI (const ItemWithId& item)
+void Client::define_ABI (const StructBase& item)
 {
 	const char* suffix = "";
-	const Union* u = nullptr;
 	if (item.kind () == Item::Kind::EXCEPTION)
 		suffix = EXCEPTION_SUFFIX;
-	else if (item.kind () == Item::Kind::UNION)
-		u = &static_cast <const Union&> (item);
 
-	const Members& members = (u ? static_cast <const Members&> (*u) : static_cast <const Members&> (static_cast <const StructBase&> (item)));
-
-	assert (is_var_len (members));
+	assert (is_var_len (item));
 
 	// ABI
 	h_.namespace_open ("CORBA/Internal");
 	h_ << "template <>\n"
 		"struct ABI <" << QName (item) << suffix << ">\n"
 		"{\n" << indent;
-	if (u) {
-		h_ << TypePrefix (u->discriminator_type ()) << "ABI __d;\n"
-			"union _U\n"
-			"{\n" << indent <<
-			"_U () {}\n"
-			"~_U () {}\n"
-			"\n";
-		for (auto m : members) {
-			h_ << TypePrefix (*m) << "ABI " << m->name () << ";\n";
-		}
-		h_ << unindent << "} _u;\n";
-	} else
-		for (auto m : members) {
+		for (const auto& m : item) {
 			h_ << TypePrefix (*m) << "ABI _" << static_cast <const string&> (m->name ()) << ";\n";
 		}
+	h_ << unindent << "};\n\n";
+}
+
+void Client::define_ABI (const Union& item)
+{
+	assert (is_var_len (item));
+
+	// ABI
+	h_.namespace_open ("CORBA/Internal");
+	h_ << "template <>\n"
+		"struct ABI <" << QName (item) << ">\n"
+		"{\n" << indent;
+	h_ << TypePrefix (item.discriminator_type ()) << "ABI __d;\n"
+		"union _U\n"
+		"{\n" << indent <<
+		"_U () {}\n"
+		"~_U () {}\n"
+		"\n";
+	for (const auto& el : item) {
+		h_ << TypePrefix (*el) << "ABI " << el->name () << ";\n";
+	}
+	h_ << unindent << "} _u;\n";
 	h_ << unindent << "};\n\n";
 
 }
@@ -1295,36 +1290,115 @@ bool Client::has_check (const ItemWithId& item)
 	return check;
 }
 
+void Client::leaf (const Exception& item)
+{
+	if (nested (item))
+		forward_decl (item);
+	else {
+		type_code_decl (item);
+		implement (item);
+	}
+}
+
+void Client::implement (const Exception& item)
+{
+	if (!item.empty ()) {
+		define (item);
+		if (is_var_len (item))
+			define_ABI (item);
+		define_structured_type (item);
+	} else
+		rep_id_of (item);
+
+	type_code_def (item);
+}
+
 void Client::leaf (const StructDecl& item)
 {
 	forward_decl (item);
-	const Struct& s = item.definition ();
-	if (!nested (item) && !is_var_len (s))
-		implement (s);
+	if (!nested (item)) {
+		const Struct& def = item.definition ();
+		if (!is_var_len (def))
+			implement (def);
+	}
+}
+
+void Client::leaf (const UnionDecl& item)
+{
+	forward_decl (item);
+	if (!nested (item)) {
+		const Union& def = item.definition ();
+		if (!is_var_len (def))
+			implement (def);
+	}
 }
 
 void Client::leaf (const Struct& item)
 {
-	if (!item.has_forward_dcl ())
-		forward_decl (item);
-	
-	if (is_var_len (item))
-		backward_compat_var (item);
-	else if (item.has_forward_dcl ())
+	if (nested (item)) {
+		if (!item.has_forward_dcl ())
+			forward_decl (item);
 		return;
+	}
 
-	if (!nested (item))
-		implement (item);
+	if (!item.has_forward_dcl ())
+		type_code_decl (item);
+	else if (!is_var_len (item))
+		return; // Fixed length, implemented in the forward declaration
+
+	implement (item);
+}
+
+void Client::leaf (const Union& item)
+{
+	if (nested (item)) {
+		if (!item.has_forward_dcl ())
+			forward_decl (item);
+		return;
+	}
+
+	if (!item.has_forward_dcl ())
+		type_code_decl (item);
+	else if (!is_var_len (item))
+		return; // Fixed length, implemented in the forward declaration
+
+	implement (item);
 }
 
 void Client::implement (const Struct& item)
 {
 	type_code_def (item);
 
-	bool var_len = is_var_len (item);
-	if (var_len)
+	if (is_var_len (item)) {
+		if (!nested (item) && !item.has_forward_dcl ())
+			forward_decl (item);
 		define_structured_type (item);
+		define (item);
+		define_ABI (item);
+	} else {
+		define (item);
+		define_structured_type (item);
+	}
+}
 
+void Client::implement (const Union& item)
+{
+	type_code_def (item);
+
+	if (is_var_len (item)) {
+		if (!nested (item) && !item.has_forward_dcl ())
+			forward_decl (item);
+		define_structured_type (item);
+		define (item);
+		define_ABI (item);
+	} else {
+		define (item);
+		define_structured_type (item);
+	}
+}
+
+void Client::define (const Struct& item)
+{
 	h_.namespace_open (item);
 	h_ << empty_line
 		<< "class " << QName (item) << "\n"
@@ -1354,38 +1428,10 @@ void Client::implement (const Struct& item)
 
 	h_ << unindent
 		<< "};\n";
-
-	if (!var_len)
-		define_structured_type (item);
-	else
-		define_ABI (item);
 }
 
-void Client::leaf (const UnionDecl& item)
+void Client::define (const Union& item)
 {
-	forward_decl (item);
-}
-
-void Client::leaf (const Union& item)
-{
-	if (!item.has_forward_dcl ())
-		forward_decl (item);
-
-	if (is_var_len (item))
-		backward_compat_var (item);
-
-	if (!nested (item))
-		implement (item);
-}
-
-void Client::implement (const Union& item)
-{
-	type_code_def (item);
-
-	bool var_len = is_var_len (item);
-	if (var_len)
-		define_structured_type (item);
-
 	h_.namespace_open (item);
 	h_ << empty_line
 		<< "class " << QName (item) << "\n"
@@ -1591,7 +1637,7 @@ void Client::implement (const Union& item)
 		"\n"
 		"void _destruct () NIRVANA_NOEXCEPT";
 
-	if (var_len) {
+	if (is_var_len (item)) {
 		h_ << ";\n";
 		cpp_ << empty_line <<
 			"void " << item.name () << "::_destruct () NIRVANA_NOEXCEPT\n"
@@ -1685,13 +1731,7 @@ void Client::implement (const Union& item)
 
 	h_ << unindent <<
 		"} _u;\n"
-		<< unindent <<
-		"};\n";
-
-	if (!var_len)
-		define_structured_type (item);
-	else
-		define_ABI (item);
+		<< unindent << "};\n";
 }
 
 void Client::assign_union (const AST::Union& item, bool move)

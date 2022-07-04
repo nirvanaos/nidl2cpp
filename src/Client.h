@@ -73,7 +73,7 @@ public:
 		const AST::OperationBase& op;
 	};
 
-protected:
+private:
 	virtual void end (const AST::Root&);
 
 	virtual void leaf (const AST::Include& item);
@@ -86,11 +86,21 @@ protected:
 	virtual void leaf (const AST::Constant& item);
 
 	virtual void leaf (const AST::Exception& item);
+	void define (const AST::Exception& item);
+	void implement (const AST::Exception& item);
 
 	virtual void leaf (const AST::StructDecl& item);
 	virtual void leaf (const AST::Struct& item);
+	void define (const AST::Struct& item);
+	void implement (const AST::Struct& item);
+
+	virtual void leaf (const AST::UnionDecl& item);
+	virtual void leaf (const AST::Union&);
+	void define (const AST::Union& item);
+	void implement (const AST::Union& item);
 
 	virtual void leaf (const AST::Enum& item);
+	void implement (const AST::Enum& item);
 
 	virtual void leaf (const AST::ValueTypeDecl& item);
 	virtual void begin (const AST::ValueType& item);
@@ -98,13 +108,19 @@ protected:
 
 	virtual void leaf (const AST::ValueBox& item);
 
-	virtual void leaf (const AST::UnionDecl& item);
-	virtual void leaf (const AST::Union&);
-
-private:
 	void forward_guard (const AST::NamedItem& item);
 	void forward_define (const AST::NamedItem& item);
 	void forward_decl (const AST::NamedItem& item);
+	void forward_decl (const AST::StructBase& item);
+	void forward_decl (const AST::StructDecl& item)
+	{
+		forward_decl (item.definition ());
+	}
+	void forward_decl (const AST::UnionDecl& item)
+	{
+		forward_decl (item.definition ());
+	}
+
 	void forward_interface (const AST::NamedItem& item);
 	void begin_interface (const AST::IV_Base& item);
 	void end_interface (const AST::IV_Base& item);
@@ -114,7 +130,8 @@ private:
 	void type_code_def (const AST::ItemWithId& item);
 	void rep_id_of (const AST::ItemWithId& item);
 	void define_structured_type (const AST::ItemWithId& item);
-	void define_ABI (const AST::ItemWithId& item);
+	void define_ABI (const AST::StructBase& item);
+	void define_ABI (const AST::Union& item);
 	void type_code_func (const AST::NamedItem& item);
 	void constructors (const AST::StructBase& item, const char* prefix);
 	void accessors (const AST::StructBase& item);
@@ -125,10 +142,6 @@ private:
 	void h_namespace_open (const AST::NamedItem& item);
 
 	void implement_nested_items (const AST::IV_Base& parent);
-	void implement (const AST::Exception& item);
-	void implement (const AST::Struct& item);
-	void implement (const AST::Union& item);
-	void implement (const AST::Enum& item);
 
 	void native_itf_template (const AST::Operation& op);
 

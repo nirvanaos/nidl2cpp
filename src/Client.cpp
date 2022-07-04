@@ -318,8 +318,8 @@ void Client::type_code_func (const NamedItem& item)
 
 void Client::begin_interface (const IV_Base& container)
 {
-	if (!is_pseudo (container))
-		type_code_def (container);
+	type_code_decl (container);
+	type_code_def (container);
 
 	h_.namespace_open ("CORBA/Internal");
 	h_ << empty_line
@@ -1284,6 +1284,7 @@ void Client::leaf (const Struct& item)
 		if (!item.has_forward_dcl ())
 			forward_decl (item);
 	} else {
+		h_.empty_line ();
 		if (!item.has_forward_dcl ())
 			type_code_decl (item);
 		implement (item);
@@ -1296,6 +1297,7 @@ void Client::leaf (const Union& item)
 		if (!item.has_forward_dcl ())
 			forward_decl (item);
 	} else {
+		h_.empty_line ();
 		if (!item.has_forward_dcl ())
 			type_code_decl (item);
 		implement (item);

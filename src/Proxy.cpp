@@ -604,7 +604,7 @@ void Proxy::leaf (const Exception& item)
 
 void Proxy::leaf (const Struct& item)
 {
-	if (is_pseudo (item))
+	if (is_pseudo (item) || is_native (item))
 		return;
 
 	cpp_.namespace_open ("CORBA/Internal");
@@ -870,7 +870,7 @@ void Proxy::unmarshal_members (const Members& members, const char* prefix, const
 
 void Proxy::leaf (const Union& item)
 {
-	if (is_pseudo (item))
+	if (is_pseudo (item) || is_native (item))
 		return;
 
 	cpp_.namespace_open ("CORBA/Internal");

@@ -305,6 +305,15 @@ bool CodeGenBase::is_native (const Type& type)
 		return false;
 }
 
+bool CodeGenBase::is_native (const Members& members)
+{
+	for (const auto& member : members) {
+		if (is_native (*member))
+			return true;
+	}
+	return false;
+}
+
 const AST::Enum* CodeGenBase::is_enum (const Type& type)
 {
 	const Type& t = type.dereference_type ();

@@ -67,6 +67,7 @@ public:
 	static const AST::Enum* is_enum (const AST::Type& type);
 	static bool is_native_interface (const AST::Type& type);
 	static bool is_native (const AST::Type& type);
+	static bool is_native (const Members& members);
 	static bool is_boolean (const AST::Type& t);
 	static bool may_have_check (const AST::Type& type);
 	static bool may_have_check_skip_recursive (const AST::NamedItem& cont, const AST::Type& type);

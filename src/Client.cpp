@@ -86,7 +86,7 @@ void Client::type_code_decl (const NamedItem& item)
 	if (is_pseudo (item))
 		return;
 
-	if (!nested (item)) {
+	if (!is_nested (item)) {
 		h_.namespace_open (item);
 		h_ << "extern ";
 	} else
@@ -98,13 +98,13 @@ void Client::type_code_decl (const NamedItem& item)
 
 void Client::type_code_def (const ItemWithId& item)
 {
-	cpp_.namespace_close ();
 	if (is_pseudo (item))
 		return;
 
+	cpp_.namespace_close ();
 	cpp_ << empty_line
 		<< "NIRVANA_OLF_SECTION_N (" << (export_count_++) << ')';
-	if (!nested (item))
+	if (!is_nested (item))
 		 cpp_ << " extern";
 	cpp_ << " const " << Namespace ("Nirvana") << "ImportInterfaceT <" << Namespace ("CORBA") << "TypeCode>\n"
 		<< TC_Name (item) << " = { Nirvana::OLF_IMPORT_INTERFACE, ";
@@ -120,14 +120,14 @@ void Client::type_code_def (const ItemWithId& item)
 	cpp_ << ", CORBA::Internal::RepIdOf <CORBA::TypeCode>::id };\n\n";
 }
 
-bool Client::nested (const NamedItem& item)
+bool Client::is_nested (const NamedItem& item)
 {
 	return item.parent () && item.parent ()->kind () != Item::Kind::MODULE;
 }
 
 void Client::h_namespace_open (const NamedItem& item)
 {
-	if (!nested (item))
+	if (!is_nested (item))
 		h_.namespace_open (item);
 }
 
@@ -929,7 +929,7 @@ void Client::leaf (const Constant& item)
 			break;
 	}
 
-	if (nested (item))
+	if (is_nested (item))
 		h_ << "static ";
 	else if (outline)
 		h_ << "extern ";
@@ -945,7 +945,7 @@ void Client::leaf (const Constant& item)
 	if (outline) {
 		cpp_.namespace_open (item);
 
-		if (nested (item))
+		if (is_nested (item))
 			cpp_ << "static ";
 		else
 			cpp_ << "extern ";
@@ -966,7 +966,7 @@ void Client::leaf (const Constant& item)
 
 void Client::define (const Exception& item)
 {
-	if (nested (item))
+	if (is_nested (item))
 		h_.namespace_open ("CORBA/Internal");
 	else
 		h_.namespace_open (item);
@@ -1159,68 +1159,58 @@ void Client::define_structured_type (const ItemWithId& item)
 			"static const Long default_index_ = " << default_index << ";\n\n";
 	}
 
-	bool native_member = false;
-	for (auto m : members) {
-		if (is_native (*m)) {
-			native_member = true;
-			break;
-		}
-	}
+	// Declare marshaling
+	if (var_len || u) {
+		h_ << "\n"
+			"static void marshal_in (const Var&, IORequest::_ptr_type);\n";
 
-	if (!native_member) {
-		// Declare marshaling
-		if (var_len || u) {
-			h_ << "\n"
-				"static void marshal_in (const Var&, IORequest::_ptr_type);\n";
+		if (var_len)
+			h_ << "static void marshal_out (Var&, IORequest::_ptr_type);\n";
 
-			if (var_len)
-				h_ << "static void marshal_out (Var&, IORequest::_ptr_type);\n";
+		h_ << "static void unmarshal (IORequest::_ptr_type, Var&);\n";
+	} else
+		h_ << "static void byteswap (Var&) NIRVANA_NOEXCEPT;\n";
 
-			h_ << "static void unmarshal (IORequest::_ptr_type, Var&);\n";
-		} else
-			h_ << "static void byteswap (Var&) NIRVANA_NOEXCEPT;\n";
+	if (check) {
+		// Declare check()
+		h_ << "static void check (const ABI& val);\n";
 
-		if (check) {
-			// Declare check()
-			h_ << "static void check (const ABI& val);\n";
-
-			// Implement check()
-			cpp_.namespace_open ("CORBA/Internal");
-			cpp_ << "void Type <" << QName (item) << suffix << ">::check (const ABI& val)\n"
-				"{\n" << indent;
-			if (!u) {
-				for (auto m : members) {
-					if (may_have_check (*m))
-						cpp_ << TypePrefix (*m) << "check (val._" << static_cast <const string&> (m->name ()) << ");\n";
-				}
-			} else {
-				bool check = false;
-				if (may_have_check (u->discriminator_type ())) {
-					cpp_ << TypePrefix (u->discriminator_type ()) << "check (val.__d);\n";
-					// If discriminator is enum, members may not have checks
-					for (auto m : members) {
-						if (may_have_check (*m)) {
-							check = true;
-							break;
-						}
-					}
-				} else
-					check = true; // Some members definitely have check
-				if (check) {
-					cpp_ << "switch (val.__d) {\n";
-					for (auto m : members) {
-						element_case (static_cast <const UnionElement&> (*m));
-						cpp_.indent ();
-						if (may_have_check (*m))
-							cpp_ << TypePrefix (*m) << "check (val._u." << m->name () << ");\n";
-						cpp_ << "break;\n"
-							<< unindent;
-					}
-					cpp_ << "}\n";
-				}
+		// Implement check()
+		cpp_.namespace_open ("CORBA/Internal");
+		cpp_ << "void Type <" << QName (item) << suffix << ">::check (const ABI& val)\n"
+			"{\n" << indent;
+		if (!u) {
+			for (auto m : members) {
+				if (may_have_check (*m))
+					cpp_ << TypePrefix (*m) << "check (val._" << static_cast <const string&> (m->name ()) << ");\n";
 			}
-			cpp_ << unindent << "}\n";
+		} else {
+			bool check = false;
+			if (may_have_check (u->discriminator_type ())) {
+				cpp_ << TypePrefix (u->discriminator_type ()) << "check (val.__d);\n";
+				// If discriminator is enum, members may not have checks
+				for (auto m : members) {
+					if (may_have_check (*m)) {
+						check = true;
+						break;
+					}
+				}
+			} else
+				check = true; // Some members definitely have check
+			if (check) {
+				cpp_ << "switch (val.__d) {\n";
+				for (auto m : members) {
+					element_case (static_cast <const UnionElement&> (*m));
+					cpp_.indent ();
+					if (may_have_check (*m))
+						cpp_ << TypePrefix (*m) << "check (val._u." << m->name () << ");\n";
+					cpp_ << "break;\n"
+						<< unindent;
+				}
+				cpp_ << "}\n";
+			}
 		}
+		cpp_ << unindent << "}\n";
 	}
 
 	if (item.kind () != Item::Kind::EXCEPTION && !is_pseudo (item))
@@ -1296,7 +1286,7 @@ bool Client::has_check (const ItemWithId& item)
 
 void Client::leaf (const Exception& item)
 {
-	if (nested (item))
+	if (is_nested (item))
 		forward_decl (item);
 	else {
 		type_code_decl (item);
@@ -1320,7 +1310,7 @@ void Client::implement (const Exception& item)
 void Client::leaf (const StructDecl& item)
 {
 	forward_decl (item);
-	if (!nested (item)) {
+	if (!is_nested (item)) {
 		const Struct& def = item.definition ();
 		if (!is_var_len (def))
 			implement (def);
@@ -1330,7 +1320,7 @@ void Client::leaf (const StructDecl& item)
 void Client::leaf (const UnionDecl& item)
 {
 	forward_decl (item);
-	if (!nested (item)) {
+	if (!is_nested (item)) {
 		const Union& def = item.definition ();
 		if (!is_var_len (def))
 			implement (def);
@@ -1339,7 +1329,7 @@ void Client::leaf (const UnionDecl& item)
 
 void Client::leaf (const Struct& item)
 {
-	if (nested (item)) {
+	if (is_nested (item)) {
 		if (!item.has_forward_dcl ())
 			forward_decl (item);
 		return;
@@ -1355,7 +1345,7 @@ void Client::leaf (const Struct& item)
 
 void Client::leaf (const Union& item)
 {
-	if (nested (item)) {
+	if (is_nested (item)) {
 		if (!item.has_forward_dcl ())
 			forward_decl (item);
 		return;
@@ -1374,7 +1364,7 @@ void Client::implement (const Struct& item)
 	type_code_def (item);
 
 	if (is_var_len (item)) {
-		if (!nested (item) && !item.has_forward_dcl ())
+		if (!is_nested (item) && !item.has_forward_dcl ())
 			forward_decl (item);
 		define_structured_type (item);
 		define (item);
@@ -1390,7 +1380,7 @@ void Client::implement (const Union& item)
 	type_code_def (item);
 
 	if (is_var_len (item)) {
-		if (!nested (item) && !item.has_forward_dcl ())
+		if (!is_nested (item) && !item.has_forward_dcl ())
 			forward_decl (item);
 		define_structured_type (item);
 		define (item);
@@ -1403,7 +1393,7 @@ void Client::implement (const Union& item)
 
 void Client::define (const Struct& item)
 {
-	if (nested (item))
+	if (is_nested (item))
 		h_.namespace_open ("CORBA/Internal");
 	else
 		h_.namespace_open (item);
@@ -1440,7 +1430,7 @@ void Client::define (const Struct& item)
 
 void Client::define (const Union& item)
 {
-	if (nested (item))
+	if (is_nested (item))
 		h_.namespace_open ("CORBA/Internal");
 	else
 		h_.namespace_open (item);
@@ -1893,7 +1883,7 @@ void Client::leaf (const Enum& item)
 		<< "\n};\n";
 	type_code_decl (item);
 
-	if (!nested (item))
+	if (!is_nested (item))
 		implement (item);
 }
 

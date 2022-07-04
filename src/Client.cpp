@@ -1106,16 +1106,18 @@ void Client::define_structured_type (const ItemWithId& item)
 	h_ << "template <>\n"
 		"struct Type <" << QName (item) << suffix << "> :\n" << indent;
 
-	bool check = has_check (item);
+	bool check;
 	if (var_len) {
-		h_ << "TypeVarLen <" << QName (item) << suffix << ", "
-			<< (check ? "true" : "false")
-			<< ">\n"
+		check = true;
+
+		h_ << "TypeVarLen <" << QName (item) << suffix << ">\n"
 			<< unindent <<
 			"{\n"
 			<< indent;
 
 	} else {
+		check = has_check (item);
+
 		h_ << "TypeFixLen <" << QName (item) << suffix << ">";
 
 		if (u)
@@ -1125,8 +1127,10 @@ void Client::define_structured_type (const ItemWithId& item)
 			h_ << endl;
 
 		h_ << unindent <<
-			"{\n" << indent
-			<< "static const bool has_check = " << (check ? "true" : "false") << ";\n";
+			"{\n" << indent;
+
+		if (check)
+			h_ << "static const bool has_check = true;\n";
 
 		if (u) {
 			h_ << "static const bool fixed_len = false;\n"

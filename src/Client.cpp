@@ -273,9 +273,9 @@ void Client::forward_interface (const ItemWithId& item)
 		type_code_func (item);
 		h_.unindent ();
 	}
-	h_ << "};\n"
-		"\n"
-		"const Char RepIdOf <" << QName (item) << ">::id [] = \"" << item.repository_id () << "\";\n";
+	h_ << "};\n";
+
+	rep_id_of (item);
 
 	h_.namespace_close ();
 	h_ << empty_line
@@ -751,7 +751,9 @@ void Client::end (const ValueType& vt)
 			string factory_id = vt.repository_id ();
 			factory_id.insert (version (factory_id), FACTORY_SUFFIX);
 
-			h_ << "const Char RepIdOf <" << QName (vt) << FACTORY_SUFFIX << ">::id [] = \"" << factory_id << "\";\n" <<
+			h_ <<
+				"template <>\n"
+				"const Char RepIdOf <" << QName (vt) << FACTORY_SUFFIX << ">::id [] = \"" << factory_id << "\";\n" <<
 				"NIRVANA_BRIDGE_BEGIN (" << QName (vt) << FACTORY_SUFFIX << ")\n"
 				"NIRVANA_BASE_ENTRY  (ValueFactoryBase, CORBA_ValueFactoryBase)\n"
 				"NIRVANA_BRIDGE_EPV\n";
@@ -1038,7 +1040,9 @@ void Client::define (const Exception& item)
 
 void Client::rep_id_of (const ItemWithId& item)
 {
-	if (!is_pseudo (item)) {
+	if (item.kind () == Item::Kind::INTERFACE
+		|| item.kind () == Item::Kind::INTERFACE_DECL
+		|| !is_pseudo (item)) {
 		h_.namespace_open ("CORBA/Internal");
 		h_ << empty_line
 			<< "template <>\n"

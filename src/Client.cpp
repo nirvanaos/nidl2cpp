@@ -1851,38 +1851,39 @@ void Client::leaf (const ValueBox& vb)
 	h_ << empty_line
 		<< "class " << vb.name () << " : public CORBA::Internal::ValueBox <"
 		<< vb.name () << ", " << static_cast <const Type&> (vb) << ">\n"
-		"{\n";
+		"{\n"
+		"public:\n" << indent <<
+		"~" << vb.name () << " ()\n"
+		"{\n" << indent <<
+		"_value ().~BoxedType ();\n"
+		<< unindent << "}\n";
+
 	if (options ().legacy)
-		h_ << "#ifdef LEGACY_CORBA_CPP\n"
-		"public:\n"
-		"#else\n";
-	h_ << "private:\n"
+		h_ << "#ifndef LEGACY_CORBA_CPP\n";
+
+	h_ << unindent <<
+		"private:\n"
 		<< indent <<
 		"template <class T1, class ... Args>\n"
 		"friend CORBA::servant_reference <T1> CORBA::make_reference (Args ...);\n";
-	if (options ().legacy) {
-		h_ << unindent <<
-			"#endif\n"
-			<< indent;
-	}
 
-	h_ << vb.name () << " ()\n"
-		"{}\n\n"
-		<< vb.name () << " (const BoxedType& v) :\n"
-		"value_ (v)\n"
-		"{}\n\n"
-		<< vb.name () << " (BoxedType&& v) :\n"
-		"value_ (std::move (v))\n"
-		"{}\n\n"
-		<< unindent <<
-		"private:\n"
-		<< indent <<
-		"friend class CORBA::Internal::ValueBox <" << vb.name () << ", "
-		<< static_cast <const Type&> (vb) << ">;\n"
-		"\n"
-		"BoxedType value_;\n"
-		<< unindent <<
-		"};\n\n";
+	if (options ().legacy)
+		h_ << "#endif\n";
+
+	h_ <<
+		vb.name () << " ()\n"
+		"{\n" << indent <<
+		"::new (&value_) BoxedType ();\n"
+		<< unindent << "}\n" <<
+		vb.name () << " (const BoxedType& v)\n"
+		"{\n" << indent <<
+		"::new (&value_) BoxedType (v);\n"
+		<< unindent << "}\n" <<
+		vb.name () << " (BoxedType&& v)\n"
+		"{\n" << indent <<
+		"::new (&value_) BoxedType (std::move (v));\n"
+		<< unindent << "}\n"
+		<< unindent << "};\n\n";
 
 	type_code_decl (vb);
 	type_code_def (vb);
@@ -1901,6 +1902,5 @@ void Client::leaf (const ValueBox& vb)
 		"struct Type <" << QName (vb) << "> : TypeValueBox <" << QName (vb) << ">\n"
 		"{\n" << indent;
 	type_code_func (vb);
-	h_ << unindent <<
-		"};\n";
+	h_ << unindent << "};\n";
 }

@@ -177,6 +177,53 @@ bool CodeGenBase::is_var_len (const Type& type)
 	return false;
 }
 
+bool CodeGenBase::is_CDR (const Type& type)
+{
+	const Type& t = type.dereference_type ();
+	switch (t.tkind ()) {
+		case Type::Kind::BASIC_TYPE:
+			switch (t.basic_type ()) {
+				case BasicType::ANY:
+				case BasicType::OBJECT:
+				case BasicType::VALUE_BASE:
+				case BasicType::CHAR:
+				case BasicType::WCHAR:
+					return false;
+				default:
+					return true;
+			}
+
+		case Type::Kind::STRING:
+		case Type::Kind::WSTRING:
+		case Type::Kind::SEQUENCE:
+			return false;
+
+		case Type::Kind::ARRAY:
+			return is_CDR (t.array ());
+
+		case Type::Kind::NAMED_TYPE: {
+			const NamedItem& item = t.named_type ();
+			switch (item.kind ()) {
+				case Item::Kind::INTERFACE:
+				case Item::Kind::INTERFACE_DECL:
+				case Item::Kind::VALUE_TYPE:
+				case Item::Kind::VALUE_TYPE_DECL:
+				case Item::Kind::VALUE_BOX:
+				case Item::Kind::NATIVE:
+				case Item::Kind::UNION:
+					return false;
+
+				case Item::Kind::STRUCT:
+					return is_CDR (static_cast <const Struct&> (item));
+
+				default:
+					return true;
+			}
+		}
+	}
+	return true;
+}
+
 bool CodeGenBase::is_var_len (const Members& members)
 {
 	for (const auto& member : members) {
@@ -184,6 +231,15 @@ bool CodeGenBase::is_var_len (const Members& members)
 			return true;
 	}
 	return false;
+}
+
+bool CodeGenBase::is_CDR (const Members& members)
+{
+	for (const auto& member : members) {
+		if (!is_CDR (*member))
+			return false;
+	}
+	return true;
 }
 
 bool CodeGenBase::is_bounded (const AST::Type& type)

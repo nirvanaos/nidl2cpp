@@ -636,7 +636,7 @@ void Proxy::implement_marshaling (const StructBase& item, const char* prefix)
 	if (item.kind () == Item::Kind::EXCEPTION)
 		suffix = EXCEPTION_SUFFIX;
 
-	if (is_var_len (item)) {
+	if (!is_CDR (item)) {
 
 		string my_prefix = "v.";
 		my_prefix += prefix;
@@ -646,20 +646,22 @@ void Proxy::implement_marshaling (const StructBase& item, const char* prefix)
 			<< ">::marshal_in (const Var& v, IORequest::_ptr_type rq)\n"
 			"{\n";
 		marshal_members (item, "marshal_in", my_prefix.c_str (), "&v + 1");
-		cpp_ << "}\n\n"
-			"void Type <" << QName (item) << suffix
-			<< ">::marshal_out (Var& v, IORequest::_ptr_type rq)\n"
-			"{\n";
-		marshal_members (item, "marshal_out", my_prefix.c_str (), "&v + 1");
-		cpp_ << "}\n\n"
+		cpp_ << "}\n";
+		if (is_var_len (item)) {
+			cpp_ << "\n"
+				"void Type <" << QName (item) << suffix
+				<< ">::marshal_out (Var& v, IORequest::_ptr_type rq)\n"
+				"{\n";
+			marshal_members (item, "marshal_out", my_prefix.c_str (), "&v + 1");
+			cpp_ << "}\n";
+		}
+		cpp_ << "\n"
 			"void Type <" << QName (item) << suffix
 			<< ">::unmarshal (IORequest::_ptr_type rq, Var& v)\n"
 			"{\n";
-
 		unmarshal_members (item, my_prefix.c_str (), "&v + 1");
 		cpp_ << "}\n";
 	} else {
-
 		cpp_ << "\n"
 			"void Type <" << QName (item) << suffix
 			<< ">::byteswap (Var& v) NIRVANA_NOEXCEPT\n"
@@ -784,7 +786,7 @@ void Proxy::marshal_members (const Members& members, const char* func, const cha
 
 	for (Members::const_iterator m = members.begin (); m != members.end ();) {
 		// Marshal variable-length members
-		while (is_var_len (**m)) {
+		while (!is_CDR (**m)) {
 			marshal_member (**m, func, prefix);
 			if (members.end () == ++m)
 				break;
@@ -794,7 +796,7 @@ void Proxy::marshal_members (const Members& members, const char* func, const cha
 			auto begin = m;
 			do {
 				++m;
-			} while (m != members.end () && !is_var_len (**m));
+			} while (m != members.end () && is_CDR (**m));
 
 			if (m > begin + 1) {
 				cpp_ << "marshal_members (&" << prefix << (*begin)->name () << ", ";
@@ -826,7 +828,7 @@ void Proxy::unmarshal_members (const Members& members, const char* prefix, const
 	cpp_.indent ();
 	for (Members::const_iterator m = members.begin (); m != members.end ();) {
 		// Unmarshal variable-length members
-		while (is_var_len (**m)) {
+		while (!is_CDR (**m)) {
 			unmarshal_member (**m, prefix);
 			if (members.end () == ++m)
 				break;
@@ -836,7 +838,7 @@ void Proxy::unmarshal_members (const Members& members, const char* prefix, const
 			auto begin = m;
 			do {
 				++m;
-			} while (m != members.end () && !is_var_len (**m));
+			} while (m != members.end () && is_CDR (**m));
 			auto end = m;
 
 			if (end > begin + 1) {

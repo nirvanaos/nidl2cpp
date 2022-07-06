@@ -336,8 +336,27 @@ Code& operator << (Code& stm, const Variant& var)
 {
 	switch (var.vtype ()) {
 
-		case Variant::VT::FIXED:
-			stm << '"' << var.to_string () << '"';
+		case Variant::VT::FIXED: {
+			vector <uint8_t> bcd = var.as_Fixed ().to_BCD ();
+			stm << "{{ ";
+			stm << hex;
+			auto f = stm.fill ('0');
+			auto it = bcd.begin ();
+			stm << "0x" << (unsigned)*(it++);
+			while (it != bcd.end ()) {
+				stm << ", 0x" << setw (2) << (unsigned)*(it++);
+			}
+			stm << dec;
+			stm.fill (f);
+			stm << " }}";
+		} break;
+
+		case Variant::VT::STRING:
+			stm << "NIRVANA_S(" << var.to_string () << ")";
+			break;
+
+		case Variant::VT::WSTRING:
+			stm << "NIRVANA_W(" << var.to_string () << ")";
 			break;
 
 		case Variant::VT::ENUM_ITEM: {
@@ -351,6 +370,18 @@ Code& operator << (Code& stm, const Variant& var)
 
 		case Variant::VT::BOOLEAN:
 			stm << (var.as_bool () ? "true" : "false");
+			break;
+
+		case Variant::VT::FLOAT:
+			stm << var.as_float () << 'f';
+			break;
+
+		case Variant::VT::DOUBLE:
+			stm << var.as_double ();
+			break;
+
+		case Variant::VT::LONGDOUBLE:
+			stm << var.as_long_double ();
 			break;
 
 		default:

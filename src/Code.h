@@ -112,6 +112,24 @@ public:
 		return *this;
 	}
 
+	Code& operator << (float val)
+	{
+		Base::operator << (val);
+		return *this;
+	}
+
+	Code& operator << (double val)
+	{
+		Base::operator << (val);
+		return *this;
+	}
+
+	Code& operator << (long double val)
+	{
+		Base::operator << (val);
+		return *this;
+	}
+
 	Code& operator << (std::ios_base& (*func)(std::ios_base&))
 	{
 		Base::operator << (func);

@@ -62,6 +62,8 @@ public:
 
 	static bool is_var_len (const AST::Type& type);
 	static bool is_var_len (const Members& members);
+	static bool is_CDR (const AST::Type& type);
+	static bool is_CDR (const Members& members);
 	static bool is_pseudo (const AST::NamedItem& item);
 	static bool is_ref_type (const AST::Type& type);
 	static const AST::Enum* is_enum (const AST::Type& type);

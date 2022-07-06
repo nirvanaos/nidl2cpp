@@ -73,6 +73,15 @@ public:
 		const AST::OperationBase& op;
 	};
 
+	struct ConstType
+	{
+		ConstType (const AST::Constant& _c) :
+			c (_c)
+		{}
+
+		const AST::Constant& c;
+	};
+
 private:
 	virtual void end (const AST::Root&);
 
@@ -118,7 +127,7 @@ private:
 	}
 	void forward_decl (const AST::UnionDecl& item)
 	{
-		forward_decl (item.definition ());
+		forward_decl (static_cast <const AST::StructBase&> (item.definition ()));
 	}
 
 	void forward_interface (const AST::ItemWithId& item);
@@ -162,5 +171,6 @@ private:
 
 Code& operator << (Code& stm, const Client::Param& t);
 Code& operator << (Code& stm, const Client::Signature& op);
+Code& operator << (Code& stm, const Client::ConstType& op);
 
 #endif

@@ -142,7 +142,7 @@ void Client::leaf (const TypeDef& item)
 
 	if (options ().legacy) {
 		// <Type>_var
-		switch (item.tkind ()) {
+		switch (item.dereference_type ().tkind ()) {
 			case Type::Kind::STRING:
 			case Type::Kind::WSTRING:
 			case Type::Kind::FIXED:
@@ -190,7 +190,7 @@ void Client::forward_decl (const NamedItem& item)
 void Client::forward_decl (const AST::StructBase& item)
 {
 	forward_decl (static_cast <const NamedItem&> (item));
-	if (item.kind () != Item::Kind::EXCEPTION && is_var_len (item))
+	if (item.kind () != Item::Kind::EXCEPTION)
 		backward_compat_var (item);
 }
 
@@ -661,20 +661,29 @@ void Client::end_interface (const IV_Base& container)
 					h_ << "using " << Namespace ("CORBA/Internal") << "Decls <"
 					<< container.name () << ">::_tc_" << static_cast <const string&> (def.name ()) << ";\n";
 
-				if (options ().legacy && item->kind () != Item::Kind::EXCEPTION) {
-					h_ << "#ifdef LEGACY_CORBA_CPP\n"
-						"using " << Namespace ("CORBA/Internal") << "Decls <" << container.name () << ">::" << def.name () << "_var;\n"
-						"using " << Namespace ("CORBA/Internal") << "Decls <" << container.name () << ">::" << def.name () << "_out;\n";
+				if (options ().legacy) {
+					switch (item->kind ()) {
+						case Item::Kind::TYPE_DEF:
+							if (static_cast <const TypeDef&> (*item).dereference_type ().tkind () == Type::Kind::BASIC_TYPE)
+								break;
+						case Item::Kind::STRUCT:
+						case Item::Kind::UNION:
+						case Item::Kind::ENUM:
+							h_ << "#ifdef LEGACY_CORBA_CPP\n";
+							if (item->kind () != Item::Kind::ENUM)
+								h_ << "using " << Namespace ("CORBA/Internal") << "Decls <" << container.name () << ">::" << def.name () << "_var;\n";
+							h_ << "using " << Namespace ("CORBA/Internal") << "Decls <" << container.name () << ">::" << def.name () << "_out;\n";
 
-					if (item->kind () == Item::Kind::TYPE_DEF) {
-						const TypeDef& td = static_cast <const TypeDef&> (*item);
-						if (td.tkind () == Type::Kind::NAMED_TYPE && is_ref_type (td))
-							h_ << "using " << Namespace ("CORBA/Internal") << "Decls <" << container.name () << ">::" << def.name () << "_ptr;\n";
+							if (item->kind () == Item::Kind::TYPE_DEF) {
+								const TypeDef& td = static_cast <const TypeDef&> (*item);
+								if (td.tkind () == Type::Kind::NAMED_TYPE && is_ref_type (td))
+									h_ << "using " << Namespace ("CORBA/Internal") << "Decls <" << container.name () << ">::" << def.name () << "_ptr;\n";
+							}
+
+							h_ << "#endif\n";
+							break;
 					}
-
-					h_ << "#endif\n";
 				}
-
 			}
 		}
 	}
@@ -915,22 +924,48 @@ void Client::environment (const Raises& raises)
 	}
 }
 
+Code& operator << (Code& stm, const Client::ConstType& ct)
+{
+	const Type& t = ct.c.dereference_type ();
+	switch (t.tkind ()) {
+		case Type::Kind::STRING:
+			stm << Namespace ("CORBA") << "Char*";
+			break;
+		case Type::Kind::WSTRING:
+			stm << Namespace ("CORBA") << "WChar*";
+			break;
+		case Type::Kind::FIXED:
+			stm << Namespace ("IDL") << "FixedCDR <" <<
+				ct.c.as_Fixed ().digits () << ", " << ct.c.as_Fixed ().scale () << '>';
+			break;
+		default:
+			assert (t.tkind () == Type::Kind::BASIC_TYPE);
+			// CORBA floating point types may be emulated, use native types.
+			switch (t.basic_type ()) {
+				case BasicType::FLOAT:
+					stm << "float";
+					break;
+				case BasicType::DOUBLE:
+					stm << "double";
+					break;
+				case BasicType::LONGDOUBLE:
+					stm << "long double";
+					break;
+				default:
+					stm << static_cast <const Type&> (ct.c);
+			}
+	}
+	return stm;
+}
+
 void Client::leaf (const Constant& item)
 {
 	h_namespace_open (item);
 
-	bool outline = false;
-	const char* type = nullptr;
-	switch (item.dereference_type ().tkind ()) {
-		case Type::Kind::STRING:
-		case Type::Kind::FIXED:
-			outline = true;
-			type = "char* const";
-			break;
-		case Type::Kind::WSTRING:
-			outline = true;
-			type = "whar_t* const";
-			break;
+	bool outline;
+	{
+		const Type& t = item.dereference_type ();
+		outline = t.tkind () != Type::Kind::BASIC_TYPE || !AST::is_integral (t.basic_type ());
 	}
 
 	if (is_nested (item))
@@ -938,30 +973,17 @@ void Client::leaf (const Constant& item)
 	else if (outline)
 		h_ << "extern ";
 
-	h_ << "const ";
-	
-	if (type)
-		h_ << type;
-	else
-		h_ << static_cast <const Type&> (item);
+	h_ << "const " << ConstType (item) << ' ' << item.name ();
 
-	h_ << ' ' << item.name ();
 	if (outline) {
-		cpp_.namespace_open (item);
-
-		if (is_nested (item))
-			cpp_ << "static ";
-		else
+		if (!is_nested (item)) {
+			cpp_.namespace_open (item);
 			cpp_ << "extern ";
+		} else
+			cpp_.namespace_open ("CORBA/Internal");
 
-		cpp_ << "const ";
-
-		if (type)
-			cpp_ << type;
-		else
-			cpp_ << static_cast <const Type&> (item);
-
-		cpp_ << ' ' << QName (item) << " = " << static_cast <const Variant&> (item) << ";\n";
+		cpp_ << "const " << ConstType (item) << ' ' << QName (item) << " = "
+			<< static_cast <const Variant&> (item) << ";\n";
 	} else {
 		h_ << " = " << static_cast <const Variant&> (item);
 	}
@@ -1110,6 +1132,7 @@ void Client::define_structured_type (const ItemWithId& item)
 	const Members& members = (u ? static_cast <const Members&> (*u) : static_cast <const Members&> (static_cast <const StructBase&> (item)));
 
 	bool var_len = is_var_len (members);
+	bool CDR = !u && is_CDR (members);
 
 	// Type
 	h_ << "template <>\n"
@@ -1133,14 +1156,13 @@ void Client::define_structured_type (const ItemWithId& item)
 			h_ << ",\n"
 			"MarshalHelper <" << QName (item) << ", " << QName (item) << ">";
 
-		h_ << unindent << "\n{\n" << indent;
+		h_ << unindent << "\n{\n" << indent <<
 
-		if (check)
-			h_ << "static const bool has_check = true;\n";
+			"static const bool has_check = " << (check ? "true" : "false") << ";\n" <<
+			"static const bool is_CDR = " << (CDR ? "true" : "false") << ";\n";
 
 		if (u) {
-			h_ << "static const bool is_CDR = false;\n"
-				"\n"
+			h_ << "\n"
 				"using MarshalHelper <" << QName (item) << ", "
 				<< QName (item) << suffix << ">::marshal_in_a;\n"
 				"using MarshalHelper <" << QName (item) << ", "
@@ -1167,7 +1189,7 @@ void Client::define_structured_type (const ItemWithId& item)
 	}
 
 	// Declare marshaling
-	if (var_len || u) {
+	if (!CDR) {
 		h_ << "\n"
 			"static void marshal_in (const Var&, IORequest::_ptr_type);\n";
 

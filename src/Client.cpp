@@ -960,8 +960,6 @@ Code& operator << (Code& stm, const Client::ConstType& ct)
 
 void Client::leaf (const Constant& item)
 {
-	h_namespace_open (item);
-
 	bool outline;
 	{
 		const Type& t = item.dereference_type ();
@@ -970,16 +968,18 @@ void Client::leaf (const Constant& item)
 
 	if (is_nested (item))
 		h_ << "static ";
-	else if (outline)
-		h_ << "extern ";
+	else {
+		h_.namespace_open (item);
+		if (outline)
+			h_ << "extern ";
+	}
 
 	h_ << "const " << ConstType (item) << ' ' << item.name ();
 
 	if (outline) {
-		if (!is_nested (item)) {
+		if (!is_nested (item))
 			cpp_.namespace_open (item);
-			cpp_ << "extern ";
-		} else
+		else
 			cpp_.namespace_open ("CORBA/Internal");
 
 		cpp_ << "const " << ConstType (item) << ' ' << QName (item) << " = "

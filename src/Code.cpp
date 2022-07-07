@@ -352,11 +352,11 @@ Code& operator << (Code& stm, const Variant& var)
 		} break;
 
 		case Variant::VT::STRING:
-			stm << "NIRVANA_S(" << var.to_string () << ")";
+			stm << var.to_string ();
 			break;
 
 		case Variant::VT::WSTRING:
-			stm << "NIRVANA_W(" << var.to_string () << ")";
+			stm << "_W(" << var.to_string () << ")";
 			break;
 
 		case Variant::VT::ENUM_ITEM: {

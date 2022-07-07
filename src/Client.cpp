@@ -155,9 +155,7 @@ void Client::leaf (const TypeDef& item)
 				h_ <<
 					"#ifdef LEGACY_CORBA_CPP\n"
 					"typedef " << static_cast <const string&> (item.named_type ().name ()) << "_var "
-					<< static_cast <const string&> (item.name ()) << "_var;\n"
-					"typedef " << static_cast <const string&> (item.named_type ().name ()) << "_out "
-					<< static_cast <const string&> (item.name ()) << "_out;\n";
+					<< static_cast <const string&> (item.name ()) << "_var;\n";
 
 				if (is_ref_type (item))
 					h_ << "typedef " << static_cast <const string&> (item.named_type ().name ()) << "_ptr "
@@ -174,7 +172,6 @@ void Client::backward_compat_var (const NamedItem& item)
 		h_ <<
 			"#ifdef LEGACY_CORBA_CPP\n"
 			"typedef " << Namespace ("CORBA/Internal") << "T_var <" << item.name () << "> " << static_cast <const string&> (item.name ()) << "_var;\n"
-			"typedef " << static_cast <const string&> (item.name ()) << "_var& " << static_cast <const string&> (item.name ()) << "_out;\n"
 			"#endif\n";
 	}
 }
@@ -289,8 +286,6 @@ void Client::forward_interface (const ItemWithId& item)
 			<< static_cast <const string&> (item.name ()) << "_ptr;\n"
 			"typedef " << Namespace ("CORBA/Internal") << "I_var <" << item.name () << "> "
 			<< static_cast <const string&> (item.name ()) << "_var;\n"
-			"typedef " << static_cast <const string&> (item.name ()) << "_var& "
-			<< static_cast <const string&> (item.name ()) << "_out;\n"
 			"#endif\n";
 	}
 }
@@ -668,11 +663,8 @@ void Client::end_interface (const IV_Base& container)
 								break;
 						case Item::Kind::STRUCT:
 						case Item::Kind::UNION:
-						case Item::Kind::ENUM:
 							h_ << "#ifdef LEGACY_CORBA_CPP\n";
-							if (item->kind () != Item::Kind::ENUM)
-								h_ << "using " << Namespace ("CORBA/Internal") << "Decls <" << container.name () << ">::" << def.name () << "_var;\n";
-							h_ << "using " << Namespace ("CORBA/Internal") << "Decls <" << container.name () << ">::" << def.name () << "_out;\n";
+							h_ << "using " << Namespace ("CORBA/Internal") << "Decls <" << container.name () << ">::" << def.name () << "_var;\n";
 
 							if (item->kind () == Item::Kind::TYPE_DEF) {
 								const TypeDef& td = static_cast <const TypeDef&> (*item);
@@ -1314,6 +1306,8 @@ void Client::leaf (const Struct& item)
 		if (!item.has_forward_dcl ())
 			type_code_decl (item);
 		implement (item);
+		if (!item.has_forward_dcl ())
+			backward_compat_var (item);
 	}
 }
 
@@ -1327,6 +1321,8 @@ void Client::leaf (const Union& item)
 		if (!item.has_forward_dcl ())
 			type_code_decl (item);
 		implement (item);
+		if (!item.has_forward_dcl ())
+			backward_compat_var (item);
 	}
 }
 
@@ -1795,31 +1791,8 @@ void Client::member_variables (const StructBase& item)
 void Client::member_variables_legacy (const StructBase& item)
 {
 	for (const auto& m : item) {
-		if (is_boolean (*m))
-			h_ << TypePrefix (*m) << "ABI";
-		else {
-			switch (m->tkind ()) {
-				case Type::Kind::STRING:
-					h_ << Namespace ("CORBA") << "String_var";
-					break;
-				case Type::Kind::WSTRING:
-					h_ << Namespace ("CORBA") << "WString_var";
-					break;
-				default:
-					h_ << static_cast <const Type&> (*m);
-					if (is_ref_type (*m))
-						h_ << "_var";
-					else {
-						switch (m->dereference_type ().tkind ()) {
-							case Type::Kind::STRING:
-							case Type::Kind::WSTRING:
-								h_ << "_var";
-								break;
-						}
-					}
-			}
-		}
-		h_ << ' ' << m->name () << ";\n";
+		h_ << MemberType (*m) << ' '
+			<< static_cast <const string&> (m->name ()) << ";\n";
 	}
 }
 
@@ -1856,14 +1829,6 @@ void Client::implement (const Enum& item)
 	h_ << unindent
 		<< "};\n";
 
-	if (options ().legacy) {
-		h_.namespace_open (item);
-		h_ <<
-			"#ifdef LEGACY_CORBA_CPP\n"
-			"typedef " << item.name () << "& " << static_cast <const string&> (item.name ())
-			<< "_out;\n"
-			"#endif\n";
-	}
 	type_code_def (item);
 }
 

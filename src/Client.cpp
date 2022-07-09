@@ -489,7 +489,7 @@ void Client::end_interface (const IV_Base& container)
 			<< indent;
 		environment (Raises ());
 		h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n"
-			"Type <" << QName (*concrete_itf) << ">::C_ret _ret = (_b._epv ().epv._this) (&_b, &_env);\n"
+			"Type <" << QName (*concrete_itf) << ">::C_ret _ret ((_b._epv ().epv._this) (&_b, &_env));\n"
 			"_env.check ();\n"
 			"return _ret;\n"
 			<< unindent <<
@@ -515,13 +515,17 @@ void Client::end_interface (const IV_Base& container)
 				h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n";
 
 				if (op.tkind () != Type::Kind::VOID)
-					h_ << TypePrefix (op) << "C_ret _ret = ";
+					h_ << TypePrefix (op) << "C_ret _ret (";
 
 				h_ << "(_b._epv ().epv." << op.name () << ") (&_b";
 				for (auto it = op.begin (); it != op.end (); ++it) {
 					h_ << ", &" << (*it)->name ();
 				}
-				h_ << ", &_env);\n"
+				h_ << ", &_env)";
+				if (op.tkind () != Type::Kind::VOID)
+					h_ << ')';
+
+				h_ << ";\n";
 					"_env.check ();\n";
 
 				if (op.tkind () != Type::Kind::VOID)
@@ -561,7 +565,7 @@ void Client::end_interface (const IV_Base& container)
 				if (att_byref)
 					h_ << "_VT";
 
-				h_ << "_ret _ret = (_b._epv ().epv._get_" << m.name () << ") (&_b, &_env);\n"
+				h_ << "_ret _ret ((_b._epv ().epv._get_" << m.name () << ") (&_b, &_env));\n"
 					"_env.check ();\n"
 					"return _ret;\n"
 					<< unindent
@@ -793,12 +797,12 @@ void Client::end (const ValueType& vt)
 				<< indent;
 			environment (f->raises ());
 			h_ << "Bridge < " << QName (vt) << FACTORY_SUFFIX ">& _b (T::_get_bridge (_env));\n"
-				"Type <" << QName (vt) << ">::C_ret _ret = (_b._epv ().epv." << f->name ()
+				"Type <" << QName (vt) << ">::C_ret _ret ((_b._epv ().epv." << f->name ()
 				<< ") (&_b";
 			for (auto it = f->begin (); it != f->end (); ++it) {
 				h_ << ", &" << (*it)->name ();
 			}
-			h_ << ", &_env);\n"
+			h_ << ", &_env));\n"
 				"_env.check ();\n"
 				"return _ret;\n"
 				<< unindent
@@ -1142,7 +1146,7 @@ void Client::define_structured_type (const ItemWithId& item)
 	} else {
 		check = has_check (item);
 
-		h_ << "TypeFixLen <" << QName (item) << suffix << ">";
+		h_ << "TypeFixLen <" << QName (item) << suffix << ", " << (check ? "true" : "false") << ">";
 
 		if (u)
 			h_ << ",\n"

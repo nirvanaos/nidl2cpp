@@ -629,7 +629,6 @@ void Client::end_interface (const IV_Base& container)
 				break;
 		}
 	} else {
-		const ValueType& vt = static_cast <const ValueType&> (container);
 		h_ << ", " << Namespace ("CORBA") << "ValueBase";
 		if (!supports.empty ()) {
 			h_ << ">,\n"

@@ -370,7 +370,7 @@ void Client::end_interface (const IV_Base& container)
 	} else {
 		const ValueType& vt = static_cast <const ValueType&> (container);
 		att_byref = true;
-		if (concrete_itf = get_concrete_supports (vt)) {
+		if ((concrete_itf = get_concrete_supports (vt))) {
 			supports.push_back (concrete_itf);
 			Interfaces itf_bases = concrete_itf->get_all_bases ();
 			supports.insert (supports.end (), itf_bases.begin (), itf_bases.end ());
@@ -522,10 +522,11 @@ void Client::end_interface (const IV_Base& container)
 					h_ << ", &" << (*it)->name ();
 				}
 				h_ << ", &_env)";
+
 				if (op.tkind () != Type::Kind::VOID)
 					h_ << ')';
 
-				h_ << ";\n";
+				h_ << ";\n"
 					"_env.check ();\n";
 
 				if (op.tkind () != Type::Kind::VOID)

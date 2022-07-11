@@ -295,7 +295,7 @@ Code& operator << (Code& stm, const Type& t)
 				stm << "WString";
 			break;
 		case Type::Kind::FIXED:
-			stm.namespace_prefix ("CORBA/Internal");
+			stm.namespace_prefix ("IDL");
 			stm << "Fixed <" << t.fixed_digits () << ", " << t.fixed_scale () << '>';
 			break;
 		case Type::Kind::SEQUENCE: {

@@ -1246,7 +1246,9 @@ void Client::define_structured_type (const ItemWithId& item)
 
 bool Client::has_check (const Type& type)
 {
-	return is_var_len (type) || is_enum (type);
+	return is_var_len (type)
+		|| is_enum (type)
+		|| type.dereference_type ().tkind () == Type::Kind::FIXED;
 }
 
 bool Client::has_check (const ItemWithId& item)

@@ -338,7 +338,7 @@ Code& operator << (Code& stm, const Variant& var)
 
 		case Variant::VT::FIXED: {
 			vector <uint8_t> bcd = var.as_Fixed ().to_BCD ();
-			stm << "{{ ";
+			stm << "{ ";
 			stm << hex;
 			auto f = stm.fill ('0');
 			auto it = bcd.begin ();
@@ -348,7 +348,7 @@ Code& operator << (Code& stm, const Variant& var)
 			}
 			stm << dec;
 			stm.fill (f);
-			stm << " }}";
+			stm << " }";
 		} break;
 
 		case Variant::VT::STRING:

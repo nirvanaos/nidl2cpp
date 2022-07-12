@@ -931,7 +931,7 @@ Code& operator << (Code& stm, const Client::ConstType& ct)
 			stm << Namespace ("CORBA") << "WChar*";
 			break;
 		case Type::Kind::FIXED:
-			stm << Namespace ("IDL") << "FixedCDR <" <<
+			stm << Namespace ("IDL") << "FixedBCD <" <<
 				ct.c.as_Fixed ().digits () << ", " << ct.c.as_Fixed ().scale () << '>';
 			break;
 		default:

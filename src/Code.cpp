@@ -281,14 +281,14 @@ Code& operator << (Code& stm, const Type& t)
 			stm << QName (t.named_type ());
 			break;
 		case Type::Kind::STRING:
-			stm.namespace_prefix ("CORBA/Internal");
+			stm.namespace_prefix ("IDL");
 			if (t.string_bound ())
 				stm << "BoundedString <" << t.string_bound () << '>';
 			else
 				stm << "String";
 			break;
 		case Type::Kind::WSTRING:
-			stm.namespace_prefix ("CORBA/Internal");
+			stm.namespace_prefix ("IDL");
 			if (t.string_bound ())
 				stm << "BoundedWString <" << t.string_bound () << '>';
 			else
@@ -300,7 +300,7 @@ Code& operator << (Code& stm, const Type& t)
 			break;
 		case Type::Kind::SEQUENCE: {
 			const Sequence& seq = t.sequence ();
-			stm.namespace_prefix ("CORBA/Internal");
+			stm.namespace_prefix ("IDL");
 			if (seq.bound ())
 				stm << "Bounded";
 			stm << "Sequence <";

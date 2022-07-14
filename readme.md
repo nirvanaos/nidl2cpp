@@ -13,6 +13,3 @@ To build under Visual C++ use *nirvanaos/nidl2cpp.vc* supermodule.
 ## Dependencies
 
 IDL compiler front-end library: https://github.com/nirvanaos/idlfe
-
-## Does not implemented yet
-* Fixed

@@ -31,16 +31,25 @@
 #define PREFIX_OP_PARAM_OUT "__par_out_"
 #define PREFIX_OP_IDX "__OPIDX_"
 
+// If USE_ALIAS_TC is defined, alias type codes used in the metadata.
+// This is not necessary and produces bloated code.
+// In the DII we use tc->equivalent() that ignores aliases.
+//#define USE_ALIAS_TC
+
 using namespace std;
 using namespace AST;
 
 Code& operator << (Code& stm, const Proxy::WithAlias& t)
 {
+#ifdef USE_ALIAS_TC
 	if (t.type.tkind () == Type::Kind::NAMED_TYPE && t.type.named_type ().kind () == Item::Kind::TYPE_DEF)
 		stm << "Alias <&" << TC_Name (t.type.named_type ()) << '>';
 	else
 		stm << t.type;
 	return stm;
+#else
+	return stm << t.type;
+#endif
 }
 
 void Proxy::end (const Root&)

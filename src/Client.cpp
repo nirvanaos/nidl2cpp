@@ -219,6 +219,21 @@ void Client::forward_interface (const ItemWithId& item)
 	forward_guard (item);
 	forward_define (item);
 	forward_decl (item);
+
+	// A namespace level swap must be provided
+	if (options ().legacy)
+		h_ << "#ifndef LEGACY_CORBA_CPP\n";
+	
+	h_ << "inline void swap (" <<
+		Namespace ("IDL") << "traits <" << item.name () << ">::ref_type& x, " <<
+		Namespace ("IDL") << "traits <" << item.name () << ">::ref_type& y)\n" <<
+		"{\n" << indent <<
+		Namespace ("std") << "swap (x, y);\n"
+		<< unindent << "}\n";
+	
+	if (options ().legacy)
+		h_ << "#endif\n";
+
 	h_ << endl;
 	h_.namespace_open ("CORBA/Internal");
 	h_ << empty_line
@@ -1116,6 +1131,7 @@ void Client::define_ABI (const Union& item)
 
 void Client::define_structured_type (const ItemWithId& item)
 {
+	h_.namespace_open ("CORBA/Internal");
 	rep_id_of (item);
 
 	const char* suffix = "";
@@ -1284,6 +1300,7 @@ void Client::implement (const Exception& item)
 {
 	define (item);
 	if (!item.empty ()) {
+		define_swap (item);
 		define_ABI (item);
 		define_structured_type (item);
 	} else
@@ -1336,6 +1353,7 @@ void Client::implement (const Struct& item)
 {
 	type_code_def (item);
 	define (item);
+	define_swap (item);
 	define_ABI (item);
 	define_structured_type (item);
 }
@@ -1344,6 +1362,7 @@ void Client::implement (const Union& item)
 {
 	type_code_def (item);
 	define (item);
+	define_swap (item);
 	define_ABI (item);
 	define_structured_type (item);
 }
@@ -1896,4 +1915,14 @@ void Client::leaf (const ValueBox& vb)
 		"{\n" << indent;
 	type_code_func (vb);
 	h_ << unindent << "};\n";
+}
+
+void Client::define_swap (const ItemWithId& item)
+{
+	// A namespace level swap() must be provided to exchange the values of two structs in an efficient manner.
+	h_.namespace_open (item);
+	h_ << "inline void swap (" << QName (item) << "& x, " << QName (item) << "& y)\n"
+		"{\n" << indent <<
+		Namespace ("std") << "swap (x, y);\n"
+		<< unindent << "}\n";
 }

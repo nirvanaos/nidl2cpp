@@ -315,7 +315,7 @@ Code& operator << (Code& stm, const Type& t)
 		case Type::Kind::ARRAY: {
 			const Array& arr = t.array ();
 			for (size_t cnt = arr.dimensions ().size (); cnt; --cnt) {
-				stm << "std::array <";
+				stm << Namespace ("std") << "array <";
 			}
 			if (CodeGenBase::is_ref_type (arr))
 				stm << TypePrefix (arr) << "Var";

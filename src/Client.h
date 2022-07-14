@@ -162,6 +162,8 @@ private:
 	void assign_union (const AST::Union& item, bool move);
 	void element_case (const AST::UnionElement& el);
 
+	void define_swap (const AST::ItemWithId& item);
+
 private:
 	Header h_; // .h file
 	Code cpp_; // .cpp file.

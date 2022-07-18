@@ -572,11 +572,21 @@ Code& operator << (Code& stm, const TC_Name& t)
 
 Code& operator << (Code& stm, const ServantParam& t)
 {
-	stm << TypePrefix (t.type);
-	if (t.att == Parameter::Attribute::IN)
-		stm << "ConstRef";
-	else
-		stm << "Var&";
+	if (t.att == Parameter::Attribute::IN) {
+		if (t.virt && !CodeGenBase::is_ref_type (t.type)) {
+			// For virtual methods (POA implementation), the type must not depend on
+			// machine word size.
+			// In parameters for all basic types, except for Any, are passed by value.
+			// Other types are passed by reference.
+			const Type& dt = t.type.dereference_type ();
+			if (dt.tkind () == Type::Kind::BASIC_TYPE && dt.basic_type () != BasicType::ANY)
+				stm << TypePrefix (t.type) << "Var";
+			else
+				stm << "const " << TypePrefix (t.type) << "Var&";
+		} else
+			stm << TypePrefix (t.type) << "ConstRef";
+	} else
+		stm << TypePrefix (t.type) << "Var&";
 	return stm;
 }
 
@@ -585,10 +595,10 @@ Code& operator << (Code& stm, const ServantOp& op)
 	stm << VRet (op.op) << ' ' << op.op.name () << " (";
 	auto it = op.op.begin ();
 	if (it != op.op.end ()) {
-		stm << ServantParam (**it) << ' ' << (*it)->name ();
+		stm << ServantParam (**it, op.virt) << ' ' << (*it)->name ();
 		++it;
 		for (; it != op.op.end (); ++it) {
-			stm << ", " << ServantParam (**it) << ' ' << (*it)->name ();
+			stm << ", " << ServantParam (**it, op.virt) << ' ' << (*it)->name ();
 		}
 	}
 	return stm << ')';

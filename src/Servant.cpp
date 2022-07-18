@@ -265,13 +265,13 @@ void Servant::end (const Interface& itf)
 				switch (item.kind ()) {
 					case Item::Kind::OPERATION: {
 						const Operation& op = static_cast <const Operation&> (item);
-						h_ << "virtual " << ServantOp (op) << " = 0;\n";
+						h_ << "virtual " << ServantOp (op, true) << " = 0;\n";
 					} break;
 					case Item::Kind::ATTRIBUTE: {
 						const Attribute& att = static_cast <const Attribute&> (item);
 						h_ << "virtual " << VRet (att) << ' ' << att.name () << " () = 0;\n";
 						if (!att.readonly ())
-							h_ << "virtual void " << att.name () << " (" << ServantParam (att) << ") = 0;\n";
+							h_ << "virtual void " << att.name () << " (" << ServantParam (att, true) << ") = 0;\n";
 					} break;
 				}
 			}

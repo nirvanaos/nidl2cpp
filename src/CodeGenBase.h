@@ -243,29 +243,34 @@ Code& operator << (Code& stm, const TC_Name& t);
 
 struct ServantParam
 {
-	ServantParam (const AST::Parameter& p) :
+	ServantParam (const AST::Parameter& p, bool v = false) :
 		type (p),
-		att (p.attribute ())
+		att (p.attribute ()),
+		virt (v)
 	{}
 
-	ServantParam (const AST::Attribute& t) :
+	ServantParam (const AST::Attribute& t, bool v = false) :
 		type (t),
-		att (AST::Parameter::Attribute::IN)
+		att (AST::Parameter::Attribute::IN),
+		virt (v)
 	{}
 
 	const AST::Type& type;
 	const AST::Parameter::Attribute att;
+	const bool virt;
 };
 
 Code& operator << (Code& stm, const ServantParam& t);
 
 struct ServantOp
 {
-	ServantOp (const AST::Operation& o) :
-		op (o)
+	ServantOp (const AST::Operation& o, bool v = false) :
+		op (o),
+		virt (v)
 	{}
 
 	const AST::Operation& op;
+	const bool virt;
 };
 
 Code& operator << (Code& stm, const ServantOp& t);

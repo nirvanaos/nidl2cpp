@@ -8,4 +8,9 @@
 #include <streambuf>
 #include <assert.h>
 
+#if defined (__GNUG__) || defined (__clang__)
+#pragma GCC diagnostic ignored "-Wswitch"
+#pragma GCC diagnostic ignored "-Woverloaded-virtual"
+#endif
+
 #endif

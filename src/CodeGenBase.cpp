@@ -290,9 +290,12 @@ bool CodeGenBase::is_ref_type (const Type& type)
 				case BasicType::OBJECT:
 				case BasicType::VALUE_BASE:
 					return true;
-			} break;
-		case Type::Kind::NAMED_TYPE:
-			switch (t.named_type ().kind ()) {
+			}
+			break;
+
+		case Type::Kind::NAMED_TYPE: {
+			const NamedItem& item = t.named_type ();
+			switch (item.kind ()) {
 				case Item::Kind::INTERFACE_DECL:
 				case Item::Kind::INTERFACE:
 				case Item::Kind::VALUE_TYPE_DECL:
@@ -301,8 +304,10 @@ bool CodeGenBase::is_ref_type (const Type& type)
 					return true;
 
 				case Item::Kind::NATIVE:
-					return is_native_interface (t.named_type ());
-			} break;
+					return is_native_interface (type)
+						|| is_servant (type);
+			}
+		} break;
 	}
 	return false;
 }
@@ -310,9 +315,21 @@ bool CodeGenBase::is_ref_type (const Type& type)
 bool CodeGenBase::is_native_interface (const Type& type)
 {
 	const Type& t = type.dereference_type ();
-	return t.tkind () == Type::Kind::NAMED_TYPE
-		&& t.named_type ().kind () == Item::Kind::NATIVE
-		&& is_native_interface (t.named_type ());
+	if (t.tkind () == Type::Kind::NAMED_TYPE) {
+		const NamedItem& item = t.named_type ();
+		return item.kind () == Item::Kind::NATIVE && is_native_interface (item);
+	}
+	return false;
+}
+
+bool CodeGenBase::is_servant (const Type& type)
+{
+	const Type& t = type.dereference_type ();
+	if (t.tkind () == Type::Kind::NAMED_TYPE) {
+		const NamedItem& item = t.named_type ();
+		return item.kind () == Item::Kind::NATIVE && is_servant (item);
+	}
+	return false;
 }
 
 bool CodeGenBase::is_native_interface (const NamedItem& type)
@@ -320,7 +337,22 @@ bool CodeGenBase::is_native_interface (const NamedItem& type)
 	assert (type.kind () == Item::Kind::NATIVE);
 	if (type.name () == "Interface") {
 		const NamedItem* parent = type.parent ();
-		return parent && parent->kind () == Item::Kind::MODULE && parent->name () == "Internal";
+		if (parent && parent->kind () == Item::Kind::MODULE
+			&& parent->name () == "Internal") {
+			parent = parent->parent ();
+			return parent && parent->name () == "CORBA" && !parent->parent ();
+		}
+	}
+	return false;
+}
+
+bool CodeGenBase::is_servant (const NamedItem& type)
+{
+	assert (type.kind () == Item::Kind::NATIVE);
+	if (type.name () == "Servant") {
+		const NamedItem* parent = type.parent ();
+		return parent && parent->kind () == Item::Kind::MODULE
+			&& parent->name () == "PortableServer" && !parent->parent ();
 	}
 	return false;
 }

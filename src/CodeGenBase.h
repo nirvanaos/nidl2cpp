@@ -68,6 +68,7 @@ public:
 	static bool is_ref_type (const AST::Type& type);
 	static const AST::Enum* is_enum (const AST::Type& type);
 	static bool is_native_interface (const AST::Type& type);
+	static bool is_servant (const AST::Type& type);
 	static bool is_native (const AST::Type& type);
 	static bool is_native (const Members& members);
 	static bool is_boolean (const AST::Type& t);
@@ -121,6 +122,7 @@ private:
 	}
 
 	static bool is_native_interface (const AST::NamedItem& type);
+	static bool is_servant (const AST::NamedItem& type);
 
 	static void get_all_bases (const AST::ValueType& vt,
 		std::unordered_set <const AST::IV_Base*>& bset, Bases& bvec);

@@ -227,17 +227,12 @@ void Proxy::implement (const Attribute& att)
 	}
 }
 
-bool Proxy::is_custom (const Type& t)
+bool Proxy::is_custom (const AST::Operation& op)
 {
-	return is_native (t) && !is_servant (t);
-}
-
-bool Proxy::is_custom (const Operation& op)
-{
-	bool custom = is_custom (static_cast <const Type&> (op));
+	bool custom = is_native (op);
 	if (!custom) {
 		for (auto par : op) {
-			if (is_custom (*par)) {
+			if (is_native (*par)) {
 				custom = true;
 				break;
 			}
@@ -370,7 +365,7 @@ void Proxy::end (const Interface& itf)
 					op_md.type = &att;
 				}
 
-				bool custom = is_custom (att);
+				bool custom = is_native (att);
 
 				cpp_ << VRet (att) << ' ' << att.name () << " () const";
 				if (custom) {

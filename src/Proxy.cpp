@@ -763,7 +763,7 @@ void Proxy::end (const ValueType& vt)
 	<< (vt.modifier () != ValueType::Modifier::ABSTRACT ?
 		"::Internal::PseudoBase, CORBA::Internal::ValueFactoryImpl <"
 		:
-		"::ValueType, CORBA::Internal::TypeCodeValue <")
+		"::TypeCode, CORBA::Internal::TypeCodeValue <")
 	<< QName (vt) << ">)\n";
 }
 

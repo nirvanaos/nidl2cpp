@@ -334,7 +334,7 @@ void Client::begin_interface (const IV_Base& container)
 	h_.namespace_open ("CORBA/Internal");
 	h_ << empty_line
 		<< "template <>\n"
-		"struct Decls <" << QName (container) << ">\n"
+		"struct Decls <" << QName (container) << "> : NativeDecls <" << QName (container) << ">\n"
 		"{\n"
 		<< indent;
 }

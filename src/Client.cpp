@@ -137,8 +137,8 @@ void Client::leaf (const TypeDef& item)
 	h_ << empty_line
 		<< "typedef " << static_cast <const Type&> (item) << ' ' << item.name ()
 		<< ";\n";
-	type_code_decl (item);
-	type_code_def (item);
+	
+	const string& name = static_cast <const string&> (item.name ());
 
 	if (options ().legacy) {
 		// <Type>_var
@@ -155,13 +155,48 @@ void Client::leaf (const TypeDef& item)
 				h_ <<
 					"#ifdef LEGACY_CORBA_CPP\n"
 					"typedef " << static_cast <const string&> (item.named_type ().name ()) << "_var "
-					<< static_cast <const string&> (item.name ()) << "_var;\n";
+					<< name << "_var;\n";
 
 				if (is_ref_type (item))
 					h_ << "typedef " << static_cast <const string&> (item.named_type ().name ()) << "_ptr "
-					<< static_cast <const string&> (item.name ()) << "_ptr;\n";
+					<< name << "_ptr;\n";
 				h_ << "#endif\n";
 		}
+	}
+
+	if (!is_pseudo (item)) {
+
+		// Define type code
+
+		if (!is_nested (item))
+			h_ << "extern ";
+		else
+			h_ << "static ";
+		h_ << "const " << Namespace ("CORBA/Internal") << "Alias _tc_" << name << ";\n";
+
+		cpp_.namespace_open ("CORBA/Internal");
+		cpp_ << empty_line <<
+			"template <>\n"
+			"class TypeDef <&" << TC_Name (item) << "> :\n"
+			<< indent
+			<< "public TypeCodeTypeDef <&" << TC_Name (item) << ", ";
+		if (item.tkind () == Type::Kind::NAMED_TYPE && item.named_type ().kind () == Item::Kind::TYPE_DEF)
+			cpp_ << "TypeDef <&" << TC_Name (item.named_type ()) << '>';
+		else
+			cpp_ << static_cast <const Type&> (item);
+		cpp_ << ">\n"
+			<< unindent
+			<< "{};\n";
+		if (!is_nested (item)) {
+			cpp_.namespace_open (item);
+			cpp_ << "extern ";
+		}
+		cpp_ << "NIRVANA_SELECTANY\n"
+			"const " << Namespace ("CORBA/Internal") << "Alias " << TC_Name (item)
+			<< " { \"" << item.repository_id () << "\", \"" << name << "\",\n"
+			"NIRVANA_STATIC_BRIDGE ("
+			<< Namespace ("CORBA") << "TypeCode, "
+			<< Namespace ("CORBA/Internal") << "TypeDef <&" << TC_Name (item) << ">) }; \n";
 	}
 }
 

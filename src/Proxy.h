@@ -45,20 +45,9 @@ public:
 		cpp_.include_header (servant);
 	}
 
-	struct WithAlias
-	{
-		WithAlias (const AST::Type& t) :
-			type (t)
-		{}
-
-		const AST::Type& type;
-	};
-
 private:
 	virtual void end (const AST::Root&);
 
-	virtual void leaf (const AST::TypeDef& item);
-	
 	virtual void begin (const AST::Interface& itf) {}
 	virtual void end (const AST::Interface& itf);
 
@@ -113,7 +102,5 @@ private:
 	Code cpp_;
 	bool custom_;
 };
-
-Code& operator << (Code& stm, const Proxy::WithAlias& t);
 
 #endif

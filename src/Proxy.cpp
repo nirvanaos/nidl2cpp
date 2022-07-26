@@ -31,26 +31,8 @@
 #define PREFIX_OP_PARAM_OUT "__par_out_"
 #define PREFIX_OP_IDX "__OPIDX_"
 
-// If USE_ALIAS_TC is defined, alias type codes used in the metadata.
-// This is not necessary and produces bloated code.
-// In the DII we use tc->equivalent() that ignores aliases.
-//#define USE_ALIAS_TC
-
 using namespace std;
 using namespace AST;
-
-Code& operator << (Code& stm, const Proxy::WithAlias& t)
-{
-#ifdef USE_ALIAS_TC
-	if (t.type.tkind () == Type::Kind::NAMED_TYPE && t.type.named_type ().kind () == Item::Kind::TYPE_DEF)
-		stm << "Alias <&" << TC_Name (t.type.named_type ()) << '>';
-	else
-		stm << t.type;
-	return stm;
-#else
-	return stm << t.type;
-#endif
-}
 
 void Proxy::end (const Root&)
 {
@@ -59,26 +41,6 @@ void Proxy::end (const Root&)
 			<< "#include \"" << cpp_.file ().stem ().generic_string () << "_native.h\"\n";
 	}
 	cpp_.close ();
-}
-
-void Proxy::leaf (const TypeDef& item)
-{
-	string name = export_name (item);
-	cpp_ << empty_line
-		<< "extern \"C\" NIRVANA_OLF_SECTION const Nirvana::ExportInterface " << name << ";\n\n";
-	cpp_.namespace_open ("CORBA/Internal");
-	cpp_ <<
-		"template <>\n"
-		"class TypeCodeTypeDef <&::" << name << "> :\n"
-		<< indent
-		<< "public TypeCodeTypeDefImpl <&::" << name << ", " << WithAlias (item) << ">\n"
-		<< unindent
-		<< "{};\n"
-		"\n"
-		"template <>\n"
-		"const Char TypeCodeName <TypeCodeTypeDef <&::" << name << "> >::name_ [] = \"" << static_cast <const string&> (item.name ()) << "\";\n";
-	cpp_.namespace_close ();
-	cpp_ << "NIRVANA_EXPORT (" << name << ", \"" << item.repository_id () << "\", CORBA::TypeCode, CORBA::Internal::TypeCodeTypeDef <&" << name << ">)\n";
 }
 
 void Proxy::get_parameters (const Operation& op, Members& params_in, Members& params_out)
@@ -511,7 +473,7 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
 		cpp_ << params << ", countof (" << params << ')';
 	} else
 		cpp_ << "0, 0";
-	cpp_ << " }, Type <" << WithAlias (op.type ? *op.type : Type ())
+	cpp_ << " }, Type <" << (op.type ? *op.type : Type ())
 		<< ">::type_code, RqProcWrapper <" PREFIX_OP_PROC << op.name << "> }";
 }
 
@@ -547,7 +509,7 @@ void Proxy::md_members (const Members& members)
 
 void Proxy::md_member (const Type& t, const string& name)
 {
-	cpp_ << "{ \"" << name << "\", Type <" << WithAlias (t) << ">::type_code }";
+	cpp_ << "{ \"" << name << "\", Type <" << t << ">::type_code }";
 }
 
 void Proxy::type_code_members (const ItemWithId& item, const Members& members)
@@ -685,7 +647,7 @@ void Proxy::implement_marshaling (const StructBase& item, const char* prefix)
 void Proxy::state_member (const AST::StateMember& m)
 {
 	cpp_ << "{ \"" << static_cast <const string&> (m.name ()) << "\", Type <"
-		<< WithAlias (m) << ">::type_code, "
+		<< static_cast <const Type&> (m) << ">::type_code, "
 		<< (m.is_public () ? "PUBLIC_MEMBER" : "PRIVATE_MEMBER")
 		<< " }";
 }

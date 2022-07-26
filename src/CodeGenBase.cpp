@@ -496,6 +496,106 @@ void CodeGenBase::init_union (Code& stm, const UnionElement& init_el,
 		<< init_el.name () << ");\n";
 }
 
+void CodeGenBase::marshal_member (Code& stm, const Member& m, const char* func, const char* prefix)
+{
+	stm << TypePrefix (m) << func << " (" << prefix;
+	if (stm.last_char () == '_')
+		stm << static_cast <const string&> (m.name ()); // No check for C++ keywords
+	else
+		stm << m.name ();
+	stm << ", rq);\n";
+}
+
+void CodeGenBase::marshal_members (Code& stm, const Members& members, const char* func, const char* prefix, const char* cend)
+{
+	stm.indent ();
+
+	for (Members::const_iterator m = members.begin (); m != members.end ();) {
+		// Marshal variable-length members
+		while (!is_CDR (**m)) {
+			marshal_member (stm, **m, func, prefix);
+			if (members.end () == ++m)
+				break;
+		}
+		if (m != members.end ()) {
+			// Marshal fixed-length members
+			auto begin = m;
+			do {
+				++m;
+			} while (m != members.end () && is_CDR (**m));
+
+			if (m > begin + 1) {
+				stm << "marshal_members (&" << prefix << (*begin)->name () << ", ";
+				if (m != members.end ())
+					stm << "&" << prefix << (*m)->name ();
+				else
+					stm << cend;
+				stm << ", rq);\n";
+			} else
+				marshal_member (stm, **begin, func, prefix);
+		}
+	}
+
+	stm.unindent ();
+}
+
+void CodeGenBase::unmarshal_member (Code& stm, const Member& m, const char* prefix)
+{
+	stm << TypePrefix (m) << "unmarshal (rq, " << prefix;
+	if (stm.last_char () == '_')
+		stm << static_cast <const string&> (m.name ()); // No check for C++ keywords
+	else
+		stm << m.name ();
+	stm << ");\n";
+}
+
+void CodeGenBase::unmarshal_members (Code& stm, const Members& members, const char* prefix, const char* cend)
+{
+	stm.indent ();
+	for (Members::const_iterator m = members.begin (); m != members.end ();) {
+		// Unmarshal variable-length members
+		while (!is_CDR (**m)) {
+			unmarshal_member (stm , **m, prefix);
+			if (members.end () == ++m)
+				break;
+		}
+		if (m != members.end ()) {
+			// Unmarshal fixed-length members
+			auto begin = m;
+			do {
+				++m;
+			} while (m != members.end () && is_CDR (**m));
+			auto end = m;
+
+			if (end > begin + 1) {
+				stm << "if (unmarshal_members (rq, &" << prefix << (*begin)->name ();
+				if (end != members.end ())
+					stm << ", &" << prefix << (*end)->name ();
+				else
+					stm << ", " << cend;
+				stm << ")) {\n"
+					<< indent;
+
+				// Swap bytes
+				m = begin;
+				do {
+					stm << TypePrefix (**m) << "byteswap (" << prefix << (*m)->name () << ");\n";
+				} while (end != ++m);
+				stm << unindent
+					<< "}\n";
+
+				// If some members have check, check them
+				m = begin;
+				do {
+					stm << TypePrefix (**m) << "check ((const " << TypePrefix (**m) << "ABI&)" << prefix << (*m)->name () << ");\n";
+				} while (end != ++m);
+			} else
+				unmarshal_member (stm, **begin, prefix);
+		}
+	}
+	stm.unindent ();
+}
+
 Code& operator << (Code& stm, const QName& qn)
 {
 	return stm << ParentName (qn.item) << qn.item.name ();

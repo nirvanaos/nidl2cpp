@@ -566,7 +566,6 @@ void Proxy::leaf (const Exception& item)
 	if (!item.empty ()) {
 		cpp_.namespace_open ("CORBA/Internal");
 		type_code_members (item, item);
-		implement_marshaling (item, "_");
 	}
 
 	cpp_.namespace_close ();
@@ -582,66 +581,9 @@ void Proxy::leaf (const Struct& item)
 	type_code_name (item);
 	type_code_members (item, item);
 
-	cpp_.empty_line ();
-
-	// Marshaling
-	if (options ().legacy)
-		cpp_ << "\n#ifndef LEGACY_CORBA_CPP\n";
-
-	implement_marshaling (item, "_");
-	if (options ().legacy) {
-		cpp_ << "\n#else\n";
-		implement_marshaling (item, "");
-		cpp_ << "\n#endif\n";
-	}
-
-	cpp_.namespace_close ();
-
 	// Export TypeCode
+	cpp_.namespace_close ();
 	exp (item) << "TypeCodeStruct <" << QName (item) << ">)\n";
-}
-
-void Proxy::implement_marshaling (const StructBase& item, const char* prefix)
-{
-	const char* suffix = "";
-	if (item.kind () == Item::Kind::EXCEPTION)
-		suffix = EXCEPTION_SUFFIX;
-
-	if (!is_CDR (item)) {
-
-		string my_prefix = "v.";
-		my_prefix += prefix;
-
-		cpp_ << "\n"
-			"void Type <" << QName (item) << suffix
-			<< ">::marshal_in (const Var& v, IORequest::_ptr_type rq)\n"
-			"{\n";
-		marshal_members (item, "marshal_in", my_prefix.c_str (), "&v + 1");
-		cpp_ << "}\n";
-		if (is_var_len (item)) {
-			cpp_ << "\n"
-				"void Type <" << QName (item) << suffix
-				<< ">::marshal_out (Var& v, IORequest::_ptr_type rq)\n"
-				"{\n";
-			marshal_members (item, "marshal_out", my_prefix.c_str (), "&v + 1");
-			cpp_ << "}\n";
-		}
-		cpp_ << "\n"
-			"void Type <" << QName (item) << suffix
-			<< ">::unmarshal (IORequest::_ptr_type rq, Var& v)\n"
-			"{\n";
-		unmarshal_members (item, my_prefix.c_str (), "&v + 1");
-		cpp_ << "}\n";
-	} else {
-		cpp_ << "\n"
-			"void Type <" << QName (item) << suffix
-			<< ">::byteswap (Var& v) NIRVANA_NOEXCEPT\n"
-			"{\n" << indent;
-		for (const auto& m : item) {
-			cpp_ << TypePrefix (*m) << "byteswap (v." << prefix << m->name () << ");\n";
-		}
-		cpp_ << unindent << "}\n";
-	}
 }
 
 void Proxy::state_member (const AST::StateMember& m)
@@ -660,11 +602,11 @@ void Proxy::end (const ValueType& vt)
 		cpp_ << empty_line
 			<< "void ValueData <" << QName (vt) << ">::_marshal (I_ptr <IORequest> rq)\n"
 			"{\n";
-		marshal_members ((const Members&)members, "marshal_in", "_", "this + 1");
+		marshal_members (cpp_, (const Members&)members, "marshal_in", "_", "this + 1");
 		cpp_ << "}\n\n"
 			"void ValueData <" << QName (vt) << ">::_unmarshal (I_ptr <IORequest> rq)\n"
 			"{\n";
-		unmarshal_members ((const Members&)members, "_", "this + 1");
+		unmarshal_members (cpp_, (const Members&)members, "_", "this + 1");
 		cpp_ << "}\n";
 	}
 
@@ -741,106 +683,6 @@ void Proxy::leaf (const ValueBox& vb)
 		<< QName (vb) << ">)\n";
 }
 
-void Proxy::marshal_member (const Member& m, const char* func, const char* prefix)
-{
-	cpp_ << TypePrefix (m) << func << " (" << prefix;
-	if (cpp_.last_char () == '_')
-		cpp_ << static_cast <const string&> (m.name ()); // No check for C++ keywords
-	else
-		cpp_ << m.name ();
-	cpp_ << ", rq);\n";
-}
-
-void Proxy::marshal_members (const Members& members, const char* func, const char* prefix, const char* cend)
-{
-	cpp_.indent ();
-
-	for (Members::const_iterator m = members.begin (); m != members.end ();) {
-		// Marshal variable-length members
-		while (!is_CDR (**m)) {
-			marshal_member (**m, func, prefix);
-			if (members.end () == ++m)
-				break;
-		}
-		if (m != members.end ()) {
-			// Marshal fixed-length members
-			auto begin = m;
-			do {
-				++m;
-			} while (m != members.end () && is_CDR (**m));
-
-			if (m > begin + 1) {
-				cpp_ << "marshal_members (&" << prefix << (*begin)->name () << ", ";
-				if (m != members.end ())
-					cpp_ << "&" << prefix << (*m)->name ();
-				else
-					cpp_ << cend;
-				cpp_ << ", rq);\n";
-			} else
-				marshal_member (**begin, func, prefix);
-		}
-	}
-
-	cpp_.unindent ();
-}
-
-void Proxy::unmarshal_member (const Member& m, const char* prefix)
-{
-	cpp_ << TypePrefix (m) << "unmarshal (rq, " << prefix;
-	if (cpp_.last_char () == '_')
-		cpp_ << static_cast <const string&> (m.name ()); // No check for C++ keywords
-	else
-		cpp_ << m.name ();
-	cpp_ << ");\n";
-}
-
-void Proxy::unmarshal_members (const Members& members, const char* prefix, const char* cend)
-{
-	cpp_.indent ();
-	for (Members::const_iterator m = members.begin (); m != members.end ();) {
-		// Unmarshal variable-length members
-		while (!is_CDR (**m)) {
-			unmarshal_member (**m, prefix);
-			if (members.end () == ++m)
-				break;
-		}
-		if (m != members.end ()) {
-			// Unmarshal fixed-length members
-			auto begin = m;
-			do {
-				++m;
-			} while (m != members.end () && is_CDR (**m));
-			auto end = m;
-
-			if (end > begin + 1) {
-				cpp_ << "if (unmarshal_members (rq, &" << prefix << (*begin)->name ();
-				if (end != members.end ())
-					cpp_ << ", &" << prefix << (*end)->name ();
-				else
-					cpp_ << ", " << cend;
-				cpp_ << ")) {\n"
-					<< indent;
-
-				// Swap bytes
-				m = begin;
-				do {
-					cpp_ << TypePrefix (**m) << "byteswap (" << prefix << (*m)->name () << ");\n";
-				} while (end != ++m);
-				cpp_ << unindent
-					<< "}\n";
-
-				// If some members have check, check them
-				m = begin;
-				do {
-					cpp_ << TypePrefix (**m) << "check ((const " << TypePrefix (**m) << "ABI&)" << prefix << (*m)->name () << ");\n";
-				} while (end != ++m);
-			} else
-				unmarshal_member (**begin, prefix);
-		}
-	}
-	cpp_.unindent ();
-}
-
 void Proxy::leaf (const Union& item)
 {
 	if (is_pseudo (item) || is_native (item))
@@ -864,61 +706,7 @@ void Proxy::leaf (const Union& item)
 	cpp_ << "\n"
 		<< unindent << "};\n";
 
-	// Marshaling
-	marshal_union (item, false);
-	if (is_var_len (item))
-		marshal_union (item, true);
-	cpp_ << empty_line <<
-		"void Type <" << QName (item)
-		<< ">::unmarshal (IORequest::_ptr_type rq, Var& v)\n"
-		"{\n" << indent <<
-		"v._destruct ();\n" <<
-		TypePrefix (item.discriminator_type ()) << "unmarshal (rq, v.__d);\n"
-		"switch (v.__d) {\n";
-	for (const auto& el : item) {
-		if (el->is_default ())
-			cpp_ << "default:\n";
-		else
-			for (const auto& l : el->labels ()) {
-				cpp_ << "case " << l << ":\n";
-			}
-		cpp_.indent ();
-		init_union (cpp_, *el, "v.");
-		cpp_ << TypePrefix (*el) << "unmarshal (rq, v._u." << el->name () << ");\n"
-			"break;\n" << unindent;
-	}
-	cpp_ << "}\n"
-		<< unindent << "}\n";
-
-	cpp_.namespace_close ();
-
 	// Export TypeCode
+	cpp_.namespace_close ();
 	exp (item) << "TypeCodeUnion <" << QName (item) << ">)\n";
-}
-
-void Proxy::marshal_union (const AST::Union& u, bool out)
-{
-	const char* func = out ? "marshal_out" : "marshal_in";
-
-	cpp_ << empty_line <<
-		"void Type <" << QName (u) << ">::" << func << " (";
-	if (!out)
-		cpp_ << "const ";
-	cpp_ << "Var& v, IORequest::_ptr_type rq)\n"
-		"{\n" << indent <<
-		TypePrefix (u.discriminator_type ()) << func << " (v.__d, rq);\n"
-		"switch (v.__d) {\n";
-	for (const auto& el : u) {
-		if (el->is_default ())
-			cpp_ << "default:\n";
-		else
-			for (const auto& l : el->labels ()) {
-				cpp_ << "case " << l << ":\n";
-			}
-		cpp_.indent ();
-		cpp_ << TypePrefix (*el) << func << " (v._u." << el->name () << ", rq);\n"
-			"break;\n" << unindent;
-	}
-	cpp_ << "}\n"
-		<< unindent << "}\n";
 }

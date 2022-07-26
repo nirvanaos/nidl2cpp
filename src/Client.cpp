@@ -1338,6 +1338,7 @@ void Client::implement (const Exception& item)
 		define_swap (item);
 		define_ABI (item);
 		define_structured_type (item);
+		implement_marshaling (item, "_");
 	} else
 		rep_id_of (item);
 
@@ -1391,6 +1392,18 @@ void Client::implement (const Struct& item)
 	define_swap (item);
 	define_ABI (item);
 	define_structured_type (item);
+
+	// Marshaling
+	cpp_.namespace_open ("CORBA/Internal");
+	if (options ().legacy)
+		cpp_ << "\n#ifndef LEGACY_CORBA_CPP\n";
+
+	implement_marshaling (item, "_");
+	if (options ().legacy) {
+		cpp_ << "\n#else\n";
+		implement_marshaling (item, "");
+		cpp_ << "\n#endif\n";
+	}
 }
 
 void Client::implement (const Union& item)
@@ -1400,6 +1413,32 @@ void Client::implement (const Union& item)
 	define_swap (item);
 	define_ABI (item);
 	define_structured_type (item);
+
+	// Marshaling
+	marshal_union (item, false);
+	if (is_var_len (item))
+		marshal_union (item, true);
+	cpp_ << empty_line <<
+		"void Type <" << QName (item)
+		<< ">::unmarshal (IORequest::_ptr_type rq, Var& v)\n"
+		"{\n" << indent <<
+		"v._destruct ();\n" <<
+		TypePrefix (item.discriminator_type ()) << "unmarshal (rq, v.__d);\n"
+		"switch (v.__d) {\n";
+	for (const auto& el : item) {
+		if (el->is_default ())
+			cpp_ << "default:\n";
+		else
+			for (const auto& l : el->labels ()) {
+				cpp_ << "case " << l << ":\n";
+			}
+		cpp_.indent ();
+		init_union (cpp_, *el, "v.");
+		cpp_ << TypePrefix (*el) << "unmarshal (rq, v._u." << el->name () << ");\n"
+			"break;\n" << unindent;
+	}
+	cpp_ << "}\n"
+		<< unindent << "}\n";
 }
 
 void Client::define (const Struct& item)
@@ -1959,5 +1998,78 @@ void Client::define_swap (const ItemWithId& item)
 	h_ << "inline void swap (" << QName (item) << "& x, " << QName (item) << "& y)\n"
 		"{\n" << indent <<
 		Namespace ("std") << "swap (x, y);\n"
+		<< unindent << "}\n";
+}
+
+void Client::implement_marshaling (const StructBase& item, const char* prefix)
+{
+	cpp_.namespace_open ("CORBA/Internal");
+	const char* suffix = "";
+	if (item.kind () == Item::Kind::EXCEPTION)
+		suffix = EXCEPTION_SUFFIX;
+
+	if (!is_CDR (item)) {
+
+		string my_prefix = "v.";
+		my_prefix += prefix;
+
+		cpp_ << "\n"
+			"void Type <" << QName (item) << suffix
+			<< ">::marshal_in (const Var& v, IORequest::_ptr_type rq)\n"
+			"{\n";
+		marshal_members (cpp_, item, "marshal_in", my_prefix.c_str (), "&v + 1");
+		cpp_ << "}\n";
+		if (is_var_len (item)) {
+			cpp_ << "\n"
+				"void Type <" << QName (item) << suffix
+				<< ">::marshal_out (Var& v, IORequest::_ptr_type rq)\n"
+				"{\n";
+			marshal_members (cpp_, item, "marshal_out", my_prefix.c_str (), "&v + 1");
+			cpp_ << "}\n";
+		}
+		cpp_ << "\n"
+			"void Type <" << QName (item) << suffix
+			<< ">::unmarshal (IORequest::_ptr_type rq, Var& v)\n"
+			"{\n";
+		unmarshal_members (cpp_, item, my_prefix.c_str (), "&v + 1");
+		cpp_ << "}\n";
+	} else {
+		cpp_ << "\n"
+			"void Type <" << QName (item) << suffix
+			<< ">::byteswap (Var& v) NIRVANA_NOEXCEPT\n"
+			"{\n" << indent;
+		for (const auto& m : item) {
+			cpp_ << TypePrefix (*m) << "byteswap (v." << prefix << m->name () << ");\n";
+		}
+		cpp_ << unindent << "}\n";
+	}
+}
+
+void Client::marshal_union (const Union& u, bool out)
+{
+	cpp_.namespace_open ("CORBA/Internal");
+
+	const char* func = out ? "marshal_out" : "marshal_in";
+
+	cpp_ << empty_line <<
+		"void Type <" << QName (u) << ">::" << func << " (";
+	if (!out)
+		cpp_ << "const ";
+	cpp_ << "Var& v, IORequest::_ptr_type rq)\n"
+		"{\n" << indent <<
+		TypePrefix (u.discriminator_type ()) << func << " (v.__d, rq);\n"
+		"switch (v.__d) {\n";
+	for (const auto& el : u) {
+		if (el->is_default ())
+			cpp_ << "default:\n";
+		else
+			for (const auto& l : el->labels ()) {
+				cpp_ << "case " << l << ":\n";
+			}
+		cpp_.indent ();
+		cpp_ << TypePrefix (*el) << func << " (v._u." << el->name () << ", rq);\n"
+			"break;\n" << unindent;
+	}
+	cpp_ << "}\n"
 		<< unindent << "}\n";
 }

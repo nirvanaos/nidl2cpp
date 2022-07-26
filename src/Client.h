@@ -164,6 +164,10 @@ private:
 
 	void define_swap (const AST::ItemWithId& item);
 
+	void implement_marshaling (const AST::StructBase& item, const char* prefix);
+
+	void marshal_union (const AST::Union& u, bool out);
+
 private:
 	Header h_; // .h file
 	Code cpp_; // .cpp file.

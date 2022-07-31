@@ -1297,9 +1297,16 @@ void Client::define_structured_type (const ItemWithId& item)
 
 bool Client::has_check (const Type& type)
 {
-	return is_var_len (type)
-		|| is_enum (type)
-		|| type.dereference_type ().tkind () == Type::Kind::FIXED;
+	if (is_var_len (type) || is_enum (type))
+		return true;
+	const Type& t = type.dereference_type ();
+	switch (t.tkind ()) {
+		case Type::Kind::FIXED:
+			return true;
+		case Type::Kind::BASIC_TYPE:
+			return t.basic_type () == BasicType::CHAR;
+	}
+	return false;
 }
 
 bool Client::has_check (const ItemWithId& item)
@@ -1307,7 +1314,7 @@ bool Client::has_check (const ItemWithId& item)
 	const Members* members;
 	if (item.kind () == Item::Kind::UNION) {
 		const Union& u = static_cast <const Union&> (item);
-		if (is_enum (u.discriminator_type ()))
+		if (has_check (u.discriminator_type ()))
 			return true;
 		members = &static_cast <const StructBase&> (u);
 	} else

@@ -356,7 +356,7 @@ Code& operator << (Code& stm, const Variant& var)
 			break;
 
 		case Variant::VT::WSTRING:
-			stm << "_W(" << var.to_string () << ")";
+			stm << "L" << var.to_string ();
 			break;
 
 		case Variant::VT::ENUM_ITEM: {

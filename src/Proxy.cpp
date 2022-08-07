@@ -106,12 +106,10 @@ void Proxy::implement (const Operation& op)
 	}
 
 	// Unmarshal in and inout
-	if (!params_in.empty ()) {
-		for (auto p : params_in) {
-			cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";
-		}
-		cpp_ << "_call->unmarshal_end ();\n";
+	for (auto p : params_in) {
+		cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";
 	}
+	cpp_ << "_call->unmarshal_end ();\n";
 
 	// Call
 	if (op.tkind () != Type::Kind::VOID)

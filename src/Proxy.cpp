@@ -302,9 +302,12 @@ void Proxy::end (const Interface& itf)
 						}
 						if (op.tkind () != Type::Kind::VOID) {
 							cpp_ << Var (op) << " _ret;\n"
-								<< TypePrefix (op) << "unmarshal (_call, _ret);\n"
-								"return _ret;\n";
+								<< TypePrefix (op) << "unmarshal (_call, _ret);\n";
 						}
+						cpp_ << "_call->unmarshal_end ();\n";
+
+						if (op.tkind () != Type::Kind::VOID)
+							cpp_ << "return _ret;\n";
 					}
 
 					cpp_ << unindent

@@ -800,15 +800,11 @@ Code& operator << (Code& stm, const MemberDefault& m)
 				stm << "0";
 			break;
 
-		case Type::Kind::FIXED:
-			stm << "0";
-			break;
-
 		case Type::Kind::NAMED_TYPE: {
 			const NamedItem& nt = td.named_type ();
 			if (nt.kind () == Item::Kind::ENUM) {
 				const Enum& en = static_cast <const Enum&> (nt);
-				stm << QName (en) << "::" << QName (*en.front ());
+				stm << QName (en) << "::" << en.front ()->name ();
 			}
 		} break;
 	}

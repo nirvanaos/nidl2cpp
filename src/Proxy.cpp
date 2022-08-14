@@ -289,7 +289,7 @@ void Proxy::end (const Interface& itf)
 					assert (!op.oneway () || (op_md.params_out.empty () && op.tkind () == Type::Kind::VOID));
 
 					if (op.oneway ())
-						cpp_ << "_target ()->send (_call, ::Nirvana::INFINITE_DEADLINE);\n";
+						cpp_ << "_target ()->send (_call, 0);\n";
 					else {
 
 						cpp_ << "_call->invoke ();\n"

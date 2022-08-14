@@ -53,7 +53,7 @@ void Compiler::print_usage_info (const char* exe_name)
 		"\t-server_suffix <suffix> The suffix for server file name. Default is _s.\n"
 		"\t-proxy_suffix <suffix>  The suffix for proxy file name. Default is _p.\n"
 		"\t-legacy                 Generate code compatible with C++ language mapping 1.3.\n"
-		"                          To enable compatibility define macro LEGACY_CORBA_CPP.\n"
+		"\t                        To enable compatibility define macro LEGACY_CORBA_CPP.\n"
 		"\t-no_servant             Do not generate servant implementations.\n";
 }
 

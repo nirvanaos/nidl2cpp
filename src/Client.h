@@ -129,6 +129,10 @@ private:
 	{
 		forward_decl (static_cast <const AST::StructBase&> (item.definition ()));
 	}
+	void forward_decl (const AST::Union& item)
+	{
+		forward_decl (static_cast <const AST::StructBase&> (item));
+	}
 
 	void forward_interface (const AST::ItemWithId& item);
 	void begin_interface (const AST::IV_Base& item);

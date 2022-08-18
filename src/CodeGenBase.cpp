@@ -275,6 +275,21 @@ bool CodeGenBase::is_pseudo (const NamedItem& item)
 			case Item::Kind::EXCEPTION:
 			case Item::Kind::MODULE:
 				return false;
+
+			case Item::Kind::TYPE_DEF: {
+				const Type* t = &static_cast <const TypeDef&> (*p).dereference_type ();
+				switch (t->tkind ()) {
+					case Type::Kind::SEQUENCE:
+						t = &t->sequence ().dereference_type ();
+						break;
+					case Type::Kind::ARRAY:
+						t = &t->array ().dereference_type ();
+						break;
+				}
+				if (t->tkind () == Type::Kind::NAMED_TYPE && is_pseudo (t->named_type ()))
+					return true;
+			} break;
+
 		}
 		p = p->parent ();
 	} while (p);

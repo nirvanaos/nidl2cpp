@@ -288,12 +288,11 @@ void Proxy::end (const Interface& itf)
 					// Call
 					assert (!op.oneway () || (op_md.params_out.empty () && op.tkind () == Type::Kind::VOID));
 
-					if (op.oneway ())
-						cpp_ << "_target ()->send (_call, 0);\n";
-					else {
+					cpp_ << "_call->invoke ();\n";
 
-						cpp_ << "_call->invoke ();\n"
-							"check_request (_call);\n";
+					if (!op.oneway ()) {
+
+						cpp_ << "check_request (_call);\n";
 
 						// Unmarshal output
 

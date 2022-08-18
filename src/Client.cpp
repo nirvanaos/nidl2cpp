@@ -1488,10 +1488,13 @@ void Client::define (const Struct& item)
 inline
 void Client::define (const Union& item)
 {
-	if (is_nested (item))
+	if (is_nested (item)) {
 		h_.namespace_open ("CORBA/Internal");
-	else
+		cpp_.namespace_open ("CORBA/Internal");
+	} else {
 		h_.namespace_open (item);
+		cpp_.namespace_open (item);
+	}
 
 	h_ << empty_line
 		<< "class " << QName (item) << "\n"
@@ -1512,8 +1515,6 @@ void Client::define (const Union& item)
 	}
 
 	assert (init_d);
-
-	cpp_.namespace_open (item);
 
 	// Constructors
 
@@ -1581,7 +1582,7 @@ void Client::define (const Union& item)
 		<< unindent << "}\n\n";
 
 	cpp_ << empty_line <<
-		"void " << item.name () << "::_d (" << item.discriminator_type () << " d)\n"
+		"void " << QName (item) << "::_d (" << item.discriminator_type () << " d)\n"
 		"{\n" << indent <<
 		"if (_switch (d) != _switch (__d))\n" << indent <<
 		"throw " << Namespace ("CORBA") << "BAD_PARAM ();\n"
@@ -1624,7 +1625,7 @@ void Client::define (const Union& item)
 		h_ << ");\n";
 
 		// ref getter
-		cpp_ << MemberType (*el) << "& " << item.name () << "::" << el->name () << " ()\n"
+		cpp_ << MemberType (*el) << "& " << QName (item) << "::" << el->name () << " ()\n"
 			"{\n" << indent <<
 			"if (_switch (__d) != " << label << ")\n" << indent <<
 			"throw " << Namespace ("CORBA") << "BAD_PARAM ();\n"
@@ -1633,7 +1634,7 @@ void Client::define (const Union& item)
 			<< unindent << "}\n"
 
 			// setter
-			<< "void " << item.name () << "::" << el->name () << " (" << ConstRef (*el) << " val";
+			<< "void " << QName (item) << "::" << el->name () << " (" << ConstRef (*el) << " val";
 		if (multi)
 			cpp_ << ", " << item.discriminator_type () << " label";
 		cpp_ << ")\n"
@@ -1664,7 +1665,7 @@ void Client::define (const Union& item)
 				h_ << ", " << item.discriminator_type () << " = " << label;
 			h_ << ");\n";
 
-			cpp_ << "void " << item.name () << "::" << el->name () << " (" << Var (*el) << "&& val";
+			cpp_ << "void " << QName (item) << "::" << el->name () << " (" << Var (*el) << "&& val";
 			if (multi)
 				cpp_ << ", " << item.discriminator_type () << " label";
 			cpp_ << ")\n"
@@ -1700,7 +1701,7 @@ void Client::define (const Union& item)
 	if (is_var_len (item)) {
 		h_ << ";\n";
 		cpp_ << empty_line <<
-			"void " << item.name () << "::_destruct () NIRVANA_NOEXCEPT\n"
+			"void " << QName (item) << "::_destruct () NIRVANA_NOEXCEPT\n"
 			"{\n"
 			<< indent <<
 			"switch (__d) {\n";
@@ -1750,7 +1751,7 @@ void Client::define (const Union& item)
 			"}\n";
 	} else {
 		h_ << ";\n";
-		cpp_ << empty_line << item.discriminator_type () << ' ' << item.name ()
+		cpp_ << empty_line << item.discriminator_type () << ' ' << QName (item)
 			<< "::_switch (" << item.discriminator_type () << " d) NIRVANA_NOEXCEPT\n"
 			"{\n"
 			<< indent <<
@@ -1805,7 +1806,7 @@ void Client::assign_union (const AST::Union& item, bool move)
 	else
 		h_ << "& src);\n";
 
-	cpp_ << "void " << item.name () << "::_assign (";
+	cpp_ << "void " << QName (item) << "::_assign (";
 	if (!move)
 		cpp_ << "const ";
 	cpp_ << item.name ();

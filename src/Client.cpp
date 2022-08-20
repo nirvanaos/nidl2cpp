@@ -1510,6 +1510,8 @@ void Client::define (const Union& item)
 		init_el = item.front ();
 		init_d = &init_el->labels ().front ();
 	} else {
+		// A union has an implicit default member if it does not have a default case
+		// and not all permissible values of the union discriminant are listed.
 		init_el = nullptr;
 		init_d = &item.default_label ();
 	}
@@ -1584,12 +1586,18 @@ void Client::define (const Union& item)
 	cpp_ << empty_line <<
 		"void " << QName (item) << "::_d (" << item.discriminator_type () << " d)\n"
 		"{\n" << indent <<
-		"if (_switch (d) != _switch (__d))\n" << indent <<
-		"throw " << Namespace ("CORBA") << "BAD_PARAM ();\n"
-		<< unindent
+		item.discriminator_type () << " nd = _switch (d);\n";
+		if (!init_el) {
+			cpp_ << "if (nd == " << *init_d << ")\n"
+				<< indent << "_destruct ();\n" << unindent
+				<< "else ";
+		}
+		cpp_ << "if (nd != _switch (__d))\n"
+			<< indent << "throw " << Namespace ("CORBA") << "BAD_PARAM ();\n"
+			<< unindent << "__d = d;\n"
 		<< unindent << "}\n\n";
 
-	// Union has implicit default, create _default () method;
+	// If union has implicit default, create _default () method;
 	if (!init_el) {
 		h_ << "void _default () NIRVANA_NOEXCEPT\n"
 			"{\n"

@@ -201,6 +201,18 @@ bool Proxy::is_custom (const AST::Operation& op)
 	return custom;
 }
 
+bool Proxy::is_special (const Interface& itf) noexcept
+{
+	if (itf.name () == "Policy" || itf.name () == "Current") {
+		const ItemScope* parent = itf.parent ();
+		if (parent && !parent->parent () && parent->kind () == Item::Kind::MODULE
+			&& parent->name () == "CORBA") {
+			return true;
+		}
+	}
+	return false;
+}
+
 void Proxy::end (const Interface& itf)
 {
 	if (itf.interface_kind () == InterfaceKind::PSEUDO)
@@ -209,14 +221,29 @@ void Proxy::end (const Interface& itf)
 	cpp_.namespace_open ("CORBA/Internal");
 	cpp_.empty_line ();
 	type_code_name (itf);
+
+	Interfaces bases = itf.get_all_bases ();
+
+	bool no_proxy = false;
+	if (itf.interface_kind () == InterfaceKind::LOCAL) {
+		if (!(no_proxy = is_special (itf))) {
+			for (auto base : bases) {
+				if (is_special (*base)) {
+					no_proxy = true;
+					break;
+				}
+			}
+		}
+	}
+
 	cpp_ << "\n"
 		"template <>\n"
 		"class Proxy <" << QName (itf) << "> : public ProxyBase <" << QName (itf) << '>';
 
-	Interfaces bases = itf.get_all_bases ();
 	cpp_.indent ();
 	for (auto p : bases) {
-		cpp_ << ",\npublic ProxyBaseInterface <" << QName (*p) << '>';
+		cpp_ << ",\n"
+			"public ProxyBaseInterface <" << QName (*p) << '>';
 	}
 	cpp_ << unindent
 		<< "\n{\n"
@@ -431,23 +458,23 @@ void Proxy::end (const Interface& itf)
 		cpp_ << ",\n"
 			<< "RepIdOf <" << QName (*p) << ">::id";
 	}
-	cpp_ << unindent
-		<< "\n};\n"
+	cpp_ << unindent << "\n};\n"
 
 		<< "template <>\n"
-		"const InterfaceMetadata ProxyFactoryImpl <" << QName (itf) << ">::metadata_ = {\n"
+		"const InterfaceMetadata MetadataOf <" << QName (itf) << ">::metadata_ = {\n"
 		<< indent
 		<< "{Proxy <" << QName (itf) << ">::__interfaces, countof (Proxy <" << QName (itf) << ">::__interfaces)},\n";
 	if (metadata.empty ())
-		cpp_ << "{nullptr, 0}";
+		cpp_ << "{nullptr, 0},\n";
 	else
-		cpp_ << "{Proxy <" << QName (itf) << ">::__operations, countof (Proxy <" << QName (itf) << ">::__operations)}\n";
-	cpp_ << unindent
-		<< "};\n";
+		cpp_ << "{Proxy <" << QName (itf) << ">::__operations, countof (Proxy <" << QName (itf) << ">::__operations)},\n";
+	cpp_ << (no_proxy ? "InterfaceMetadata::FLAG_NO_PROXY" : "0");
+	cpp_ << "\n" << unindent << "};\n";
 
 	cpp_.namespace_close ();
 	cpp_ << "NIRVANA_EXPORT (" << export_name (itf) << ", CORBA::Internal::RepIdOf <" << QName (itf)
-		<< ">::id, CORBA::Internal::PseudoBase, CORBA::Internal::ProxyFactoryImpl <" << QName (itf) << ">)\n";
+		<< ">::id, CORBA::Internal::PseudoBase, CORBA::Internal::ProxyFactory"
+		<< (no_proxy ? "NoProxy" : "Impl") << " <" << QName (itf) << ">)\n";
 }
 
 void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
@@ -460,14 +487,23 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
 	} else
 		cpp_ << "0, 0";
 	cpp_ << " }, { ";
+
+	bool out_obj = false;
 	if (!op.params_out.empty ()) {
+		for (const Member* par : op.params_out) {
+			if (is_ref_type (*par)) {
+				out_obj = true;
+				break;
+			}
+		}
 		string params = PREFIX_OP_PARAM_OUT;
 		params += op.name;
 		cpp_ << params << ", countof (" << params << ')';
 	} else
 		cpp_ << "0, 0";
 	cpp_ << " }, Type <" << (op.type ? *op.type : Type ())
-		<< ">::type_code, RqProcWrapper <" PREFIX_OP_PROC << op.name << "> }";
+		<< ">::type_code, RqProcWrapper <" PREFIX_OP_PROC << op.name << ">, "
+		<< (out_obj ? "Operation::FLAG_OUT_OBJECTS" : "0") << " }";
 }
 
 string Proxy::export_name (const NamedItem& item)

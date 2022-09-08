@@ -480,7 +480,14 @@ void Proxy::end (const Interface& itf)
 void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
 {
 	cpp_ << "{ \"" << op.name << "\", { ";
+	bool in_obj = false, out_obj = false;
 	if (!op.params_in.empty ()) {
+		for (const Member* par : op.params_in) {
+			if (is_ref_type (*par)) {
+				in_obj = true;
+				break;
+			}
+		}
 		string params = PREFIX_OP_PARAM_IN;
 		params += op.name;
 		cpp_ << params << ", countof (" << params << ')';
@@ -488,22 +495,35 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
 		cpp_ << "0, 0";
 	cpp_ << " }, { ";
 
-	bool out_obj = false;
+	if (op.type && is_ref_type (*op.type))
+		out_obj = true;
+
 	if (!op.params_out.empty ()) {
-		for (const Member* par : op.params_out) {
-			if (is_ref_type (*par)) {
-				out_obj = true;
-				break;
+		if (!out_obj)
+			for (const Member* par : op.params_out) {
+				if (is_ref_type (*par)) {
+					out_obj = true;
+					break;
+				}
 			}
-		}
 		string params = PREFIX_OP_PARAM_OUT;
 		params += op.name;
 		cpp_ << params << ", countof (" << params << ')';
 	} else
 		cpp_ << "0, 0";
+	
+	const char* flags = "0";
+	if (in_obj)
+		if (out_obj)
+			flags = "Operation::FLAG_IN_OBJ | Operation::FLAG_OUT_OBJ";
+		else
+			flags = "Operation::FLAG_IN_OBJ";
+	else if (out_obj)
+		flags = "Operation::FLAG_OUT_OBJ";
+
 	cpp_ << " }, Type <" << (op.type ? *op.type : Type ())
 		<< ">::type_code, RqProcWrapper <" PREFIX_OP_PROC << op.name << ">, "
-		<< (out_obj ? "Operation::FLAG_OUT_OBJECTS" : "0") << " }";
+		<< flags << " }";
 }
 
 string Proxy::export_name (const NamedItem& item)

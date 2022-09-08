@@ -27,8 +27,7 @@
 #include "Code.h"
 #include "CodeGenBase.h"
 
-using namespace std;
-using namespace std::filesystem;
+using std::filesystem::path;
 using namespace AST;
 
 #ifdef _WIN32
@@ -54,12 +53,12 @@ Code::~Code ()
 	}
 }
 
-void Code::open (const std::filesystem::path& file, const Root& root)
+void Code::open (const path& file, const Root& root)
 {
 	Base::open (file.empty () ? DEVNULL : file);
 	cur_namespace_.clear ();
 	file_ = file;
-	*this << "// This file was generated from " << root.file ().filename () << endl;
+	*this << "// This file was generated from " << root.file ().filename () << std::endl;
 	*this << "// Nirvana IDL compiler version 1.0\n";
 }
 
@@ -69,9 +68,9 @@ void Code::close ()
 	Base::close ();
 }
 
-void Code::include_header (const std::filesystem::path& file_h)
+void Code::include_header (const path& file_h)
 {
-	filesystem::path cpp_dir = file_.parent_path ();
+	path cpp_dir = file_.parent_path ();
 	if (file_h.parent_path () == cpp_dir)
 		*this << file_h.filename ();
 	else
@@ -177,7 +176,7 @@ void Code::namespace_open (const Namespaces& ns)
 			*this << "namespace " << *req << " {\n";
 			cur_namespace_.push_back (*req);
 		}
-		*this << endl;
+		*this << std::endl;
 	}
 }
 
@@ -244,7 +243,7 @@ Code& operator << (Code& stm, const Identifier& id)
 {
 	if (CodeGenBase::is_keyword (id))
 		stm << CodeGenBase::protected_prefix_;
-	stm << static_cast <const string&> (id);
+	stm << static_cast <const std::string&> (id);
 	return stm;
 }
 
@@ -337,16 +336,16 @@ Code& operator << (Code& stm, const Variant& var)
 	switch (var.vtype ()) {
 
 		case Variant::VT::FIXED: {
-			vector <uint8_t> bcd = var.as_Fixed ().to_BCD ();
+			std::vector <uint8_t> bcd = var.as_Fixed ().to_BCD ();
 			stm << "{ ";
-			stm << hex;
+			stm << std::hex;
 			auto f = stm.fill ('0');
 			auto it = bcd.begin ();
 			stm << "0x" << (unsigned)*(it++);
 			while (it != bcd.end ()) {
-				stm << ", 0x" << setw (2) << (unsigned)*(it++);
+				stm << ", 0x" << std::setw (2) << (unsigned)*(it++);
 			}
-			stm << dec;
+			stm << std::dec;
 			stm.fill (f);
 			stm << " }";
 		} break;

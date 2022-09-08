@@ -30,15 +30,14 @@
 #include "Proxy.h"
 #include <iostream>
 
-using namespace std;
-using namespace std::filesystem;
+using std::filesystem::path;
 using namespace AST;
 
 void Compiler::print_usage_info (const char* exe_name)
 {
-	cout << "Nirvana IDL compiler.\n";
+	std::cout << "Nirvana IDL compiler.\n";
 	IDL_FrontEnd::print_usage_info (exe_name);
-	cout << "Output options:\n"
+	std::cout << "Output options:\n"
 		"\t-out <directory>        Directory for output files.\n"
 		"\t-out_h <directory>      Directory for output *.h files.\n"
 		"\t-out_cpp <directory>    Directory for output *.cpp files.\n"
@@ -61,7 +60,7 @@ const char* Compiler::option (const char* arg, const char* opt)
 {
 	++arg;
 	size_t cc = strlen (opt);
-	if (equal (arg, arg + cc + 1, opt))
+	if (std::equal (arg, arg + cc + 1, opt))
 		return arg + cc;
 	else
 		return nullptr;
@@ -114,7 +113,7 @@ bool Compiler::parse_command_line (CmdLine& args)
 		return false;
 }
 
-path Compiler::out_file (const Root& tree, const path& dir, const string& suffix, const path& ext) const
+path Compiler::out_file (const Root& tree, const path& dir, const std::string& suffix, const path& ext) const
 {
 	path name (tree.file ().stem ().string () + suffix);
 	name.replace_extension (ext);

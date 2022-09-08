@@ -28,8 +28,7 @@
 
 #define SKELETON_FUNC_PREFIX "_s_"
 
-using namespace std;
-using namespace std::filesystem;
+using std::filesystem::path;
 using namespace AST;
 
 void Servant::end (const Root&)
@@ -43,7 +42,7 @@ void Servant::leaf (const Include& item)
 		h_ << "#include " << (item.system () ? '<' : '"')
 			<< path (path (item.file ()).replace_extension ("").string () + options ().servant_suffix).replace_extension ("h").string ()
 			<< (item.system () ? '>' : '"')
-			<< endl;
+			<< std::endl;
 	}
 }
 
@@ -165,7 +164,7 @@ void Servant::end (const Interface& itf)
 				"S::template _wide <" << QName (**b) << ", " << QName (itf) << '>';
 		}
 
-		h_ << endl
+		h_ << std::endl
 			<< unindent
 			<< "}";
 	}
@@ -297,7 +296,7 @@ void Servant::end (const Interface& itf)
 			if (ns) {
 				ScopedName sn = ns->scoped_name ();
 				{
-					string s = "POA_";
+					std::string s = "POA_";
 					s += sn.front ();
 					h_ << "namespace " << s << " {\n";
 				}
@@ -318,10 +317,10 @@ void Servant::end (const Interface& itf)
 			} else {
 
 				h_ << "typedef " << Namespace ("CORBA/Internal")
-				<< "ServantPOA <" << QName (itf) << "> POA_" << static_cast <const string&> (itf.name ()) << ";\n";
+				<< "ServantPOA <" << QName (itf) << "> POA_" << static_cast <const std::string&> (itf.name ()) << ";\n";
 
 				if (itf.interface_kind () != InterfaceKind::ABSTRACT)
-					h_ << "template <class T> using POA_" << static_cast <const string&> (itf.name ()) << "_tie = "
+					h_ << "template <class T> using POA_" << static_cast <const std::string&> (itf.name ()) << "_tie = "
 					<< Namespace ("CORBA/Internal") << "ServantTied <T, " << QName (itf) << ">;\n\n";
 			}
 			h_ << "#endif\n";
@@ -359,7 +358,7 @@ void Servant::end (const ValueType& vt)
 		}
 	}
 
-	h_ << endl
+	h_ << std::endl
 		<< unindent
 		<< "}";
 
@@ -427,7 +426,7 @@ void Servant::end (const ValueType& vt)
 				h_ << " {}\n";
 
 			// Member variables
-			h_ << endl << unindent
+			h_ << std::endl << unindent
 				<< "private:\n"
 				<< indent;
 
@@ -463,7 +462,7 @@ void Servant::end (const ValueType& vt)
 				h_ << "public ValueImpl <S, ValueBase>";
 
 			bool abstract_base = false;
-			vector <const ValueType*> concrete_bases;
+			std::vector <const ValueType*> concrete_bases;
 			for (auto it = all_bases.rbegin (); it != all_bases.rend (); ++it) {
 				auto b = *it;
 				h_ << ",\n"
@@ -710,10 +709,10 @@ void Servant::leaf (const Operation& op)
 	h_ << "static " << ABI_ret (op);
 
 	{
-		string name = SKELETON_FUNC_PREFIX;
+		std::string name = SKELETON_FUNC_PREFIX;
 		name += op.name ();
 		h_ << ' ' << name << " (Bridge <" << QName (itf) << ">* _b";
-		epv_.push_back (move (name));
+		epv_.push_back (std::move (name));
 	}
 
 	for (auto it = op.begin (); it != op.end (); ++it) {
@@ -766,11 +765,11 @@ void Servant::attribute (const Member& m)
 
 	h_ << "static " << ABI_ret (m, attributes_by_ref_);
 	{
-		string name = SKELETON_FUNC_PREFIX "get_";
+		std::string name = SKELETON_FUNC_PREFIX "get_";
 		name += m.name ();
 		h_ << ' ' << name << " (Bridge <" << QName (itf) << ">* _b, Interface* _env)\n"
 			"{\n";
-		epv_.push_back (move (name));
+		epv_.push_back (std::move (name));
 	}
 	h_ << indent
 		<< "try {\n"
@@ -789,12 +788,12 @@ void Servant::attribute (const Member& m)
 
 	if (!(m.kind () == Item::Kind::ATTRIBUTE && static_cast <const Attribute&> (m).readonly ())) {
 		{
-			string name = SKELETON_FUNC_PREFIX "set_";
+			std::string name = SKELETON_FUNC_PREFIX "set_";
 			name += m.name ();
 			h_ << "static void " << name << " (Bridge <" << QName (itf) << ">* _b, "
 				<< ABI_param (m) << " val, Interface* _env)\n"
 				"{\n";
-			epv_.push_back (move (name));
+			epv_.push_back (std::move (name));
 		}
 		h_ << indent
 			<< "try {\n"
@@ -809,12 +808,12 @@ void Servant::attribute (const Member& m)
 
 	if (m.kind () == Item::Kind::STATE_MEMBER && is_var_len (m)) {
 		{
-			string name = SKELETON_FUNC_PREFIX "move_";
+			std::string name = SKELETON_FUNC_PREFIX "move_";
 			name += m.name ();
 			h_ << "static void " << name << " (Bridge <" << QName (itf) << ">* _b, "
 				<< ABI_param (m, Parameter::Attribute::INOUT) << " val, Interface* _env)\n"
 				"{\n";
-			epv_.push_back (move (name));
+			epv_.push_back (std::move (name));
 		}
 		h_ << indent
 			<< "try {\n"
@@ -827,10 +826,10 @@ void Servant::attribute (const Member& m)
 			<< "}\n";
 	}
 
-	h_ << endl;
+	h_ << std::endl;
 }
 
-void Servant::servant_param (const Type& t, const string& name, Parameter::Attribute att)
+void Servant::servant_param (const Type& t, const std::string& name, Parameter::Attribute att)
 {
 	h_ << TypePrefix (t);
 	switch (att) {

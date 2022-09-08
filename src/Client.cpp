@@ -26,8 +26,7 @@
 #include "pch.h"
 #include "Client.h"
 
-using namespace std;
-using namespace std::filesystem;
+using std::filesystem::path;
 using namespace AST;
 
 Code& operator << (Code& stm, const Client::Param& t)
@@ -78,7 +77,7 @@ void Client::leaf (const Include& item)
 		<< path (path (item.file ()).replace_extension ("").string ()
 			+ options ().client_suffix).replace_extension ("h").string ()
 		<< (item.system () ? '>' : '"')
-		<< endl;
+		<< std::endl;
 }
 
 void Client::type_code_decl (const NamedItem& item)
@@ -93,7 +92,7 @@ void Client::type_code_decl (const NamedItem& item)
 		h_ << "static ";
 	h_ << "const " << Namespace ("Nirvana") << "ImportInterfaceT <"
 		<< Namespace ("CORBA") << "TypeCode> _tc_"
-		<< static_cast <const string&> (item.name ()) << ";\n";
+		<< static_cast <const std::string&> (item.name ()) << ";\n";
 }
 
 void Client::type_code_def (const ItemWithId& item)
@@ -138,7 +137,7 @@ void Client::leaf (const TypeDef& item)
 		<< "typedef " << static_cast <const Type&> (item) << ' ' << item.name ()
 		<< ";\n";
 	
-	const string& name = static_cast <const string&> (item.name ());
+	const std::string& name = static_cast <const std::string&> (item.name ());
 
 	if (options ().legacy) {
 		// <Type>_var
@@ -154,11 +153,11 @@ void Client::leaf (const TypeDef& item)
 			case Type::Kind::NAMED_TYPE:
 				h_ <<
 					"#ifdef LEGACY_CORBA_CPP\n"
-					"typedef " << static_cast <const string&> (item.named_type ().name ()) << "_var "
+					"typedef " << static_cast <const std::string&> (item.named_type ().name ()) << "_var "
 					<< name << "_var;\n";
 
 				if (is_ref_type (item))
-					h_ << "typedef " << static_cast <const string&> (item.named_type ().name ()) << "_ptr "
+					h_ << "typedef " << static_cast <const std::string&> (item.named_type ().name ()) << "_ptr "
 					<< name << "_ptr;\n";
 				h_ << "#endif\n";
 		}
@@ -206,7 +205,7 @@ void Client::backward_compat_var (const NamedItem& item)
 		h_namespace_open (item);
 		h_ <<
 			"#ifdef LEGACY_CORBA_CPP\n"
-			"typedef " << Namespace ("CORBA/Internal") << "T_var <" << item.name () << "> " << static_cast <const string&> (item.name ()) << "_var;\n"
+			"typedef " << Namespace ("CORBA/Internal") << "T_var <" << item.name () << "> " << static_cast <const std::string&> (item.name ()) << "_var;\n"
 			"#endif\n";
 	}
 }
@@ -269,7 +268,7 @@ void Client::forward_interface (const ItemWithId& item)
 	if (options ().legacy)
 		h_ << "#endif\n";
 
-	h_ << endl;
+	h_ << std::endl;
 	h_.namespace_open ("CORBA/Internal");
 	h_ << empty_line
 		<< "template <>\n"
@@ -315,7 +314,7 @@ void Client::forward_interface (const ItemWithId& item)
 		"{";
 
 	if (has_type_code) {
-		h_ << endl;
+		h_ << std::endl;
 		h_.indent ();
 		type_code_func (item);
 		h_.unindent ();
@@ -333,9 +332,9 @@ void Client::forward_interface (const ItemWithId& item)
 		h_ <<
 			"#ifdef LEGACY_CORBA_CPP\n"
 			"typedef " << Namespace ("CORBA/Internal") << "I_ptr <" << item.name () << "> "
-			<< static_cast <const string&> (item.name ()) << "_ptr;\n"
+			<< static_cast <const std::string&> (item.name ()) << "_ptr;\n"
 			"typedef " << Namespace ("CORBA/Internal") << "I_var <" << item.name () << "> "
-			<< static_cast <const string&> (item.name ()) << "_var;\n"
+			<< static_cast <const std::string&> (item.name ()) << "_var;\n"
 			"#endif\n";
 	}
 }
@@ -708,7 +707,7 @@ void Client::end_interface (const IV_Base& container)
 					<< container.name () << ">::" << def.name () << ";\n";
 				if (!pseudo_interface && ItemWithId::cast (&def))
 					h_ << "using " << Namespace ("CORBA/Internal") << "Decls <"
-					<< container.name () << ">::_tc_" << static_cast <const string&> (def.name ()) << ";\n";
+					<< container.name () << ">::_tc_" << static_cast <const std::string&> (def.name ()) << ";\n";
 
 				if (options ().legacy) {
 					switch (item->kind ()) {
@@ -741,7 +740,7 @@ void Client::end_interface (const IV_Base& container)
 void Client::bridge_bases (const Bases& bases)
 {
 	for (auto b : bases) {
-		string proc_name;
+		std::string proc_name;
 		{
 			ScopedName sn = b->scoped_name ();
 			for (ScopedName::const_iterator it = sn.begin (); it != sn.end (); ++it) {
@@ -775,7 +774,7 @@ void Client::begin (const ValueType& itf)
 }
 
 inline
-size_t Client::version (const string& rep_id)
+size_t Client::version (const std::string& rep_id)
 {
 
 	for (const char* begin = rep_id.data (), *p = begin + rep_id.size () - 1; p > begin; --p) {
@@ -803,7 +802,7 @@ void Client::end (const ValueType& vt)
 		h_.empty_line ();
 
 		{
-			string factory_id = vt.repository_id ();
+			std::string factory_id = vt.repository_id ();
 			factory_id.insert (version (factory_id), FACTORY_SUFFIX);
 
 			h_ <<
@@ -1089,7 +1088,7 @@ void Client::define (const Exception& item)
 			"{\n" << indent;
 		if (options ().legacy)
 			h_ << "#ifndef LEGACY_CORBA_CPP\n";
-		h_ << "return &_" << static_cast <const string&> (item.front ()->name ()) << ";\n";
+		h_ << "return &_" << static_cast <const std::string&> (item.front ()->name ()) << ";\n";
 		if (options ().legacy) {
 			h_ <<
 				"#else\n"
@@ -1134,7 +1133,7 @@ void Client::define_ABI (const StructBase& item)
 		"struct ABI <" << QName (item) << suffix << ">\n"
 		"{\n" << indent;
 		for (const auto& m : item) {
-			h_ << TypePrefix (*m) << "ABI _" << static_cast <const string&> (m->name ()) << ";\n";
+			h_ << TypePrefix (*m) << "ABI _" << static_cast <const std::string&> (m->name ()) << ";\n";
 		}
 	h_ << unindent << "};\n\n";
 }
@@ -1258,7 +1257,7 @@ void Client::define_structured_type (const ItemWithId& item)
 		if (!u) {
 			for (auto m : members) {
 				if (has_check (*m))
-					cpp_ << TypePrefix (*m) << "check (val._" << static_cast <const string&> (m->name ()) << ");\n";
+					cpp_ << TypePrefix (*m) << "check (val._" << static_cast <const std::string&> (m->name ()) << ");\n";
 			}
 		} else {
 			bool member_check = false;
@@ -1786,7 +1785,7 @@ void Client::define (const Union& item)
 	}
 
 	// Data
-	h_ << endl <<
+	h_ << std::endl <<
 		item.discriminator_type () << " __d;\n"
 		"union _U\n"
 		"{\n" << indent <<
@@ -1907,7 +1906,7 @@ void Client::member_variables_legacy (const StructBase& item)
 {
 	for (const auto& m : item) {
 		h_ << MemberType (*m) << ' '
-			<< static_cast <const string&> (m->name ()) << ";\n";
+			<< static_cast <const std::string&> (m->name ()) << ";\n";
 	}
 }
 
@@ -2026,7 +2025,7 @@ void Client::implement_marshaling (const StructBase& item, const char* prefix)
 
 	if (!is_CDR (item)) {
 
-		string my_prefix = "v.";
+		std::string my_prefix = "v.";
 		my_prefix += prefix;
 
 		cpp_ << "\n"

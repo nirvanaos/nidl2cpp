@@ -31,7 +31,6 @@
 #define PREFIX_OP_PARAM_OUT "__par_out_"
 #define PREFIX_OP_IDX "__OPIDX_"
 
-using namespace std;
 using namespace AST;
 
 void Proxy::end (const Root&)
@@ -77,7 +76,7 @@ void Proxy::implement (const Operation& op)
 		cpp_ << "static const Parameter " PREFIX_OP_PARAM_OUT << op.name () << "[" << params_out.size () << "];\n";
 
 	cpp_ << empty_line
-		<< "static void " PREFIX_OP_PROC << static_cast <const string&> (op.name ())
+		<< "static void " PREFIX_OP_PROC << static_cast <const std::string&> (op.name ())
 		<< " (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)";
 
 	if (is_custom (op)) {
@@ -144,7 +143,7 @@ void Proxy::implement (const Attribute& att)
 	const ItemScope& itf = *att.parent ();
 
 	cpp_ << empty_line
-		<< "static void " PREFIX_OP_PROC "_get_" << static_cast <const string&> (att.name ())
+		<< "static void " PREFIX_OP_PROC "_get_" << static_cast <const std::string&> (att.name ())
 		<< " (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)";
 
 	if (is_native (att)) {
@@ -171,8 +170,8 @@ void Proxy::implement (const Attribute& att)
 	if (!att.readonly ()) {
 		cpp_ << empty_line
 			<< "static const Parameter " PREFIX_OP_PARAM_IN "_set_"
-			<< static_cast <const string&> (att.name ()) << " [1];\n\n"
-			<< "static void " PREFIX_OP_PROC "_set_" << static_cast <const string&> (att.name ())
+			<< static_cast <const std::string&> (att.name ()) << " [1];\n\n"
+			<< "static void " PREFIX_OP_PROC "_set_" << static_cast <const std::string&> (att.name ())
 			<< " (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)\n"
 			"{\n"
 			<< indent
@@ -260,7 +259,7 @@ void Proxy::end (const Interface& itf)
 		<< unindent
 		<< '{';
 	if (!bases.empty ()) {
-		cpp_ << endl;
+		cpp_ << std::endl;
 		cpp_.indent ();
 		cpp_ << "Object::_ptr_type obj = static_cast <Object*> (proxy_manager->get_object (RepIdOf <Object>::id));\n";
 		for (auto p : bases) {
@@ -401,7 +400,7 @@ void Proxy::end (const Interface& itf)
 							<< "}\n\n";
 					}
 				}
-				cpp_ << endl;
+				cpp_ << std::endl;
 			} break;
 		}
 	}
@@ -424,8 +423,8 @@ void Proxy::end (const Interface& itf)
 					// _set_ operation
 					assert (op.params_in.size () == 1);
 					cpp_.indent ();
-					md_member (*op.params_in.front (), string ());
-					cpp_ << endl
+					md_member (*op.params_in.front (), std::string ());
+					cpp_ << std::endl
 						<< unindent;
 				}
 				cpp_ << "};\n";
@@ -488,7 +487,7 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
 				break;
 			}
 		}
-		string params = PREFIX_OP_PARAM_IN;
+		std::string params = PREFIX_OP_PARAM_IN;
 		params += op.name;
 		cpp_ << params << ", countof (" << params << ')';
 	} else
@@ -506,7 +505,7 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
 					break;
 				}
 			}
-		string params = PREFIX_OP_PARAM_OUT;
+		std::string params = PREFIX_OP_PARAM_OUT;
 		params += op.name;
 		cpp_ << params << ", countof (" << params << ')';
 	} else
@@ -526,9 +525,9 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
 		<< flags << " }";
 }
 
-string Proxy::export_name (const NamedItem& item)
+std::string Proxy::export_name (const NamedItem& item)
 {
-	string name = "_exp";
+	std::string name = "_exp";
 	ScopedName sn = item.scoped_name ();
 	for (const auto& n : sn) {
 		name += '_';
@@ -553,10 +552,10 @@ void Proxy::md_members (const Members& members)
 		cpp_ << ",\n";
 		md_member (**it);
 	}
-	cpp_ << unindent << endl;
+	cpp_ << unindent << std::endl;
 }
 
-void Proxy::md_member (const Type& t, const string& name)
+void Proxy::md_member (const Type& t, const std::string& name)
 {
 	cpp_ << "{ \"" << name << "\", Type <" << t << ">::type_code }";
 }
@@ -583,7 +582,7 @@ void Proxy::type_code_name (const NamedItem& item)
 {
 	cpp_ << empty_line
 		<< "template <>\n"
-		"const Char TypeCodeName <" << QName (item) << ">::name_ [] = \"" << static_cast <const string&> (item.name ()) << "\";\n";
+		"const Char TypeCodeName <" << QName (item) << ">::name_ [] = \"" << static_cast <const std::string&> (item.name ()) << "\";\n";
 }
 
 void Proxy::leaf (const Enum& item)
@@ -637,7 +636,7 @@ void Proxy::leaf (const Struct& item)
 
 void Proxy::state_member (const AST::StateMember& m)
 {
-	cpp_ << "{ \"" << static_cast <const string&> (m.name ()) << "\", Type <"
+	cpp_ << "{ \"" << static_cast <const std::string&> (m.name ()) << "\", Type <"
 		<< static_cast <const Type&> (m) << ">::type_code, "
 		<< (m.is_public () ? "PUBLIC_MEMBER" : "PRIVATE_MEMBER")
 		<< " }";

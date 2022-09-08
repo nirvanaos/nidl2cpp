@@ -26,8 +26,6 @@
 #include "pch.h"
 #include "CodeGenBase.h"
 
-using namespace std;
-using namespace std::filesystem;
 using namespace AST;
 
 const char* const CodeGenBase::protected_names_ [] = {
@@ -125,7 +123,7 @@ const char* const CodeGenBase::protected_names_ [] = {
 
 bool CodeGenBase::is_keyword (const Identifier& id)
 {
-	return binary_search (protected_names_, std::end (protected_names_), id.c_str (), pred);
+	return std::binary_search (protected_names_, std::end (protected_names_), id.c_str (), pred);
 }
 
 bool CodeGenBase::is_var_len (const Type& type)
@@ -422,7 +420,7 @@ CodeGenBase::Bases CodeGenBase::get_all_bases (const ValueType& vt)
 {
 	Bases bvec;
 	{
-		unordered_set <const IV_Base*> bset;
+		std::unordered_set <const IV_Base*> bset;
 		get_all_bases (vt, bset, bvec);
 	}
 	const Interface* itf = get_concrete_supports (vt);
@@ -439,7 +437,7 @@ CodeGenBase::Bases CodeGenBase::get_all_bases (const ValueType& vt)
 }
 
 void CodeGenBase::get_all_bases (const ValueType& vt,
-	unordered_set <const IV_Base*>& bset, Bases& bvec)
+	std::unordered_set <const IV_Base*>& bset, Bases& bvec)
 {
 	for (auto pb : vt.bases ()) {
 		if (bset.insert (pb).second) {
@@ -463,7 +461,7 @@ void CodeGenBase::get_all_bases (const ValueType& vt,
 }
 
 void CodeGenBase::get_all_bases (const Interface& ai,
-	unordered_set <const IV_Base*>& bset, Bases& bvec)
+	std::unordered_set <const IV_Base*>& bset, Bases& bvec)
 {
 	for (auto pb : ai.bases ()) {
 		if (bset.insert (pb).second) {
@@ -515,7 +513,7 @@ void CodeGenBase::marshal_member (Code& stm, const Member& m, const char* func, 
 {
 	stm << TypePrefix (m) << func << " (" << prefix;
 	if (stm.last_char () == '_')
-		stm << static_cast <const string&> (m.name ()); // No check for C++ keywords
+		stm << static_cast <const std::string&> (m.name ()); // No check for C++ keywords
 	else
 		stm << m.name ();
 	stm << ", rq);\n";
@@ -558,7 +556,7 @@ void CodeGenBase::unmarshal_member (Code& stm, const Member& m, const char* pref
 {
 	stm << TypePrefix (m) << "unmarshal (rq, " << prefix;
 	if (stm.last_char () == '_')
-		stm << static_cast <const string&> (m.name ()); // No check for C++ keywords
+		stm << static_cast <const std::string&> (m.name ()); // No check for C++ keywords
 	else
 		stm << m.name ();
 	stm << ");\n";
@@ -714,7 +712,7 @@ Code& operator << (Code& stm, const ConstRef& t)
 
 Code& operator << (Code& stm, const TC_Name& t)
 {
-	return stm << ParentName (t.item) << "_tc_" << static_cast <const string&> (t.item.name ());
+	return stm << ParentName (t.item) << "_tc_" << static_cast <const std::string&> (t.item.name ());
 }
 
 Code& operator << (Code& stm, const ServantParam& t)
@@ -765,7 +763,7 @@ Code& operator << (Code& stm, const MemberType& t)
 Code& operator << (Code& stm, const MemberVariable& m)
 {
 	return stm << MemberType (m.member)
-		<< " _" << static_cast <const string&> (m.member.name ()) << ";\n";
+		<< " _" << static_cast <const std::string&> (m.member.name ()) << ";\n";
 }
 
 Code& operator << (Code& stm, const Accessors& a)
@@ -773,7 +771,7 @@ Code& operator << (Code& stm, const Accessors& a)
 	// const getter
 	stm << ConstRef (a.member) << ' ' << a.member.name () << " () const\n"
 		"{\n" << indent <<
-		"return _" << static_cast <const string&> (a.member.name ()) << ";\n"
+		"return _" << static_cast <const std::string&> (a.member.name ()) << ";\n"
 		<< unindent << "}\n";
 
 	if (a.member.kind () != Item::Kind::STATE_MEMBER) {
@@ -781,21 +779,21 @@ Code& operator << (Code& stm, const Accessors& a)
 		stm << MemberType (a.member)
 			<< "& " << a.member.name () << " ()\n"
 			"{\n" << indent <<
-			"return _" << static_cast <const string&> (a.member.name ()) << ";\n"
+			"return _" << static_cast <const std::string&> (a.member.name ()) << ";\n"
 			<< unindent << "}\n";
 	}
 
 	// setter
 	stm << "void " << a.member.name () << " (" << ConstRef (a.member) << " val)\n"
 		"{\n" << indent <<
-		'_' << static_cast <const string&> (a.member.name ()) << " = val;\n"
+		'_' << static_cast <const std::string&> (a.member.name ()) << " = val;\n"
 		<< unindent << "}\n";
 
 	if (CodeGenBase::is_var_len (a.member)) {
 		// The move setter
 		stm << "void " << a.member.name () << " (" << Var (a.member) << "&& val)\n"
 			"{\n" << indent <<
-			'_' << static_cast <const string&> (a.member.name ()) << " = std::move (val);\n"
+			'_' << static_cast <const std::string&> (a.member.name ()) << " = std::move (val);\n"
 			<< unindent << "}\n";
 	}
 

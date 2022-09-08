@@ -26,17 +26,16 @@
 #include "pch.h"
 #include "Header.h"
 
-using namespace std;
-using namespace std::filesystem;
+using std::filesystem::path;
 
 inline
-string Header::get_guard_macro (const path& file)
+std::string Header::get_guard_macro (const path& file)
 {
-	string name = file.filename ().replace_extension ("").string ();
-	string ext = file.extension ().string ().substr (1);
+	std::string name = file.filename ().replace_extension ("").string ();
+	std::string ext = file.extension ().string ().substr (1);
 	to_upper (name);
 	to_upper (ext);
-	string ret = "IDL_";
+	std::string ret = "IDL_";
 	ret += name;
 	ret += '_';
 	ret += ext;
@@ -44,7 +43,7 @@ string Header::get_guard_macro (const path& file)
 	return ret;
 }
 
-void Header::to_upper (string& s)
+void Header::to_upper (std::string& s)
 {
 	for (auto& c : s)
 		c = toupper (c);
@@ -53,9 +52,9 @@ void Header::to_upper (string& s)
 Header::Header (const path& file, const AST::Root& root) :
 	Code (file, root)
 {
-	string guard = get_guard_macro (file);
-	*this << "#ifndef " << guard << endl;
-	*this << "#define " << guard << endl;
+	std::string guard = get_guard_macro (file);
+	*this << "#ifndef " << guard << std::endl;
+	*this << "#define " << guard << std::endl;
 }
 
 void Header::close ()

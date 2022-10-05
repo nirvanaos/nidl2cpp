@@ -655,7 +655,16 @@ void Proxy::end (const ValueType& vt)
 			"void ValueData <" << QName (vt) << ">::_unmarshal (I_ptr <IORequest> rq)\n"
 			"{\n";
 		unmarshal_members (cpp_, (const Members&)members, "_", "this + 1");
-		cpp_ << "}\n";
+		cpp_ << "}\n\n"
+			"static Interface* __truncatable_base (Bridge <ValueBase>*, Interface*)\n"
+			"{\n" << indent
+			<< "return ";
+		if (vt.modifier () == ValueType::Modifier::TRUNCATABLE)
+			cpp_ << TC_Name (*vt.bases () [0]);
+		else
+			cpp_ << "nullptr";
+		cpp_ << ";\n"
+			<< unindent << "}\n";
 	}
 
 	type_code_name (vt);

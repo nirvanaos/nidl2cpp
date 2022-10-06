@@ -513,7 +513,17 @@ void Servant::end (const ValueType& vt)
 			if (abstract_base)
 				h_ << "using InterfaceImpl <S, AbstractBase>::_get_abstract_base;\n\n";
 
-			h_ << "void _marshal (I_ptr <IORequest> rq)\n"
+			h_ << "static Interface* __truncatable_base (Bridge <ValueBase>*, Interface*)\n"
+				"{\n" << indent << "return ";
+
+			if (vt.modifier () == ValueType::Modifier::TRUNCATABLE)
+				h_ << TC_Name (*vt.bases ().front ());
+			else
+				h_ << "nullptr";
+
+			h_ << ";\n"
+				<< unindent << "}\n\n"
+				"void _marshal (I_ptr <IORequest> rq)\n"
 				"{\n"
 				<< indent;
 			for (auto b : concrete_bases) {

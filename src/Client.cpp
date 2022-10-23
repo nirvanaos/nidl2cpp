@@ -1235,16 +1235,18 @@ void Client::define_structured_type (const ItemWithId& item)
 	}
 
 	// Declare marshaling
-	if (!CDR) {
-		h_ << "\n"
-			"static void marshal_in (const Var&, IORequest::_ptr_type);\n";
+	if (!(is_pseudo (item) && is_native (members))) {
+		if (!CDR) {
+			h_ << "\n"
+				"static void marshal_in (const Var&, IORequest::_ptr_type);\n";
 
-		if (var_len)
-			h_ << "static void marshal_out (Var&, IORequest::_ptr_type);\n";
+			if (var_len)
+				h_ << "static void marshal_out (Var&, IORequest::_ptr_type);\n";
 
-		h_ << "static void unmarshal (IORequest::_ptr_type, Var&);\n";
-	} else
-		h_ << "static void byteswap (Var&) NIRVANA_NOEXCEPT;\n";
+			h_ << "static void unmarshal (IORequest::_ptr_type, Var&);\n";
+		} else
+			h_ << "static void byteswap (Var&) NIRVANA_NOEXCEPT;\n";
+	}
 
 	if (check) {
 		// Declare check()
@@ -1399,16 +1401,18 @@ void Client::implement (const Struct& item)
 	define_ABI (item);
 	define_structured_type (item);
 
-	// Marshaling
-	cpp_.namespace_open ("CORBA/Internal");
-	if (options ().legacy)
-		cpp_ << "\n#ifndef LEGACY_CORBA_CPP\n";
+	if (!(is_pseudo (item) && is_native (item))) {
+		// Marshaling
+		cpp_.namespace_open ("CORBA/Internal");
+		if (options ().legacy)
+			cpp_ << "\n#ifndef LEGACY_CORBA_CPP\n";
 
-	implement_marshaling (item, "_");
-	if (options ().legacy) {
-		cpp_ << "\n#else\n";
-		implement_marshaling (item, "");
-		cpp_ << "\n#endif\n";
+		implement_marshaling (item, "_");
+		if (options ().legacy) {
+			cpp_ << "\n#else\n";
+			implement_marshaling (item, "");
+			cpp_ << "\n#endif\n";
+		}
 	}
 }
 
@@ -1420,31 +1424,33 @@ void Client::implement (const Union& item)
 	define_ABI (item);
 	define_structured_type (item);
 
-	// Marshaling
-	marshal_union (item, false);
-	if (is_var_len (item))
-		marshal_union (item, true);
-	cpp_ << empty_line <<
-		"void Type <" << QName (item)
-		<< ">::unmarshal (IORequest::_ptr_type rq, Var& v)\n"
-		"{\n" << indent <<
-		"v._destruct ();\n" <<
-		TypePrefix (item.discriminator_type ()) << "unmarshal (rq, v.__d);\n"
-		"switch (v.__d) {\n";
-	for (const auto& el : item) {
-		if (el->is_default ())
-			cpp_ << "default:\n";
-		else
-			for (const auto& l : el->labels ()) {
-				cpp_ << "case " << l << ":\n";
-			}
-		cpp_.indent ();
-		init_union (cpp_, *el, "v.");
-		cpp_ << TypePrefix (*el) << "unmarshal (rq, v._u." << el->name () << ");\n"
-			"break;\n" << unindent;
+	if (!(is_pseudo (item) && is_native (item))) {
+		// Marshaling
+		marshal_union (item, false);
+		if (is_var_len (item))
+			marshal_union (item, true);
+		cpp_ << empty_line <<
+			"void Type <" << QName (item)
+			<< ">::unmarshal (IORequest::_ptr_type rq, Var& v)\n"
+			"{\n" << indent <<
+			"v._destruct ();\n" <<
+			TypePrefix (item.discriminator_type ()) << "unmarshal (rq, v.__d);\n"
+			"switch (v.__d) {\n";
+		for (const auto& el : item) {
+			if (el->is_default ())
+				cpp_ << "default:\n";
+			else
+				for (const auto& l : el->labels ()) {
+					cpp_ << "case " << l << ":\n";
+				}
+			cpp_.indent ();
+			init_union (cpp_, *el, "v.");
+			cpp_ << TypePrefix (*el) << "unmarshal (rq, v._u." << el->name () << ");\n"
+				"break;\n" << unindent;
+		}
+		cpp_ << "}\n"
+			<< unindent << "}\n";
 	}
-	cpp_ << "}\n"
-		<< unindent << "}\n";
 }
 
 void Client::define (const Struct& item)

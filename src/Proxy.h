@@ -78,6 +78,7 @@ private:
 		const AST::Type* type;
 		Members params_in;
 		Members params_out;
+		const AST::Raises* raises;
 	};
 
 	typedef std::list <OpMetadata> Metadata;

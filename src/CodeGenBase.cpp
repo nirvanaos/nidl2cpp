@@ -325,6 +325,32 @@ bool CodeGenBase::is_ref_type (const Type& type)
 	return false;
 }
 
+bool CodeGenBase::is_complex_type(const Type& type)
+{
+	const Type& t = type.dereference_type();
+	switch (t.tkind()) {
+		case Type::Kind::BASIC_TYPE:
+			switch (t.basic_type()) {
+				case BasicType::OBJECT:
+				case BasicType::VALUE_BASE:
+				case BasicType::ANY:
+					return true;
+			}
+			break;
+
+		case Type::Kind::NAMED_TYPE: {
+			const NamedItem& item = t.named_type();
+			switch (item.kind()) {
+				case Item::Kind::INTERFACE:
+				case Item::Kind::VALUE_TYPE:
+				case Item::Kind::VALUE_BOX:
+					return true;
+			}
+		} break;
+	}
+	return false;
+}
+
 bool CodeGenBase::is_native_interface (const Type& type)
 {
 	const Type& t = type.dereference_type ();

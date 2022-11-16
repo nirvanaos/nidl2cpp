@@ -29,6 +29,7 @@
 #define PREFIX_OP_PROC "__rq_"
 #define PREFIX_OP_PARAM_IN "__par_in_"
 #define PREFIX_OP_PARAM_OUT "__par_out_"
+#define PREFIX_OP_RAISES "__raises_"
 #define PREFIX_OP_IDX "__OPIDX_"
 
 using namespace AST;
@@ -70,10 +71,16 @@ void Proxy::implement (const Operation& op)
 	get_parameters (op, params_in, params_out);
 
 	if (!params_in.empty ())
-		cpp_ << "static const Parameter " PREFIX_OP_PARAM_IN << op.name () << " [" << params_in.size () << "];\n";
+		cpp_ << "static const Parameter " PREFIX_OP_PARAM_IN
+		<< static_cast <const std::string&> (op.name ()) << " [" << params_in.size () << "];\n";
 
 	if (!params_out.empty ())
-		cpp_ << "static const Parameter " PREFIX_OP_PARAM_OUT << op.name () << "[" << params_out.size () << "];\n";
+		cpp_ << "static const Parameter " PREFIX_OP_PARAM_OUT
+		<< static_cast <const std::string&> (op.name()) << "[" << params_out.size () << "];\n";
+
+	if (!op.raises ().empty ())
+		cpp_ << "static const TypeCodeImport* " PREFIX_OP_RAISES
+		<< static_cast <const std::string&> (op.name()) << "[" << op.raises().size() << "];\n";
 
 	cpp_ << empty_line
 		<< "static void " PREFIX_OP_PROC << static_cast <const std::string&> (op.name ())
@@ -184,6 +191,14 @@ void Proxy::implement (const Attribute& att)
 			<< unindent
 			<< "}\n";
 	}
+
+	if (!att.getraises().empty())
+		cpp_ << "static const TypeCodeImport* " PREFIX_OP_RAISES "_get_"
+		<< static_cast <const std::string&> (att.name ()) << "[" << att.getraises().size() << "];\n";
+
+	if (!att.setraises().empty())
+		cpp_ << "static const TypeCodeImport* " PREFIX_OP_RAISES "_set_"
+		<< static_cast <const std::string&> (att.name()) << "[" << att.setraises().size() << "];\n";
 }
 
 bool Proxy::is_custom (const AST::Operation& op)
@@ -284,12 +299,14 @@ void Proxy::end (const Interface& itf)
 				OpMetadata& op_md = metadata.back ();
 				op_md.name = op.name ();
 				op_md.type = &op;
+				op_md.raises = &op.raises ();
 				get_parameters (op, op_md.params_in, op_md.params_out);
 
 				cpp_ << ServantOp (op) << " const";
 				if (is_custom (op)) {
 					cpp_ << ";\n"
-						"static const UShort " PREFIX_OP_IDX << op.name () << " = " << (metadata.size () - 1) << ";\n";
+						"static const UShort " PREFIX_OP_IDX << static_cast <const std::string&> (op.name ())
+						<< " = " << (metadata.size () - 1) << ";\n";
 				} else {
 					
 					cpp_ << "\n{\n";
@@ -344,6 +361,7 @@ void Proxy::end (const Interface& itf)
 					op_md.name = "_get_";
 					op_md.name += att.name ();
 					op_md.type = &att;
+					op_md.raises = &att.getraises ();
 				}
 
 				bool custom = is_native (att);
@@ -351,7 +369,8 @@ void Proxy::end (const Interface& itf)
 				cpp_ << VRet (att) << ' ' << att.name () << " () const";
 				if (custom) {
 					cpp_ << ";\n"
-						"static const UShort " PREFIX_OP_IDX "_get_" << att.name () << " = " << (metadata.size () - 1) << ";\n";
+						"static const UShort " PREFIX_OP_IDX "_get_" << static_cast <const std::string&> (att.name ())
+						<< " = " << (metadata.size () - 1) << ";\n";
 				} else {
 
 					cpp_ << "\n{\n"
@@ -378,13 +397,15 @@ void Proxy::end (const Interface& itf)
 						op_md.name = "_set_";
 						op_md.name += att.name ();
 						op_md.type = nullptr;
+						op_md.raises = &att.setraises ();
 						op_md.params_in.push_back (&att);
 					}
 
 					cpp_ << "void " << att.name () << " (" << ServantParam (att) << " val) const";
 					if (custom) {
 						cpp_ << ";\n"
-							"static const UShort " PREFIX_OP_IDX "_set_" << att.name () << " = " << (metadata.size () - 1) << ";\n";
+							"static const UShort " PREFIX_OP_IDX "_set_" << static_cast <const std::string&> (att.name ())
+							<< " = " << (metadata.size () - 1) << ";\n";
 					} else {
 
 						cpp_ << "\n{\n"
@@ -416,7 +437,8 @@ void Proxy::end (const Interface& itf)
 
 		for (const auto& op : metadata) {
 			if (!op.params_in.empty ()) {
-				cpp_ << "const Parameter Proxy <" << QName (itf) << ">::" PREFIX_OP_PARAM_IN << op.name << " [" << op.params_in.size () << "] = {\n";
+				cpp_ << "const Parameter Proxy <" << QName (itf) << ">::" PREFIX_OP_PARAM_IN << op.name
+					<< " [" << op.params_in.size () << "] = {\n";
 				if (op.type) {
 					md_members (op.params_in);
 				} else {
@@ -430,8 +452,21 @@ void Proxy::end (const Interface& itf)
 				cpp_ << "};\n";
 			}
 			if (!op.params_out.empty ()) {
-				cpp_ << "const Parameter Proxy <" << QName (itf) << ">::" PREFIX_OP_PARAM_OUT << op.name << " [" << op.params_out.size () << "] = {\n";
+				cpp_ << "const Parameter Proxy <" << QName (itf) << ">::" PREFIX_OP_PARAM_OUT << op.name
+					<< " [" << op.params_out.size () << "] = {\n";
 				md_members (op.params_out);
+				cpp_ << "};\n";
+			}
+			if (!op.raises->empty()) {
+				cpp_ << "const TypeCodeImport* Proxy <" << QName(itf) << ">::" PREFIX_OP_RAISES << op.name
+					<< " [" << op.raises->size() << "] = {\n";
+				auto it = op.raises->begin();
+				cpp_ << '&' << TC_Name(**it);
+				for (++it; it != op.raises->end(); ++it) {
+					cpp_ << ",\n"
+						"&" << TC_Name(**it);
+				}
+				cpp_ << std::endl;
 				cpp_ << "};\n";
 			}
 		}
@@ -479,11 +514,11 @@ void Proxy::end (const Interface& itf)
 void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
 {
 	cpp_ << "{ \"" << op.name << "\", { ";
-	bool in_obj = false, out_obj = false;
+	bool in_complex = false, out_complex = false;
 	if (!op.params_in.empty ()) {
 		for (const Member* par : op.params_in) {
-			if (is_ref_type (*par)) {
-				in_obj = true;
+			if (is_complex_type (*par)) {
+				in_complex = true;
 				break;
 			}
 		}
@@ -494,14 +529,14 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
 		cpp_ << "0, 0";
 	cpp_ << " }, { ";
 
-	if (op.type && is_ref_type (*op.type))
-		out_obj = true;
+	if (op.type && is_complex_type (*op.type))
+		out_complex = true;
 
 	if (!op.params_out.empty ()) {
-		if (!out_obj)
+		if (!out_complex)
 			for (const Member* par : op.params_out) {
-				if (is_ref_type (*par)) {
-					out_obj = true;
+				if (is_complex_type (*par)) {
+					out_complex = true;
 					break;
 				}
 			}
@@ -510,15 +545,23 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
 		cpp_ << params << ", countof (" << params << ')';
 	} else
 		cpp_ << "0, 0";
-	
+	cpp_ << " }, { ";
+
+	if (!op.raises->empty()) {
+		std::string raises = PREFIX_OP_RAISES;
+		raises += op.name;
+		cpp_ << raises << ", countof (" << raises << ')';
+	} else
+		cpp_ << "0, 0";
+
 	const char* flags = "0";
-	if (in_obj)
-		if (out_obj)
-			flags = "Operation::FLAG_IN_OBJ | Operation::FLAG_OUT_OBJ";
+	if (in_complex)
+		if (out_complex)
+			flags = "Operation::FLAG_IN_CPLX | Operation::FLAG_OUT_CPLX";
 		else
-			flags = "Operation::FLAG_IN_OBJ";
-	else if (out_obj)
-		flags = "Operation::FLAG_OUT_OBJ";
+			flags = "Operation::FLAG_IN_CPLX";
+	else if (out_complex)
+		flags = "Operation::FLAG_OUT_CPLX";
 
 	cpp_ << " }, Type <" << (op.type ? *op.type : Type ())
 		<< ">::type_code, RqProcWrapper <" PREFIX_OP_PROC << op.name << ">, "

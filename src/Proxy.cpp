@@ -553,6 +553,11 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
 		cpp_ << raises << ", countof (" << raises << ')';
 	} else
 		cpp_ << "0, 0";
+	cpp_ << " }, ";
+	if (op.type && op.type->tkind () != Type::Kind::VOID)
+		cpp_ << "Type <" << *op.type << ">::type_code";
+	else
+		cpp_ << "0";
 
 	const char* flags = "0";
 	if (in_complex)
@@ -563,9 +568,7 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
 	else if (out_complex)
 		flags = "Operation::FLAG_OUT_CPLX";
 
-	cpp_ << " }, Type <" << (op.type ? *op.type : Type ())
-		<< ">::type_code, RqProcWrapper <" PREFIX_OP_PROC << op.name << ">, "
-		<< flags << " }";
+	cpp_	<< ", RqProcWrapper <" PREFIX_OP_PROC << op.name << ">, " << flags << " }";
 }
 
 std::string Proxy::export_name (const NamedItem& item)

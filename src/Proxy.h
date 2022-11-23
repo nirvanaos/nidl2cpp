@@ -79,6 +79,7 @@ private:
 		Members params_in;
 		Members params_out;
 		const AST::Raises* raises;
+		const AST::Operation::Context* context;
 	};
 
 	typedef std::list <OpMetadata> Metadata;

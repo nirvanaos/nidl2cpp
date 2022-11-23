@@ -30,6 +30,7 @@
 #define PREFIX_OP_PARAM_IN "__par_in_"
 #define PREFIX_OP_PARAM_OUT "__par_out_"
 #define PREFIX_OP_RAISES "__raises_"
+#define PREFIX_OP_CONTEXT "__raises_"
 #define PREFIX_OP_IDX "__OPIDX_"
 
 using namespace AST;
@@ -79,8 +80,12 @@ void Proxy::implement (const Operation& op)
 		<< static_cast <const std::string&> (op.name()) << "[" << params_out.size () << "];\n";
 
 	if (!op.raises ().empty ())
-		cpp_ << "static const TypeCodeImport* " PREFIX_OP_RAISES
+		cpp_ << "static const TypeCodeImport* const " PREFIX_OP_RAISES
 		<< static_cast <const std::string&> (op.name()) << "[" << op.raises().size() << "];\n";
+
+	if (!op.context().empty())
+		cpp_ << "static const Char* const " PREFIX_OP_CONTEXT
+		<< static_cast <const std::string&> (op.name()) << "[" << op.context().size() << "];\n";
 
 	cpp_ << empty_line
 		<< "static void " PREFIX_OP_PROC << static_cast <const std::string&> (op.name ())
@@ -193,11 +198,11 @@ void Proxy::implement (const Attribute& att)
 	}
 
 	if (!att.getraises().empty())
-		cpp_ << "static const TypeCodeImport* " PREFIX_OP_RAISES "_get_"
+		cpp_ << "static const TypeCodeImport* const " PREFIX_OP_RAISES "_get_"
 		<< static_cast <const std::string&> (att.name ()) << "[" << att.getraises().size() << "];\n";
 
 	if (!att.setraises().empty())
-		cpp_ << "static const TypeCodeImport* " PREFIX_OP_RAISES "_set_"
+		cpp_ << "static const TypeCodeImport* const " PREFIX_OP_RAISES "_set_"
 		<< static_cast <const std::string&> (att.name()) << "[" << att.setraises().size() << "];\n";
 }
 
@@ -300,6 +305,7 @@ void Proxy::end (const Interface& itf)
 				op_md.name = op.name ();
 				op_md.type = &op;
 				op_md.raises = &op.raises ();
+				op_md.context = &op.context ();
 				get_parameters (op, op_md.params_in, op_md.params_out);
 
 				cpp_ << ServantOp (op) << " const";
@@ -362,6 +368,7 @@ void Proxy::end (const Interface& itf)
 					op_md.name += att.name ();
 					op_md.type = &att;
 					op_md.raises = &att.getraises ();
+					op_md.context = nullptr;
 				}
 
 				bool custom = is_native (att);
@@ -398,6 +405,7 @@ void Proxy::end (const Interface& itf)
 						op_md.name += att.name ();
 						op_md.type = nullptr;
 						op_md.raises = &att.setraises ();
+						op_md.context = nullptr;
 						op_md.params_in.push_back (&att);
 					}
 
@@ -436,6 +444,7 @@ void Proxy::end (const Interface& itf)
 	if (!metadata.empty ()) {
 
 		for (const auto& op : metadata) {
+
 			if (!op.params_in.empty ()) {
 				cpp_ << "const Parameter Proxy <" << QName (itf) << ">::" PREFIX_OP_PARAM_IN << op.name
 					<< " [" << op.params_in.size () << "] = {\n";
@@ -451,20 +460,35 @@ void Proxy::end (const Interface& itf)
 				}
 				cpp_ << "};\n";
 			}
+
 			if (!op.params_out.empty ()) {
 				cpp_ << "const Parameter Proxy <" << QName (itf) << ">::" PREFIX_OP_PARAM_OUT << op.name
 					<< " [" << op.params_out.size () << "] = {\n";
 				md_members (op.params_out);
 				cpp_ << "};\n";
 			}
-			if (!op.raises->empty()) {
-				cpp_ << "const TypeCodeImport* Proxy <" << QName(itf) << ">::" PREFIX_OP_RAISES << op.name
+
+			if (!op.raises->empty ()) {
+				cpp_ << "const TypeCodeImport* const Proxy <" << QName(itf) << ">::" PREFIX_OP_RAISES << op.name
 					<< " [" << op.raises->size() << "] = {\n";
 				auto it = op.raises->begin();
 				cpp_ << '&' << TC_Name(**it);
 				for (++it; it != op.raises->end(); ++it) {
 					cpp_ << ",\n"
 						"&" << TC_Name(**it);
+				}
+				cpp_ << std::endl;
+				cpp_ << "};\n";
+			}
+
+			if (op.context && !op.context->empty ()) {
+				cpp_ << "const Char* const Proxy <" << QName(itf) << ">::" PREFIX_OP_CONTEXT << op.name
+					<< " [" << op.context->size() << "] = {\n";
+				auto it = op.context->begin();
+				cpp_ << '"' << *it << '"';
+				for (++it; it != op.context->end(); ++it) {
+					cpp_ << ",\n"
+						"\"" << *it << '"';
 				}
 				cpp_ << std::endl;
 				cpp_ << "};\n";
@@ -553,7 +577,16 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
 		cpp_ << raises << ", countof (" << raises << ')';
 	} else
 		cpp_ << "0, 0";
+	cpp_ << " }, { ";
+
+	if (op.context && !op.context->empty()) {
+		std::string context = PREFIX_OP_CONTEXT;
+		context += op.name;
+		cpp_ << context << ", countof (" << context << ')';
+	} else
+		cpp_ << "0, 0";
 	cpp_ << " }, ";
+
 	if (op.type && op.type->tkind () != Type::Kind::VOID)
 		cpp_ << "Type <" << *op.type << ">::type_code";
 	else

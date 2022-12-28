@@ -1071,12 +1071,14 @@ void Client::define (const Exception& item)
 		h_ << empty_line
 			<< unindent
 			<< "private:\n"
-			<< indent;
+			<< indent
+			<< "alignas (_Data) ";
 		member_variables (item);
 
 		if (options ().legacy) {
 			h_ << "\n#else\n";
 			constructors (item, "");
+			h_ << "alignas (_Data) ";
 			member_variables_legacy (item);
 			h_ << "\n#endif\n";
 		}

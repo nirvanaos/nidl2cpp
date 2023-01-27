@@ -345,6 +345,15 @@ bool CodeGenBase::is_complex_type(const Type& type)
 				case Item::Kind::VALUE_TYPE:
 				case Item::Kind::VALUE_BOX:
 					return true;
+
+				case Item::Kind::STRUCT:
+				case Item::Kind::UNION: {
+					const StructBase& sb = static_cast <const StructBase&> (item);
+					for (const Member* m : sb) {
+						if (is_complex_type (*m))
+							return true;
+					}
+				}
 			}
 		} break;
 	}

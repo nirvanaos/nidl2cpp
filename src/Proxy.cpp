@@ -62,7 +62,7 @@ void Proxy::get_parameters (const Operation& op, Members& params_in, Members& pa
 	}
 }
 
-void Proxy::implement (const Operation& op)
+void Proxy::implement (const Operation& op, bool no_rq)
 {
 	cpp_.empty_line ();
 
@@ -86,6 +86,11 @@ void Proxy::implement (const Operation& op)
 	if (!op.context().empty())
 		cpp_ << "static const Char* const " PREFIX_OP_CONTEXT
 		<< static_cast <const std::string&> (op.name()) << "[" << op.context().size() << "];\n";
+
+	if (no_rq)
+		return;
+
+	// Implement request static function
 
 	cpp_ << empty_line
 		<< "static void " PREFIX_OP_PROC << static_cast <const std::string&> (op.name ())
@@ -150,51 +155,56 @@ void Proxy::implement (const Operation& op)
 		<< "}\n";
 }
 
-void Proxy::implement (const Attribute& att)
+void Proxy::implement (const Attribute& att, bool no_rq)
 {
 	const ItemScope& itf = *att.parent ();
 
-	cpp_ << empty_line
-		<< "static void " PREFIX_OP_PROC "_get_" << static_cast <const std::string&> (att.name ())
-		<< " (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)";
+	if (!no_rq) {
+		cpp_ << empty_line
+			<< "static void " PREFIX_OP_PROC "_get_" << static_cast <const std::string&> (att.name ())
+			<< " (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)";
 
-	if (is_native (att)) {
-		custom_ = true;
-		cpp_ << ";\n\n";
-		return;
+		if (is_native (att)) {
+			custom_ = true;
+			cpp_ << ";\n\n";
+			return;
+		}
+
+		cpp_ << "\n{\n"
+			<< indent;
+
+		// ret
+		cpp_ << Var (att) << " _ret;\n";
+
+		// Call
+		cpp_ << "_ret = _servant->" << att.name () << " ();\n";
+
+		// Marshal
+		cpp_ << TypePrefix (att) << "marshal_out (_ret, _call);\n";
+
+		cpp_ << unindent
+			<< "}\n";
 	}
-
-	cpp_ << "\n{\n"
-		<< indent;
-
-	// ret
-	cpp_ << Var (att) << " _ret;\n";
-
-	// Call
-	cpp_ << "_ret = _servant->" << att.name () << " ();\n";
-
-	// Marshal
-	cpp_ << TypePrefix (att) << "marshal_out (_ret, _call);\n";
-
-	cpp_ << unindent
-		<< "}\n";
 
 	if (!att.readonly ()) {
 		cpp_ << empty_line
 			<< "static const Parameter " PREFIX_OP_PARAM_IN "_set_"
-			<< static_cast <const std::string&> (att.name ()) << " [1];\n\n"
-			<< "static void " PREFIX_OP_PROC "_set_" << static_cast <const std::string&> (att.name ())
-			<< " (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)\n"
-			"{\n"
-			<< indent
+			<< static_cast <const std::string&> (att.name ()) << " [1];\n";
 
-			<< Var (att) << " val;\n"
-			<< TypePrefix (att) << "unmarshal (_call, val);\n"
-			"_call->unmarshal_end ();\n"
-			"_servant->" << att.name () << " (val);\n"
+		if (!no_rq) {
+			cpp_ << "\nstatic void " PREFIX_OP_PROC "_set_" << static_cast <const std::string&> (att.name ())
+				<< " (" << QName (itf) << "::_ptr_type _servant, IORequest::_ptr_type _call)\n"
+				"{\n"
+				<< indent
 
-			<< unindent
-			<< "}\n";
+				<< Var (att) << " val;\n"
+				<< TypePrefix (att) << "unmarshal (_call, val);\n"
+				"_call->unmarshal_end ();\n"
+				"_servant->" << att.name () << " (val);\n"
+
+				<< unindent
+				<< "}\n";
+		}
 	}
 
 	if (!att.getraises().empty())
@@ -220,14 +230,22 @@ bool Proxy::is_custom (const AST::Operation& op)
 	return custom;
 }
 
-bool Proxy::is_special (const Interface& itf) noexcept
+bool Proxy::is_special_base (const Interface& itf) noexcept
 {
-	if (itf.name () == "Policy" || itf.name () == "Current") {
-		const ItemScope* parent = itf.parent ();
-		if (parent && !parent->parent () && parent->kind () == Item::Kind::MODULE
-			&& parent->name () == "CORBA") {
-			return true;
-		}
+	const ItemScope* parent = itf.parent ();
+	if (parent && !parent->parent ()) {
+		if (parent->name () == "CORBA")
+			return itf.name () == "Policy" || itf.name () == "Current";
+	}
+	return false;
+}
+
+bool Proxy::is_immutable (const AST::Interface& itf) noexcept
+{
+	const ItemScope* parent = itf.parent ();
+	if (parent && !parent->parent ()) {
+		if (parent->name () == "CosTime")
+			return itf.name () == "TIO" || itf.name () == "UTO";
 	}
 	return false;
 }
@@ -243,51 +261,57 @@ void Proxy::end (const Interface& itf)
 
 	Interfaces bases = itf.get_all_bases ();
 
-	bool no_proxy = false;
-	if (itf.interface_kind () == InterfaceKind::LOCAL) {
-		if (!(no_proxy = is_special (itf))) {
-			for (auto base : bases) {
-				if (is_special (*base)) {
-					no_proxy = true;
-					break;
-				}
+	bool no_proxy = is_special_base (itf) || is_immutable (itf);
+	if (!no_proxy) {
+		for (auto base : bases) {
+			if (is_special_base (*base)) {
+				no_proxy = true;
+				break;
 			}
 		}
 	}
 
+	bool local_no_proxy = no_proxy && (itf.interface_kind () == InterfaceKind::LOCAL);
+
 	cpp_ << "\n"
 		"template <>\n"
-		"class Proxy <" << QName (itf) << "> : public ProxyBase <" << QName (itf) << '>';
+		"class Proxy <" << QName (itf) << '>';
+	
+	if (!local_no_proxy) {
+		cpp_ << " : public ProxyBase <" << QName (itf) << '>';
 
-	cpp_.indent ();
-	for (auto p : bases) {
-		cpp_ << ",\n"
-			"public ProxyBaseInterface <" << QName (*p) << '>';
-	}
-	cpp_ << unindent
-		<< "\n{\n"
-		<< indent
-		<< "typedef ProxyBase <" << QName (itf) << "> Base;\n"
-		<< unindent
-		<< "public:\n"
-		<< indent
-
-	// Constructor
-		<< "Proxy (IOReference::_ptr_type proxy_manager, uint16_t interface_idx) :\n"
-		<< indent
-		<< "Base (proxy_manager, interface_idx)\n"
-		<< unindent
-		<< '{';
-	if (!bases.empty ()) {
-		cpp_ << std::endl;
 		cpp_.indent ();
-		cpp_ << "Object::_ptr_type obj = static_cast <Object*> (proxy_manager->get_object (RepIdOf <Object>::id));\n";
+
 		for (auto p : bases) {
-			cpp_ << "ProxyBaseInterface <" << QName (*p) << ">::init (obj);\n";
+			cpp_ << ",\n"
+				"public ProxyBaseInterface <" << QName (*p) << '>';
 		}
-		cpp_.unindent ();
-	}
-	cpp_ << "}\n";
+		cpp_ << unindent
+			<< "\n{\n"
+			<< indent
+			<< "typedef ProxyBase <" << QName (itf) << "> Base;\n"
+			<< unindent
+			<< "public:\n"
+			<< indent
+
+			// Constructor
+			<< "Proxy (IOReference::_ptr_type proxy_manager, uint16_t interface_idx) :\n"
+			<< indent
+			<< "Base (proxy_manager, interface_idx)\n"
+			<< unindent
+			<< '{';
+		if (!bases.empty ()) {
+			cpp_ << std::endl;
+			cpp_.indent ();
+			cpp_ << "Object::_ptr_type obj = static_cast <Object*> (proxy_manager->get_object (RepIdOf <Object>::id));\n";
+			for (auto p : bases) {
+				cpp_ << "ProxyBaseInterface <" << QName (*p) << ">::init (obj);\n";
+			}
+			cpp_.unindent ();
+		}
+		cpp_ << "}\n";
+	} else
+		cpp_ << "\n{\npublic:\n" << indent;
 
 	// Operations
 	Metadata metadata;
@@ -298,7 +322,7 @@ void Proxy::end (const Interface& itf)
 			case Item::Kind::OPERATION: {
 				const Operation& op = static_cast <const Operation&> (item);
 				
-				implement (op);
+				implement (op, local_no_proxy);
 
 				metadata.emplace_back ();
 				OpMetadata& op_md = metadata.back ();
@@ -307,6 +331,9 @@ void Proxy::end (const Interface& itf)
 				op_md.raises = &op.raises ();
 				op_md.context = &op.context ();
 				get_parameters (op, op_md.params_in, op_md.params_out);
+
+				if (local_no_proxy)
+					break;
 
 				cpp_ << ServantOp (op) << " const";
 				if (is_custom (op)) {
@@ -359,7 +386,7 @@ void Proxy::end (const Interface& itf)
 			case Item::Kind::ATTRIBUTE: {
 				const Attribute& att = static_cast <const Attribute&> (item);
 
-				implement (att);
+				implement (att, local_no_proxy);
 
 				metadata.emplace_back ();
 				{
@@ -370,6 +397,9 @@ void Proxy::end (const Interface& itf)
 					op_md.raises = &att.getraises ();
 					op_md.context = nullptr;
 				}
+
+				if (local_no_proxy)
+					break;
 
 				bool custom = is_native (att);
 
@@ -499,10 +529,10 @@ void Proxy::end (const Interface& itf)
 			<< indent;
 
 		auto it = metadata.cbegin ();
-		md_operation (itf, *it);
+		md_operation (itf, *it, local_no_proxy);
 		for (++it; it != metadata.cend (); ++it) {
 			cpp_ << ",\n";
-			md_operation (itf, *it);
+			md_operation (itf, *it, local_no_proxy);
 		}
 
 		cpp_ << unindent
@@ -532,10 +562,10 @@ void Proxy::end (const Interface& itf)
 	cpp_.namespace_close ();
 	cpp_ << "NIRVANA_EXPORT (" << export_name (itf) << ", CORBA::Internal::RepIdOf <" << QName (itf)
 		<< ">::id, CORBA::Internal::PseudoBase, CORBA::Internal::ProxyFactory"
-		<< (no_proxy ? "NoProxy" : "Impl") << " <" << QName (itf) << ">)\n";
+		<< (local_no_proxy ? "NoProxy" : "Impl") << " <" << QName (itf) << ">)\n";
 }
 
-void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
+void Proxy::md_operation (const Interface& itf, const OpMetadata& op, bool no_rq)
 {
 	cpp_ << "{ \"" << op.name << "\", { ";
 	bool in_complex = false, out_complex = false;
@@ -601,7 +631,10 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op)
 	else if (out_complex)
 		flags = "Operation::FLAG_OUT_CPLX";
 
-	cpp_	<< ", RqProcWrapper <" PREFIX_OP_PROC << op.name << ">, " << flags << " }";
+	if (no_rq)
+		cpp_ << ", nullptr, 0 }";
+	else
+		cpp_ << ", RqProcWrapper <" PREFIX_OP_PROC << op.name << ">, " << flags << " }";
 }
 
 std::string Proxy::export_name (const NamedItem& item)

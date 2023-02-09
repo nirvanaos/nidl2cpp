@@ -65,8 +65,8 @@ private:
 
 	static std::string export_name (const AST::NamedItem& item);
 
-	void implement (const AST::Operation& op);
-	void implement (const AST::Attribute& att);
+	void implement (const AST::Operation& op, bool no_rq);
+	void implement (const AST::Attribute& att, bool no_rq);
 
 	void md_members (const Members& members);
 	void md_member (const AST::Member& m);
@@ -84,7 +84,7 @@ private:
 
 	typedef std::list <OpMetadata> Metadata;
 
-	void md_operation (const AST::Interface& itf, const OpMetadata& op);
+	void md_operation (const AST::Interface& itf, const OpMetadata& op, bool no_rq);
 
 	void type_code_members (const AST::ItemWithId& item, const Members& members);
 	void type_code_name (const AST::NamedItem& item);
@@ -92,7 +92,8 @@ private:
 
 	Code& exp (const AST::NamedItem& item);
 
-	static bool is_special (const AST::Interface& itf) noexcept;
+	static bool is_special_base (const AST::Interface& itf) noexcept;
+	static bool is_immutable (const AST::Interface& itf) noexcept;
 
 private:
 	Code cpp_;

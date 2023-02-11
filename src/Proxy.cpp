@@ -39,7 +39,7 @@ void Proxy::end (const Root&)
 {
 	if (custom_) {
 		cpp_ << empty_line
-			<< "#include \"" << cpp_.file ().stem ().generic_string () << "_native.h\"\n";
+			<< "#include <" << cpp_.file ().stem ().generic_string () << "_native.h>\n";
 	}
 	cpp_.close ();
 }
@@ -246,6 +246,8 @@ bool Proxy::is_immutable (const AST::Interface& itf) noexcept
 	if (parent && !parent->parent ()) {
 		if (parent->name () == "CosTime")
 			return itf.name () == "TIO" || itf.name () == "UTO";
+		else if (parent->name () == "CORBA")
+			return itf.name () == "DomainManager";
 	}
 	return false;
 }

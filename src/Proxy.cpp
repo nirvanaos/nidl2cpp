@@ -171,9 +171,10 @@ void Proxy::implement (const Attribute& att, bool no_rq)
 		}
 
 		cpp_ << "\n{\n"
-			<< indent;
+			<< indent
+			<< "_call->unmarshal_end ();\n";
 
-		// ret
+			// ret
 		cpp_ << Var (att) << " _ret;\n";
 
 		// Call

@@ -350,7 +350,7 @@ void Proxy::end (const Interface& itf)
 
 					// Create request
 					cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
-						<< (metadata.size () - 1) << "), " << (op.oneway () ? "4" : "3") << ");\n";
+						<< (metadata.size () - 1) << "), " << (op.oneway () ? "0" : "3") << ", nullptr);\n";
 
 					// Marshal input
 					for (auto p : op_md.params_in) {
@@ -417,7 +417,7 @@ void Proxy::end (const Interface& itf)
 						<< indent
 
 						<< "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
-						<< (metadata.size () - 1) << "), 3);\n"
+						<< (metadata.size () - 1) << "), 3, nullptr);\n"
 						"_call->invoke ();\n"
 						"check_request (_call);\n"
 
@@ -453,7 +453,7 @@ void Proxy::end (const Interface& itf)
 							<< indent
 
 							<< "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
-							<< (metadata.size () - 1) << "), 3);\n"
+							<< (metadata.size () - 1) << "), 3, nullptr);\n"
 							<< TypePrefix (att) << "marshal_in (val, _call);\n"
 							"_call->invoke ();\n"
 							"check_request (_call);\n"

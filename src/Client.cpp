@@ -491,7 +491,7 @@ void Client::end_interface (const IV_Base& container)
 		<< indent;
 
 	if (concrete_itf)
-		h_ << "I_ref <" << QName (*concrete_itf) << "> _this ();\n";
+		h_ << "Type <" << QName (*concrete_itf) << ">::VRet _this ();\n";
 
 	for (auto it = container.begin (); it != container.end (); ++it) {
 		const Item& item = **it;
@@ -533,7 +533,7 @@ void Client::end_interface (const IV_Base& container)
 
 	if (concrete_itf) {
 		h_ << "\ntemplate <class T>\n"
-			"I_ref <" << QName (*concrete_itf) << "> Client <T, " << QName (container) << ">::_this ()\n"
+			"Type <" << QName (*concrete_itf) << ">::VRet Client <T, " << QName (container) << ">::_this ()\n"
 			"{\n"
 			<< indent;
 		environment (Raises ());

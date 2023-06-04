@@ -248,7 +248,7 @@ void Servant::end (const Interface& itf)
 				h_ << ">::find (*this, id);\n"
 					<< unindent
 					<< "}\n\n"
-					<< "I_ref <" << QName (itf) << "> _this ()\n"
+					<< "Type <" << QName (itf) << ">::VRet _this ()\n"
 					"{\n"
 					<< indent
 					<< "return this->_get_proxy ().template downcast <" << QName (itf)

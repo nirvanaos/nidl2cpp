@@ -1086,7 +1086,7 @@ void Client::define (const Exception& item)
 		h_ << unindent
 			<< "private:\n"
 			<< indent <<
-			"virtual void* __data () NIRVANA_NOEXCEPT\n"
+			"virtual void* __data () noexcept\n"
 			"{\n" << indent;
 		if (options ().legacy)
 			h_ << "#ifndef LEGACY_CORBA_CPP\n";
@@ -1247,7 +1247,7 @@ void Client::define_structured_type (const ItemWithId& item)
 
 			h_ << "static void unmarshal (IORequest::_ptr_type, Var&);\n";
 		} else
-			h_ << "static void byteswap (Var&) NIRVANA_NOEXCEPT;\n";
+			h_ << "static void byteswap (Var&) noexcept;\n";
 	}
 
 	if (check) {
@@ -1527,10 +1527,10 @@ void Client::define (const Union& item)
 
 	// Constructors
 
-	h_ << item.name () << " () NIRVANA_NOEXCEPT";
+	h_ << item.name () << " () noexcept";
 	if (init_el) {
 		h_ << ";\n";
-		cpp_ << QName (item) << "::" << item.name () << " () NIRVANA_NOEXCEPT :\n"
+		cpp_ << QName (item) << "::" << item.name () << " () noexcept :\n"
 			<< indent <<
 			"__d (" << *init_d << ")\n"
 			<< unindent <<
@@ -1555,7 +1555,7 @@ void Client::define (const Union& item)
 		"_assign (src);\n"
 		<< unindent << "}\n"
 
-		<< item.name () << " (" << item.name () << "&& src) NIRVANA_NOEXCEPT\n"
+		<< item.name () << " (" << item.name () << "&& src) noexcept\n"
 		"{\n" << indent <<
 		"_assign (std::move (src));\n"
 		<< unindent << "}\n"
@@ -1575,7 +1575,7 @@ void Client::define (const Union& item)
 		"return *this;\n"
 		<< unindent << "}\n"
 
-		<< item.name () << "& operator = (" << item.name () << "&& src) NIRVANA_NOEXCEPT\n"
+		<< item.name () << "& operator = (" << item.name () << "&& src) noexcept\n"
 		"{\n" << indent <<
 		"_destruct ();\n"
 		"_assign (std::move (src));\n"
@@ -1585,7 +1585,7 @@ void Client::define (const Union& item)
 		// _d ();
 
 		"void _d (" << item.discriminator_type () << " d);\n" <<
-		item.discriminator_type () << " _d () const NIRVANA_NOEXCEPT\n"
+		item.discriminator_type () << " _d () const noexcept\n"
 		"{\n" << indent <<
 		"return __d;\n"
 		<< unindent << "}\n\n";
@@ -1606,7 +1606,7 @@ void Client::define (const Union& item)
 
 	// If union has implicit default, create _default () method;
 	if (!init_el) {
-		h_ << "void _default () NIRVANA_NOEXCEPT\n"
+		h_ << "void _default () noexcept\n"
 			"{\n"
 			<< indent <<
 			"_destruct ();\n"
@@ -1711,12 +1711,12 @@ void Client::define (const Union& item)
 	h_ << unindent << "\nprivate:\n" << indent <<
 		"friend struct " << Namespace ("CORBA/Internal") << "Type <" << item.name () << ">;\n"
 		"\n"
-		"void _destruct () NIRVANA_NOEXCEPT";
+		"void _destruct () noexcept";
 
 	if (is_var_len (item)) {
 		h_ << ";\n";
 		cpp_ << empty_line <<
-			"void " << QName (item) << "::_destruct () NIRVANA_NOEXCEPT\n"
+			"void " << QName (item) << "::_destruct () noexcept\n"
 			"{\n"
 			<< indent <<
 			"switch (__d) {\n";
@@ -1756,7 +1756,7 @@ void Client::define (const Union& item)
 
 	h_ << "\n"
 		"static " << item.discriminator_type () << " _switch (" <<
-		item.discriminator_type () << " d) NIRVANA_NOEXCEPT";
+		item.discriminator_type () << " d) noexcept";
 	if (switch_is_trivial) {
 		h_ << "\n"
 			"{\n"
@@ -1767,7 +1767,7 @@ void Client::define (const Union& item)
 	} else {
 		h_ << ";\n";
 		cpp_ << empty_line << item.discriminator_type () << ' ' << QName (item)
-			<< "::_switch (" << item.discriminator_type () << " d) NIRVANA_NOEXCEPT\n"
+			<< "::_switch (" << item.discriminator_type () << " d) noexcept\n"
 			"{\n"
 			<< indent <<
 			"switch (d) {\n";
@@ -1817,7 +1817,7 @@ void Client::assign_union (const AST::Union& item, bool move)
 		h_ << "const ";
 	h_ << item.name ();
 	if (move)
-		h_ << "&& src) NIRVANA_NOEXCEPT;\n";
+		h_ << "&& src) noexcept;\n";
 	else
 		h_ << "& src);\n";
 
@@ -1826,7 +1826,7 @@ void Client::assign_union (const AST::Union& item, bool move)
 		cpp_ << "const ";
 	cpp_ << item.name ();
 	if (move)
-		cpp_ << "&& src) NIRVANA_NOEXCEPT\n";
+		cpp_ << "&& src) noexcept\n";
 	else
 		cpp_ << "& src)\n";
 	cpp_ <<
@@ -1865,7 +1865,7 @@ void Client::constructors (const StructBase& item, const char* prefix)
 	assert (!item.empty ());
 	h_ << empty_line
 	// Default constructor
-		<< item.name () << " () NIRVANA_NOEXCEPT :\n"
+		<< item.name () << " () noexcept :\n"
 		<< indent;
 	auto it = item.begin ();
 	h_ << MemberDefault (**it, prefix);
@@ -2059,7 +2059,7 @@ void Client::implement_marshaling (const StructBase& item, const char* prefix)
 	} else {
 		cpp_ << "\n"
 			"void Type <" << QName (item) << suffix
-			<< ">::byteswap (Var& v) NIRVANA_NOEXCEPT\n"
+			<< ">::byteswap (Var& v) noexcept\n"
 			"{\n" << indent;
 		for (const auto& m : item) {
 			cpp_ << TypePrefix (*m) << "byteswap (v." << prefix << m->name () << ");\n";

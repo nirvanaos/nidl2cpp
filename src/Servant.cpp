@@ -498,7 +498,7 @@ void Servant::end (const ValueType& vt)
 				<< indent
 				<< "typedef " << QName (vt) << " PrimaryInterface;\n"
 				"\n"
-				"Interface* _query_valuetype (String_in id) NIRVANA_NOEXCEPT\n"
+				"Interface* _query_valuetype (String_in id) noexcept\n"
 				"{\n"
 				<< indent
 				<< "return FindInterface <" << QName (vt);
@@ -547,7 +547,7 @@ void Servant::end (const ValueType& vt)
 				<< indent
 
 				// Default constructor
-				<< "Servant () NIRVANA_NOEXCEPT\n"
+				<< "Servant () noexcept\n"
 				"{}\n";
 
 			// Explicit constructor

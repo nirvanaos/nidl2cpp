@@ -193,7 +193,8 @@ void Code::namespace_prefix (const Namespaces& ns)
 		for (; req != ns.end (); ++req) {
 			*this << *req << "::";
 		}
-	}
+	} else if (cur != cur_namespace_.end () && !ns.empty ())
+		*this << ns.back () << "::";
 }
 
 void Code::check_digraph (char c)

@@ -117,9 +117,9 @@ protected:
 	virtual void leaf (const AST::ValueBox&) {}
 
 protected:
-	static void marshal_members (Code& stm, const Members& members, const char* func, const char* prefix, const char* end);
+	static void marshal_members (Code& stm, const Members& members, const char* func, const char* prefix);
 	static void marshal_member (Code& stm, const AST::Member& m, const char* func, const char* prefix);
-	static void unmarshal_members (Code& stm, const Members& members, const char* prefix, const char* end);
+	static void unmarshal_members (Code& stm, const Members& members, const char* prefix);
 	static void unmarshal_member (Code& stm, const AST::Member& m, const char* prefix);
 
 private:

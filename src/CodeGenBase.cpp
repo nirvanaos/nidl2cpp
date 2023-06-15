@@ -554,7 +554,7 @@ void CodeGenBase::marshal_member (Code& stm, const Member& m, const char* func, 
 	stm << ", rq);\n";
 }
 
-void CodeGenBase::marshal_members (Code& stm, const Members& members, const char* func, const char* prefix, const char* cend)
+void CodeGenBase::marshal_members (Code& stm, const Members& members, const char* func, const char* prefix)
 {
 	stm.indent ();
 
@@ -574,10 +574,7 @@ void CodeGenBase::marshal_members (Code& stm, const Members& members, const char
 
 			if (m > begin + 1) {
 				stm << "marshal_members (&" << prefix << (*begin)->name () << ", ";
-				if (m != members.end ())
-					stm << "&" << prefix << (*m)->name ();
-				else
-					stm << cend;
+				stm << "&" << prefix << (*(m - 1))->name ();
 				stm << ", rq);\n";
 			} else
 				marshal_member (stm, **begin, func, prefix);
@@ -597,7 +594,7 @@ void CodeGenBase::unmarshal_member (Code& stm, const Member& m, const char* pref
 	stm << ");\n";
 }
 
-void CodeGenBase::unmarshal_members (Code& stm, const Members& members, const char* prefix, const char* cend)
+void CodeGenBase::unmarshal_members (Code& stm, const Members& members, const char* prefix)
 {
 	stm.indent ();
 	for (Members::const_iterator m = members.begin (); m != members.end ();) {
@@ -616,12 +613,9 @@ void CodeGenBase::unmarshal_members (Code& stm, const Members& members, const ch
 			auto end = m;
 
 			if (end > begin + 1) {
-				stm << "if (unmarshal_members (rq, &" << prefix << (*begin)->name ();
-				if (end != members.end ())
-					stm << ", &" << prefix << (*end)->name ();
-				else
-					stm << ", " << cend;
-				stm << ")) {\n"
+				stm << "if (unmarshal_members (rq, &" << prefix << (*begin)->name ()
+					<< ", &" << prefix << (*(end - 1))->name ()
+					<< ")) {\n"
 					<< indent;
 
 				// Swap bytes

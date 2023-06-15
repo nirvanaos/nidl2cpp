@@ -2040,21 +2040,21 @@ void Client::implement_marshaling (const StructBase& item, const char* prefix)
 			"void Type <" << QName (item) << suffix
 			<< ">::marshal_in (const Var& v, IORequest::_ptr_type rq)\n"
 			"{\n";
-		marshal_members (cpp_, item, "marshal_in", my_prefix.c_str (), "&v + 1");
+		marshal_members (cpp_, item, "marshal_in", my_prefix.c_str ());
 		cpp_ << "}\n";
 		if (is_var_len (item)) {
 			cpp_ << "\n"
 				"void Type <" << QName (item) << suffix
 				<< ">::marshal_out (Var& v, IORequest::_ptr_type rq)\n"
 				"{\n";
-			marshal_members (cpp_, item, "marshal_out", my_prefix.c_str (), "&v + 1");
+			marshal_members (cpp_, item, "marshal_out", my_prefix.c_str ());
 			cpp_ << "}\n";
 		}
 		cpp_ << "\n"
 			"void Type <" << QName (item) << suffix
 			<< ">::unmarshal (IORequest::_ptr_type rq, Var& v)\n"
 			"{\n";
-		unmarshal_members (cpp_, item, my_prefix.c_str (), "&v + 1");
+		unmarshal_members (cpp_, item, my_prefix.c_str ());
 		cpp_ << "}\n";
 	} else {
 		cpp_ << "\n"

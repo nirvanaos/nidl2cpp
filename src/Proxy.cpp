@@ -765,11 +765,11 @@ void Proxy::end (const ValueType& vt)
 		cpp_ << empty_line
 			<< "void ValueData <" << QName (vt) << ">::_marshal (I_ptr <IORequest> rq)\n"
 			"{\n";
-		marshal_members (cpp_, (const Members&)members, "marshal_in", "_", "this + 1");
+		marshal_members (cpp_, (const Members&)members, "marshal_in", "_");
 		cpp_ << "}\n\n"
 			"void ValueData <" << QName (vt) << ">::_unmarshal (I_ptr <IORequest> rq)\n"
 			"{\n";
-		unmarshal_members (cpp_, (const Members&)members, "_", "this + 1");
+		unmarshal_members (cpp_, (const Members&)members, "_");
 		cpp_ << "}\n";
 	}
 

@@ -434,10 +434,17 @@ const AST::Enum* CodeGenBase::is_enum (const Type& type)
 	return nullptr;
 }
 
-bool CodeGenBase::is_boolean (const Type& t)
+bool CodeGenBase::is_boolean (const Type& type)
 {
-	const Type& dt = t.dereference_type ();
-	return dt.tkind () == Type::Kind::BASIC_TYPE && dt.basic_type () == BasicType::BOOLEAN;
+	const Type& t = type.dereference_type ();
+	return t.tkind () == Type::Kind::BASIC_TYPE && t.basic_type () == BasicType::BOOLEAN;
+}
+
+bool CodeGenBase::is_aligned_struct (const Type& type)
+{
+	// TODO: Check for CDR size == native size
+	const Type& t = type.dereference_type ();
+	return t.tkind () == Type::Kind::NAMED_TYPE && t.named_type ().kind () == Item::Kind::STRUCT;
 }
 
 CodeGenBase::StateMembers CodeGenBase::get_members (const ValueType& cont)
@@ -560,7 +567,7 @@ void CodeGenBase::marshal_members (Code& stm, const Members& members, const char
 
 	for (Members::const_iterator m = members.begin (); m != members.end ();) {
 		// Marshal variable-length members
-		while (!is_CDR (**m)) {
+		while (!is_CDR (**m) && !is_aligned_struct (**m)) {
 			marshal_member (stm, **m, func, prefix);
 			if (members.end () == ++m)
 				break;
@@ -568,9 +575,11 @@ void CodeGenBase::marshal_members (Code& stm, const Members& members, const char
 		if (m != members.end ()) {
 			// Marshal fixed-length members
 			auto begin = m;
+			const Member* last;
 			do {
+				last = *m;
 				++m;
-			} while (m != members.end () && is_CDR (**m));
+			} while (m != members.end () && is_CDR (**m) && !is_aligned_struct (*last));
 
 			if (m > begin + 1) {
 				stm << "marshal_members (&" << prefix << (*begin)->name () << ", ";
@@ -599,7 +608,7 @@ void CodeGenBase::unmarshal_members (Code& stm, const Members& members, const ch
 	stm.indent ();
 	for (Members::const_iterator m = members.begin (); m != members.end ();) {
 		// Unmarshal variable-length members
-		while (!is_CDR (**m)) {
+		while (!is_CDR (**m) && !is_aligned_struct (**m)) {
 			unmarshal_member (stm , **m, prefix);
 			if (members.end () == ++m)
 				break;
@@ -607,9 +616,11 @@ void CodeGenBase::unmarshal_members (Code& stm, const Members& members, const ch
 		if (m != members.end ()) {
 			// Unmarshal fixed-length members
 			auto begin = m;
+			const Member* last;
 			do {
+				last = *m;
 				++m;
-			} while (m != members.end () && is_CDR (**m));
+			} while (m != members.end () && is_CDR (**m) && !is_aligned_struct (*last));
 			auto end = m;
 
 			if (end > begin + 1) {

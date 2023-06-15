@@ -2123,3 +2123,4 @@ void Client::marshal_union (const Union& u, bool out)
 	cpp_ << "}\n"
 		<< unindent << "}\n";
 }
+

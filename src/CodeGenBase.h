@@ -72,12 +72,14 @@ public:
 	static bool is_servant (const AST::Type& type);
 	static bool is_native (const AST::Type& type);
 	static bool is_native (const Members& members);
-	static bool is_boolean (const AST::Type& t);
+	static bool is_boolean (const AST::Type& type);
 
 	static bool is_sequence (const AST::Type& type)
 	{
 		return type.dereference_type ().tkind () == AST::Type::Kind::SEQUENCE;
 	}
+
+	static bool is_aligned_struct (const AST::Type& type);
 
 	static bool is_bounded (const AST::Type& type);
 	void init_union (Code& stm, const AST::UnionElement& init_el, const char* prefix = "");

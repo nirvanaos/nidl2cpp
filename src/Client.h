@@ -172,6 +172,8 @@ private:
 
 	void marshal_union (const AST::Union& u, bool out);
 
+	void CDR_size (const AST::StructBase& item, const char* prefix);
+
 private:
 	Header h_; // .h file
 	Code cpp_; // .cpp file.

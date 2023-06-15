@@ -1178,6 +1178,7 @@ void Client::define_structured_type (const ItemWithId& item)
 		u = &static_cast <const Union&> (item);
 
 	const Members& members = (u ? static_cast <const Members&> (*u) : static_cast <const Members&> (static_cast <const StructBase&> (item)));
+	assert (!members.empty ());
 
 	bool var_len = is_var_len (members);
 	bool CDR = !u && is_CDR (members);
@@ -1246,8 +1247,21 @@ void Client::define_structured_type (const ItemWithId& item)
 				h_ << "static void marshal_out (Var&, IORequest::_ptr_type);\n";
 
 			h_ << "static void unmarshal (IORequest::_ptr_type, Var&);\n";
-		} else
-			h_ << "static void byteswap (Var&) noexcept;\n";
+		} else {
+			h_ << "static void byteswap (Var&) noexcept;\n"
+
+				<< "static const size_t CDR_align = " << TypePrefix (*members.front ()) << "CDR_align;\n";
+
+			if (options ().legacy && item.kind () == Item::Kind::STRUCT)
+				h_ << "\n#ifndef LEGACY_CORBA_CPP\n";
+			CDR_size (static_cast <const StructBase&> (item), "_");
+
+			if (options ().legacy && item.kind () == Item::Kind::STRUCT) {
+				h_ << "#else\n";
+				CDR_size (static_cast <const StructBase&> (item), "");
+				h_ << "#endif\n";
+			}
+		}
 	}
 
 	if (check) {
@@ -1296,6 +1310,19 @@ void Client::define_structured_type (const ItemWithId& item)
 		type_code_func (item);
 
 	h_ << unindent << "};\n";
+}
+
+void Client::CDR_size (const StructBase& item, const char* prefix)
+{
+	assert (!item.empty ());
+
+	const char* suffix = "";
+	if (item.kind () == Item::Kind::EXCEPTION)
+		suffix = EXCEPTION_SUFFIX;
+
+	h_ << "static const size_t CDR_size = offsetof ("
+		<< QName (item) << suffix << ", " << prefix << item.back ()->name () << ") + "
+		<< TypePrefix (*item.back ()) << "CDR_size;\n";
 }
 
 bool Client::has_check (const Type& type)

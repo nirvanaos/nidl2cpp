@@ -337,24 +337,24 @@ void Servant::end (const ValueType& vt)
 	h_ << ",\n"
 		"{ // base\n"
 		<< indent
-		<< "S::template _wide <ValueBase, " << QName (vt) << '>';
+		<< "S::template _wide_val <ValueBase, " << QName (vt) << '>';
 
 	const Bases all_bases = get_all_bases (vt);
 
 	for (auto b : all_bases) {
 		h_ << ",\n"
-			"S::template _wide <" << QName (*b) << ", " << QName (vt) << '>';
+			"S::template _wide_val <" << QName (*b) << ", " << QName (vt) << '>';
 	}
 
 	const Interface* concrete_itf = get_concrete_supports (vt);
 	if (concrete_itf) {
 		h_ << ",\n"
-			"S::template _wide <" << QName (*concrete_itf) << ", " << QName (vt) << '>';
+			"S::template _wide_val <" << QName (*concrete_itf) << ", " << QName (vt) << '>';
 
 		Interfaces bases = concrete_itf->get_all_bases ();
 		for (auto b : bases) {
 			h_ << ",\n"
-				"S::template _wide <" << QName (*b) << ", " << QName (vt) << '>';
+				"S::template _wide_val <" << QName (*b) << ", " << QName (vt) << '>';
 		}
 	}
 
@@ -621,7 +621,7 @@ void Servant::end (const ValueType& vt)
 		h_ << ",\n"
 			"{ // base\n"
 			<< indent
-			<< "S::template _wide <ValueFactoryBase, " << QName (vt) << FACTORY_SUFFIX ">\n"
+			<< "S::template _wide_val <ValueFactoryBase, " << QName (vt) << FACTORY_SUFFIX ">\n"
 			<< unindent
 			<< "},\n"
 			"{ // EPV\n"

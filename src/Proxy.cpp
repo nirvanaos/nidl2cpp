@@ -152,7 +152,7 @@ void Proxy::implement (const Operation& op, bool no_rq)
 		cpp_ << TypePrefix (op) << "marshal_out (_ret, _call);\n";
 
 	cpp_ << unindent
-		<< "}\n";
+		<< "}\n\n";
 }
 
 void Proxy::implement (const Attribute& att, bool no_rq)
@@ -184,7 +184,7 @@ void Proxy::implement (const Attribute& att, bool no_rq)
 		cpp_ << TypePrefix (att) << "marshal_out (_ret, _call);\n";
 
 		cpp_ << unindent
-			<< "}\n";
+			<< "}\n\n";
 	}
 
 	if (!att.readonly ()) {
@@ -204,7 +204,7 @@ void Proxy::implement (const Attribute& att, bool no_rq)
 				"_servant->" << att.name () << " (val);\n"
 
 				<< unindent
-				<< "}\n";
+				<< "}\n\n";
 		}
 	}
 
@@ -264,57 +264,53 @@ void Proxy::end (const Interface& itf)
 
 	Interfaces bases = itf.get_all_bases ();
 
-	bool no_proxy = is_special_base (itf) || is_immutable (itf);
-	if (!no_proxy) {
+	bool stateless = is_special_base (itf) || is_immutable (itf);
+	if (!stateless) {
 		for (auto base : bases) {
 			if (is_special_base (*base)) {
-				no_proxy = true;
+				stateless = true;
 				break;
 			}
 		}
 	}
 
-	bool local_no_proxy = no_proxy && (itf.interface_kind () == InterfaceKind::LOCAL);
+	bool local_stateless = stateless && (itf.interface_kind () == InterfaceKind::LOCAL);
+
+	const char* proxy_base = stateless ? "ProxyBaseStateless" : "ProxyBase";
 
 	cpp_ << "\n"
 		"template <>\n"
-		"class Proxy <" << QName (itf) << '>';
-	
-	if (!local_no_proxy) {
-		cpp_ << " : public ProxyBase <" << QName (itf) << '>';
+		"class Proxy <" << QName (itf) << "> : public " << proxy_base << " <" << QName (itf) << '>'
+		<< indent;
 
+	for (auto p : bases) {
+		cpp_ << ",\n"
+			"public ProxyBaseInterface <" << QName (*p) << '>';
+	}
+	cpp_ << unindent
+		<< "\n{\n"
+		<< indent
+		<< "typedef " << proxy_base << " <" << QName (itf) << "> Base;\n\n"
+		<< unindent
+		<< "public:\n"
+		<< indent
+
+		// Constructor
+		<< "Proxy (IOReference::_ptr_type proxy_manager, uint16_t interface_idx, Interface*& servant) :\n"
+		<< indent
+		<< "Base (proxy_manager, interface_idx, servant)\n"
+		<< unindent
+		<< '{';
+	if (!bases.empty ()) {
+		cpp_ << std::endl;
 		cpp_.indent ();
-
+		cpp_ << "Object::_ptr_type obj = static_cast <Object*> (proxy_manager->get_object (RepIdOf <Object>::id));\n";
 		for (auto p : bases) {
-			cpp_ << ",\n"
-				"public ProxyBaseInterface <" << QName (*p) << '>';
+			cpp_ << "ProxyBaseInterface <" << QName (*p) << ">::init (obj);\n";
 		}
-		cpp_ << unindent
-			<< "\n{\n"
-			<< indent
-			<< "typedef ProxyBase <" << QName (itf) << "> Base;\n"
-			<< unindent
-			<< "public:\n"
-			<< indent
-
-			// Constructor
-			<< "Proxy (IOReference::_ptr_type proxy_manager, uint16_t interface_idx) :\n"
-			<< indent
-			<< "Base (proxy_manager, interface_idx)\n"
-			<< unindent
-			<< '{';
-		if (!bases.empty ()) {
-			cpp_ << std::endl;
-			cpp_.indent ();
-			cpp_ << "Object::_ptr_type obj = static_cast <Object*> (proxy_manager->get_object (RepIdOf <Object>::id));\n";
-			for (auto p : bases) {
-				cpp_ << "ProxyBaseInterface <" << QName (*p) << ">::init (obj);\n";
-			}
-			cpp_.unindent ();
-		}
-		cpp_ << "}\n";
-	} else
-		cpp_ << "\n{\npublic:\n" << indent;
+		cpp_.unindent ();
+	}
+	cpp_ << "}\n";
 
 	// Operations
 	Metadata metadata;
@@ -325,7 +321,7 @@ void Proxy::end (const Interface& itf)
 			case Item::Kind::OPERATION: {
 				const Operation& op = static_cast <const Operation&> (item);
 				
-				implement (op, local_no_proxy);
+				implement (op, local_stateless);
 
 				metadata.emplace_back ();
 				OpMetadata& op_md = metadata.back ();
@@ -335,9 +331,6 @@ void Proxy::end (const Interface& itf)
 				op_md.context = &op.context ();
 				get_parameters (op, op_md.params_in, op_md.params_out);
 
-				if (local_no_proxy)
-					break;
-
 				cpp_ << ServantOp (op) << " const";
 				if (is_custom (op)) {
 					cpp_ << ";\n"
@@ -345,51 +338,76 @@ void Proxy::end (const Interface& itf)
 						<< " = " << (metadata.size () - 1) << ";\n";
 				} else {
 					
-					cpp_ << "\n{\n";
-					cpp_.indent ();
+					cpp_ << "\n{\n" << indent;
 
-					// Create request
-					cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
-						<< (metadata.size () - 1) << "), " << (op.oneway () ? "0" : "3") << ", nullptr);\n";
-
-					// Marshal input
-					for (auto p : op_md.params_in) {
-						cpp_ << TypePrefix (*p) << "marshal_in (" << p->name () << ", _call);\n";
-					}
-
-					// Call
-					assert (!op.oneway () || (op_md.params_out.empty () && op.tkind () == Type::Kind::VOID));
-
-					cpp_ << "_call->invoke ();\n";
-
-					if (!op.oneway ()) {
-
-						cpp_ << "check_request (_call);\n";
-
-						// Unmarshal output
-
-						for (auto p : op_md.params_out) {
-							cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";
-						}
-						if (op.tkind () != Type::Kind::VOID) {
-							cpp_ << Var (op) << " _ret;\n"
-								<< TypePrefix (op) << "unmarshal (_call, _ret);\n";
-						}
-						cpp_ << "_call->unmarshal_end ();\n";
-
+					if (stateless) {
+						if (!local_stateless)
+							cpp_ << "if (servant ())\n" << indent;
+							
 						if (op.tkind () != Type::Kind::VOID)
-							cpp_ << "return _ret;\n";
+							cpp_ << "return ";
+						cpp_ << "servant ()->" << op.name () << " (";
+						{
+							auto it = op.begin ();
+							if (it != op.end ()) {
+								cpp_ << (*it)->name ();
+								for (++it; it != op.end (); ++it) {
+									cpp_ << ", " << (*it)->name ();
+								}
+							}
+						}
+						cpp_ << ");\n";
+
+						if (!local_stateless)
+							cpp_ << unindent << "else {\n" << indent;
 					}
 
-					cpp_ << unindent
-						<< "}\n\n";
+					if (!local_stateless) {
+						// Create request
+						cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
+							<< (metadata.size () - 1) << "), " << (op.oneway () ? "0" : "3") << ", nullptr);\n";
+
+						// Marshal input
+						for (auto p : op_md.params_in) {
+							cpp_ << TypePrefix (*p) << "marshal_in (" << p->name () << ", _call);\n";
+						}
+
+						// Call
+						assert (!op.oneway () || (op_md.params_out.empty () && op.tkind () == Type::Kind::VOID));
+
+						cpp_ << "_call->invoke ();\n";
+
+						if (!op.oneway ()) {
+
+							cpp_ << "check_request (_call);\n";
+
+							// Unmarshal output
+
+							for (auto p : op_md.params_out) {
+								cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";
+							}
+							if (op.tkind () != Type::Kind::VOID) {
+								cpp_ << Var (op) << " _ret;\n"
+									<< TypePrefix (op) << "unmarshal (_call, _ret);\n";
+							}
+							cpp_ << "_call->unmarshal_end ();\n";
+
+							if (op.tkind () != Type::Kind::VOID)
+								cpp_ << "return _ret;\n";
+						}
+
+						if (stateless)
+							cpp_ << unindent << "}\n";
+					}
+
+					cpp_ << unindent << "}\n\n";
 				}
 			} break;
 
 			case Item::Kind::ATTRIBUTE: {
 				const Attribute& att = static_cast <const Attribute&> (item);
 
-				implement (att, local_no_proxy);
+				implement (att, local_stateless);
 
 				metadata.emplace_back ();
 				{
@@ -401,9 +419,6 @@ void Proxy::end (const Interface& itf)
 					op_md.context = nullptr;
 				}
 
-				if (local_no_proxy)
-					break;
-
 				bool custom = is_native (att);
 
 				cpp_ << VRet (att) << ' ' << att.name () << " () const";
@@ -413,20 +428,33 @@ void Proxy::end (const Interface& itf)
 						<< " = " << (metadata.size () - 1) << ";\n";
 				} else {
 
-					cpp_ << "\n{\n"
-						<< indent
+					cpp_ << "\n{\n" << indent;
 
-						<< "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
-						<< (metadata.size () - 1) << "), 3, nullptr);\n"
-						"_call->invoke ();\n"
-						"check_request (_call);\n"
+					if (stateless) {
+						if (!local_stateless)
+							cpp_ << "if (servant ())\n" << indent;
 
-						<< Var (att) << " _ret;\n"
-						<< TypePrefix (att) << "unmarshal (_call, _ret);\n"
-						"return _ret;\n"
+						cpp_ << "return servant ()->" << att.name () << " ();\n";
+						
+						if (!local_stateless)
+							cpp_ << unindent << "else {\n" << indent;
+					}
 
-						<< unindent
-						<< "}\n";
+					if (!local_stateless) {
+						cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
+							<< (metadata.size () - 1) << "), 3, nullptr);\n"
+							"_call->invoke ();\n"
+							"check_request (_call);\n"
+
+							<< Var (att) << " _ret;\n"
+							<< TypePrefix (att) << "unmarshal (_call, _ret);\n"
+							"return _ret;\n";
+
+						if (stateless)
+							cpp_ << unindent << "}\n";
+					}
+
+					cpp_ << unindent << "}\n\n";
 				}
 
 				if (!att.readonly ()) {
@@ -449,20 +477,32 @@ void Proxy::end (const Interface& itf)
 							<< " = " << (metadata.size () - 1) << ";\n";
 					} else {
 
-						cpp_ << "\n{\n"
-							<< indent
+						cpp_ << "\n{\n" << indent;
 
-							<< "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
-							<< (metadata.size () - 1) << "), 3, nullptr);\n"
-							<< TypePrefix (att) << "marshal_in (val, _call);\n"
-							"_call->invoke ();\n"
-							"check_request (_call);\n"
+						if (stateless) {
+							if (!local_stateless)
+								cpp_ << "if (servant ())\n" << indent;
 
-							<< unindent
-							<< "}\n\n";
+							cpp_ << "servant ()->" << att.name () << " (val);\n";
+							
+							if (!local_stateless)
+								cpp_ << unindent << "else {\n" << indent;
+						}
+
+						if (!local_stateless) {
+							cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
+								<< (metadata.size () - 1) << "), 3, nullptr);\n"
+								<< TypePrefix (att) << "marshal_in (val, _call);\n"
+								"_call->invoke ();\n"
+								"check_request (_call);\n";
+
+							if (stateless)
+								cpp_ << unindent << "}\n";
+						}
+
+						cpp_ << unindent << "}\n\n";
 					}
 				}
-				cpp_ << std::endl;
 			} break;
 		}
 	}
@@ -471,8 +511,7 @@ void Proxy::end (const Interface& itf)
 	if (!metadata.empty ())
 		cpp_ << "static const Operation __operations [];\n";
 
-	cpp_ << unindent
-		<< "};\n\n";
+	cpp_ << unindent << "};\n\n";
 
 	if (!metadata.empty ()) {
 
@@ -532,10 +571,10 @@ void Proxy::end (const Interface& itf)
 			<< indent;
 
 		auto it = metadata.cbegin ();
-		md_operation (itf, *it, local_no_proxy);
+		md_operation (itf, *it, local_stateless);
 		for (++it; it != metadata.cend (); ++it) {
 			cpp_ << ",\n";
-			md_operation (itf, *it, local_no_proxy);
+			md_operation (itf, *it, local_stateless);
 		}
 
 		cpp_ << unindent
@@ -559,13 +598,13 @@ void Proxy::end (const Interface& itf)
 		cpp_ << "{nullptr, 0},\n";
 	else
 		cpp_ << "{Proxy <" << QName (itf) << ">::__operations, countof (Proxy <" << QName (itf) << ">::__operations)},\n";
-	cpp_ << (no_proxy ? "InterfaceMetadata::FLAG_NO_PROXY" : "0");
+	cpp_ << (local_stateless ? "InterfaceMetadata::FLAG_LOCAL_STATELESS" : "0");
 	cpp_ << "\n" << unindent << "};\n";
 
 	cpp_.namespace_close ();
 	cpp_ << "NIRVANA_EXPORT (" << export_name (itf) << ", CORBA::Internal::RepIdOf <" << QName (itf)
-		<< ">::id, CORBA::Internal::PseudoBase, CORBA::Internal::ProxyFactory"
-		<< (local_no_proxy ? "NoProxy" : "Impl") << " <" << QName (itf) << ">)\n";
+		<< ">::id, CORBA::Internal::PseudoBase, CORBA::Internal::ProxyFactoryImpl"
+		<< " <" << QName (itf) << ">)\n";
 }
 
 void Proxy::md_operation (const Interface& itf, const OpMetadata& op, bool no_rq)

@@ -476,8 +476,15 @@ void Servant::end (const ValueType& vt)
 
 				} else {
 					assert (static_cast <const Interface&> (*b).interface_kind () == InterfaceKind::ABSTRACT);
-					abstract_base = true;
-					h_ << "Interface";
+					abstract_base = true; // We need abstract base
+
+					// If value supports concrete interface, abstract interface references must be obtained
+					// via _this() call. If value supports abstract interfaces only, abstract interface references
+					// obtained directly from the servant reference.
+					if (concrete_itf)
+						h_ << "Interface";
+					else
+						h_ << "Value";
 				}
 				h_ << "Impl <S, " << QName (*b) << '>';
 			}

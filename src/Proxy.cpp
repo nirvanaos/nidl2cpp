@@ -326,6 +326,9 @@ void Proxy::end (const Interface& itf)
 				metadata.emplace_back ();
 				OpMetadata& op_md = metadata.back ();
 				op_md.name = op.name ();
+				// Escape fault tolerance FT_HB operation.
+				if (op.name () == "FT_HB")
+					op_md.name.insert (0, 1, '_');
 				op_md.type = &op;
 				op_md.raises = &op.raises ();
 				op_md.context = &op.context ();

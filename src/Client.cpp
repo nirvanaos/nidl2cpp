@@ -1279,8 +1279,9 @@ void Client::define_structured_type (const ItemWithId& item)
 			}
 		} else {
 			bool member_check = false;
-			if (has_check (u->discriminator_type ())) {
-				cpp_ << TypePrefix (u->discriminator_type ()) << "check (val.__d);\n";
+			const Type& d_type = u->discriminator_type ();
+			if (has_check (d_type)) {
+				cpp_ << TypePrefix (d_type) << "check (val.__d);\n";
 				// If discriminator is enum, members may not have checks
 				for (auto m : members) {
 					if (has_check (*m)) {
@@ -1291,7 +1292,12 @@ void Client::define_structured_type (const ItemWithId& item)
 			} else
 				member_check = true; // Some members definitely have check
 			if (member_check) {
-				cpp_ << "switch (val.__d) {\n";
+				cpp_ << "switch (";
+				if (is_enum (d_type)) {
+					// Cast enum ABI to enum
+					cpp_ << '(' << d_type << ')';
+				}
+				cpp_ << "val.__d) {\n";
 				for (auto m : members) {
 					element_case (static_cast <const UnionElement&> (*m));
 					cpp_.indent ();

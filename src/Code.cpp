@@ -372,6 +372,30 @@ Code& operator << (Code& stm, const Variant& var)
 			stm << (var.as_bool () ? "true" : "false");
 			break;
 
+		case Variant::VT::USHORT:
+			stm << var.as_unsigned_short () << 'u';
+			break;
+
+		case Variant::VT::SHORT:
+			stm << var.as_short ();
+			break;
+
+		case Variant::VT::ULONG:
+			stm << var.as_unsigned_long () << "ul";
+			break;
+
+		case Variant::VT::LONG:
+			stm << var.as_long () << 'l';
+			break;
+
+		case Variant::VT::ULONGLONG:
+			stm << var.as_unsigned_long_long () << "ull";
+			break;
+
+		case Variant::VT::LONGLONG:
+			stm << var.as_long_long () << "ll";
+			break;
+
 		case Variant::VT::FLOAT:
 			stm << var.as_float () << 'f';
 			break;
@@ -381,7 +405,7 @@ Code& operator << (Code& stm, const Variant& var)
 			break;
 
 		case Variant::VT::LONGDOUBLE:
-			stm << var.as_long_double ();
+			stm << var.as_long_double () << 'l';
 			break;
 
 		default:

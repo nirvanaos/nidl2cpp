@@ -414,7 +414,12 @@ void Servant::end (const ValueType& vt)
 			h_ << "\n{}\n\n";
 
 			// Marshaling
-			h_ << "void _marshal (I_ptr <IORequest>)";
+			h_ << "void _marshal_in (I_ptr <IORequest>) const";
+			if (!members.empty ())
+				h_ << ";\n";
+			else
+				h_ << " {}\n";
+			h_ << "void _marshal_out (I_ptr <IORequest>)";
 			if (!members.empty ())
 				h_ << ";\n";
 			else
@@ -530,24 +535,29 @@ void Servant::end (const ValueType& vt)
 
 			h_ << ";\n"
 				<< unindent << "}\n\n"
-				"void _marshal (I_ptr <IORequest> rq)\n"
-				"{\n"
-				<< indent;
+				"void _marshal_in (I_ptr <IORequest> rq) const\n"
+				"{\n" << indent;
 			for (auto b : concrete_bases) {
-				h_ << "ValueData <" << QName (*b) << ">::_marshal (rq);\n";
+				h_ << "ValueData <" << QName (*b) << ">::_marshal_in (rq);\n";
 			}
-			h_ << "ValueData <" << QName (vt) << ">::_marshal (rq);\n"
-				<< unindent
-				<< "}\n"
+			h_ << "ValueData <" << QName (vt) << ">::_marshal_in (rq);\n"
+				<< unindent << "}\n"
+
+				"void _marshal_out (I_ptr <IORequest> rq)\n"
+				"{\n" << indent;
+			for (auto b : concrete_bases) {
+				h_ << "ValueData <" << QName (*b) << ">::_marshal_out (rq);\n";
+			}
+			h_ << "ValueData <" << QName (vt) << ">::_marshal_out (rq);\n"
+				<< unindent << "}\n"
+
 				"void _unmarshal (I_ptr <IORequest> rq)\n"
-				"{\n"
-				<< indent;
+				"{\n" << indent;
 			for (auto b : concrete_bases) {
 				h_ << "ValueData <" << QName (*b) << ">::_unmarshal (rq);\n";
 			}
 			h_ << "ValueData <" << QName (vt) << ">::_unmarshal (rq);\n"
-				<< unindent
-				<< "}\n\n"
+				<< unindent << "}\n\n"
 
 				<< unindent
 				<< "protected:\n"

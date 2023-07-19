@@ -499,9 +499,25 @@ void Servant::end (const ValueType& vt)
 				"public InterfaceImpl <S, AbstractBase>";
 
 			h_ << ",\n"
-				"public ValueImpl <S, " << QName (vt) << '>'
+				"public ValueImpl <S, " << QName (vt) << '>';
 
-				<< unindent
+			if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
+				h_ << ",\n"
+					"public ValueBaseFactory <" << QName (vt) << '>';
+			} else {
+				h_ << ",\n"
+					"public ValueBaseNoFactory";
+			}
+
+			if (vt.modifier () == ValueType::Modifier::TRUNCATABLE) {
+				h_ << ",\n"
+					"public ValueTruncatable <&" << TC_Name (*vt.bases ().front ()) << ">";
+			} else {
+				h_ << ",\n"
+					"public ValueNonTruncatable";
+			}
+
+			h_ << unindent
 
 				<< "\n"
 				"{\n"
@@ -525,17 +541,7 @@ void Servant::end (const ValueType& vt)
 			if (abstract_base)
 				h_ << "using InterfaceImpl <S, AbstractBase>::_get_abstract_base;\n\n";
 
-			h_ << "static Interface* __truncatable_base (Bridge <ValueBase>*, Interface*)\n"
-				"{\n" << indent << "return ";
-
-			if (vt.modifier () == ValueType::Modifier::TRUNCATABLE)
-				h_ << TC_Name (*vt.bases ().front ());
-			else
-				h_ << "nullptr";
-
-			h_ << ";\n"
-				<< unindent << "}\n\n"
-				"void _marshal_in (I_ptr <IORequest> rq) const\n"
+			h_ << "void _marshal_in (I_ptr <IORequest> rq) const\n"
 				"{\n" << indent;
 			for (auto b : concrete_bases) {
 				h_ << "ValueData <" << QName (*b) << ">::_marshal_in (rq);\n";

@@ -539,6 +539,16 @@ CodeGenBase::Factories CodeGenBase::get_factories (const ValueType& vt)
 	return factories;
 }
 
+bool CodeGenBase::has_factories (const AST::ValueType& vt)
+{
+	for (auto it = vt.begin (); it != vt.end (); ++it) {
+		const Item& item = **it;
+		if (item.kind () == Item::Kind::VALUE_FACTORY)
+			return true;
+	}
+	return false;
+}
+
 void CodeGenBase::init_union (Code& stm, const UnionElement& init_el,
 	const char* prefix)
 {

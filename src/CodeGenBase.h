@@ -59,6 +59,7 @@ public:
 
 	typedef std::vector <const AST::ValueFactory*> Factories;
 	static Factories get_factories (const AST::ValueType& vt);
+	static bool has_factories (const AST::ValueType& vt);
 
 	static bool is_var_len (const AST::Type& type);
 	static bool is_var_len (const Members& members);

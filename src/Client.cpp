@@ -660,6 +660,16 @@ void Client::end_interface (const IV_Base& container)
 
 	// Interface definition
 	h_.namespace_open (container);
+
+	bool has_factory = false;
+
+	if (container.kind () == Item::Kind::VALUE_TYPE) {
+		has_factory = has_factories (static_cast <const ValueType&> (container));
+		if (has_factory)
+			h_ << empty_line
+				<< "class " << container.name () << FACTORY_SUFFIX ";\n";
+	}
+
 	h_ << empty_line
 		<< "class " << container.name () << " :\n"
 		<< indent <<
@@ -733,6 +743,9 @@ void Client::end_interface (const IV_Base& container)
 		}
 	}
 
+	if (has_factory)
+		h_ << "static const ::Nirvana::ImportInterfaceT <" << container.name () << FACTORY_SUFFIX "> _factory;\n";
+
 	h_ << unindent
 		<< "};\n";
 }
@@ -794,10 +807,6 @@ void Client::end (const ValueType& vt)
 	Factories factories = get_factories (vt);
 
 	if (!factories.empty ()) {
-		h_.namespace_open (vt);
-		h_ << empty_line
-			<< "class " << vt.name () << FACTORY_SUFFIX ";\n";
-
 		h_.namespace_open ("CORBA/Internal");
 		h_.empty_line ();
 
@@ -863,17 +872,12 @@ void Client::end (const ValueType& vt)
 			<< "class " << vt.name () << FACTORY_SUFFIX " : public "
 			<< Namespace ("CORBA/Internal") << "ClientInterface <" << vt.name ()
 			<< FACTORY_SUFFIX ", CORBA::ValueFactoryBase>\n"
-			"{\n"
-			"public:\n"
-			<< indent <<
-			"static const ::Nirvana::ImportInterfaceT <" << vt.name () << FACTORY_SUFFIX "> _factory;\n"
-			<< unindent <<
-			"};\n";
+			"{};\n";
 	
 		cpp_ << empty_line
 			<< "NIRVANA_OLF_SECTION_N (" << (export_count_++) << ')';
 		cpp_ << " const " << Namespace ("Nirvana") << "ImportInterfaceT <" << QName (vt) << FACTORY_SUFFIX ">\n"
-			<< QName (vt) << FACTORY_SUFFIX "::_factory = { Nirvana::OLF_IMPORT_INTERFACE, CORBA::Internal::RepIdOf <"
+			<< QName (vt) << "::_factory = { Nirvana::OLF_IMPORT_INTERFACE, CORBA::Internal::RepIdOf <"
 			<< QName (vt) << ">::id, CORBA::Internal::RepIdOf <" << QName (vt) << FACTORY_SUFFIX ">::id };\n";
 	}
 }

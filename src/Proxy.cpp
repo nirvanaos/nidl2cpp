@@ -872,7 +872,8 @@ void Proxy::end (const ValueType& vt)
 		"{};\n";
 
 	if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
-		cpp_ << "\nInterface* ValueBaseFactory <" << QName (vt) << ">::__factory (Bridge <ValueBase>*, Interface*)\n"
+		cpp_ << "\ntemplate <>\n"
+			"Interface* ValueBaseFactory <" << QName (vt) << ">::__factory (Bridge <ValueBase>*, Interface*)\n"
 			"{\n" << indent <<
 			"return ValueFactoryImpl <" << QName (vt) << ">::factory_base ();\n"
 			<< unindent << "}\n";

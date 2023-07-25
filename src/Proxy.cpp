@@ -805,13 +805,9 @@ void Proxy::end (const ValueType& vt)
 	StateMembers members = get_members (vt);
 	if (!members.empty ()) {
 		cpp_ << empty_line <<
-			"void ValueData <" << QName (vt) << ">::_marshal_in (I_ptr <IORequest> rq) const\n"
+			"void ValueData <" << QName (vt) << ">::_marshal (I_ptr <IORequest> rq) const\n"
 			"{\n";
 		marshal_members (cpp_, (const Members&)members, "marshal_in", "_");
-		cpp_ << "}\n\n"
-			"void ValueData <" << QName (vt) << ">::_marshal_out (I_ptr <IORequest> rq)\n"
-			"{\n";
-		marshal_members (cpp_, (const Members&)members, "marshal_out", "_");
 		cpp_ << "}\n\n"
 			"void ValueData <" << QName (vt) << ">::_unmarshal (I_ptr <IORequest> rq)\n"
 			"{\n";

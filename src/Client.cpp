@@ -1385,7 +1385,7 @@ void Client::implement (const Exception& item)
 		define_swap (item);
 		define_ABI (item);
 		define_structured_type (item);
-		implement_marshaling (item, "_");
+		implement_marshaling (item);
 	} else
 		rep_id_of (item);
 
@@ -1443,15 +1443,7 @@ void Client::implement (const Struct& item)
 	if (!(is_pseudo (item) && is_native (item))) {
 		// Marshaling
 		cpp_.namespace_open ("CORBA/Internal");
-		if (options ().legacy)
-			cpp_ << "\n#ifndef LEGACY_CORBA_CPP\n";
-
-		implement_marshaling (item, "_");
-		if (options ().legacy) {
-			cpp_ << "\n#else\n";
-			implement_marshaling (item, "");
-			cpp_ << "\n#endif\n";
-		}
+		implement_marshaling (item);
 	}
 }
 
@@ -2061,7 +2053,7 @@ void Client::define_swap (const ItemWithId& item)
 		<< unindent << "}\n";
 }
 
-void Client::implement_marshaling (const StructBase& item, const char* prefix)
+void Client::implement_marshaling (const StructBase& item)
 {
 	cpp_.namespace_open ("CORBA/Internal");
 	const char* suffix = "";
@@ -2070,8 +2062,7 @@ void Client::implement_marshaling (const StructBase& item, const char* prefix)
 
 	if (!is_CDR (item)) {
 
-		std::string my_prefix = "v.";
-		my_prefix += prefix;
+		std::string my_prefix = "v._";
 
 		cpp_ << "\n"
 			"void Type <" << QName (item) << suffix
@@ -2099,7 +2090,7 @@ void Client::implement_marshaling (const StructBase& item, const char* prefix)
 			<< ">::byteswap (Var& v) noexcept\n"
 			"{\n" << indent;
 		for (const auto& m : item) {
-			cpp_ << TypePrefix (*m) << "byteswap (v." << prefix << m->name () << ");\n";
+			cpp_ << TypePrefix (*m) << "byteswap (v._" << m->name () << ");\n";
 		}
 		cpp_ << unindent << "}\n";
 	}

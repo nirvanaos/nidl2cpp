@@ -168,7 +168,7 @@ private:
 
 	void define_swap (const AST::ItemWithId& item);
 
-	void implement_marshaling (const AST::StructBase& item, const char* prefix);
+	void implement_marshaling (const AST::StructBase& item);
 
 	void marshal_union (const AST::Union& u, bool out);
 

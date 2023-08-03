@@ -432,7 +432,7 @@ void Client::end_interface (const IV_Base& container)
 		bridge_bases (supports);
 		h_ << "NIRVANA_BRIDGE_EPV\n";
 
-		if (concrete_itf)
+		if (concrete_itf && concrete_itf->interface_kind () != InterfaceKind::PSEUDO)
 			h_ << "Interface* (*_this) (Bridge <" << QName (vt) << ">*, Interface*);\n";
 	}
 

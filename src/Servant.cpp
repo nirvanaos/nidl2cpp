@@ -58,7 +58,7 @@ void Servant::begin (const ValueType& vt)
 	skeleton_begin (vt);
 
 	const Interface* concrete_itf = get_concrete_supports (vt);
-	if (concrete_itf) {
+	if (concrete_itf && concrete_itf->interface_kind () != InterfaceKind::PSEUDO) {
 		h_ << "static Interface* " SKELETON_FUNC_PREFIX "this (Bridge <" << QName (vt) << ">* _b, Interface* _env)\n"
 			"{\n"
 			<< indent <<
@@ -363,7 +363,7 @@ void Servant::end (const ValueType& vt)
 		<< "}";
 
 	// EPV
-	epv (concrete_itf);
+	epv (concrete_itf && concrete_itf->interface_kind () != InterfaceKind::PSEUDO);
 
 	// Servant implementations
 	StateMembers members;
@@ -459,11 +459,13 @@ void Servant::end (const ValueType& vt)
 
 			<< "public ValueTraits <S>,\n";
 
-		if (concrete_itf)
-			h_ << "public ValueImplBase <S, ValueBase>,\n"
-			"public Servant <S, " << QName (*concrete_itf) << '>';
+		if (concrete_itf && concrete_itf->interface_kind () != InterfaceKind::PSEUDO)
+			h_ << "public ValueImplBase <S, ValueBase>";
 		else
 			h_ << "public ValueImpl <S, ValueBase>";
+
+		if (concrete_itf)
+			h_ << ",\npublic Servant <S, " << QName (*concrete_itf) << '>';
 
 		bool abstract_base = false;
 		std::vector <const ValueType*> concrete_bases;
@@ -533,6 +535,8 @@ void Servant::end (const ValueType& vt)
 		for (auto b : all_bases) {
 			h_ << ", " << QName (*b);
 		}
+		if (concrete_itf && concrete_itf->interface_kind () == InterfaceKind::PSEUDO)
+			h_ << ", " << QName (*concrete_itf);
 		h_ << ">::find (static_cast <S&> (*this), id);\n"
 			<< unindent
 			<< "}\n\n";

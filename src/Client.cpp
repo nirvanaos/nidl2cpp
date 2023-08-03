@@ -490,7 +490,7 @@ void Client::end_interface (const IV_Base& container)
 		"public:\n"
 		<< indent;
 
-	if (concrete_itf)
+	if (concrete_itf && concrete_itf->interface_kind () != InterfaceKind::PSEUDO)
 		h_ << "Type <" << QName (*concrete_itf) << ">::VRet _this ();\n";
 
 	for (auto it = container.begin (); it != container.end (); ++it) {
@@ -531,7 +531,7 @@ void Client::end_interface (const IV_Base& container)
 
 	h_ << unindent << "};\n";
 
-	if (concrete_itf) {
+	if (concrete_itf && concrete_itf->interface_kind () != InterfaceKind::PSEUDO) {
 		h_ << "\ntemplate <class T>\n"
 			"Type <" << QName (*concrete_itf) << ">::VRet Client <T, " << QName (container) << ">::_this ()\n"
 			"{\n"

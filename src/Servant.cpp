@@ -442,7 +442,7 @@ void Servant::end (const ValueType& vt)
 		h_ << "template <class S>\n"
 			"class ValueImpl <S, " << QName (vt) << "> :\n"
 			<< indent
-			<< "public ValueImplBase <S, " << QName (vt) << ">";
+			<< "public ValueImplBase <S, " << QName (vt) << ">\n";
 		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
 			h_ << ",\n"
 				"public ValueData <" << QName (vt) << ">\n";

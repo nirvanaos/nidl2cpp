@@ -450,22 +450,78 @@ void Servant::end (const ValueType& vt)
 		h_ << unindent
 			<< "{};";
 
+		// Aggregated
+
+		h_ << empty_line
+			<< "template <class S>\n"
+			"class Aggregated <S, " << QName (vt) << "> :"
+			<< indent
+			<< "public ValueTraits <S>,\n"
+			<< "public ValueImpl <S, " << QName (vt) << '>';
+
+		if (concrete_itf && concrete_itf->interface_kind () != InterfaceKind::PSEUDO)
+			h_ << ",\n"
+				"public ValueImplBase <S, ValueBase>";
+		else
+			h_ << ",\n"
+				"public ValueImpl <S, ValueBase>";
+
+		if (vt.modifier () != ValueType::Modifier::ABSTRACT)
+			h_ << ",\n"
+				"public ValueBaseFactory <" << QName (vt) << ">";
+		else
+			h_ << ",\n"
+				"public ValueBaseNoFactory";
+
+		if (vt.modifier () == ValueType::Modifier::TRUNCATABLE)
+			h_ << ",\n"
+				"public ValueTruncatable <&" << TC_Name (*vt.bases ().front ()) << '>';
+		else
+			h_ << ",\n"
+				"public ValueNonTruncatable";
+
+		h_ << unindent
+			<< "\n"
+			"{\n"
+			"public:\n"
+			<< indent
+			<< "typedef " << QName (vt) << " PrimaryInterface;\n"
+			"\n"
+			"Interface* _query_valuetype (String_in id) noexcept\n"
+			"{\n"
+			<< indent
+			<< "return FindInterface <" << QName (vt);
+
+		for (auto b : all_bases) {
+			h_ << ", " << QName (*b);
+		}
+		if (concrete_itf && concrete_itf->interface_kind () == InterfaceKind::PSEUDO)
+			h_ << ", " << QName (*concrete_itf);
+
+		h_ << ">::find (static_cast <S&> (*this), id);\n"
+			<< unindent << "}\n";
+
+		if (vt.modifier () == ValueType::Modifier::ABSTRACT) {
+			h_ << "using ValueBaseNoFactory::__marshal;\n"
+				"using ValueBaseNoFactory::__unmarshal;\n";
+		}
+
+		h_ << unindent << "};\n"; // End AggregateBase
+
 		// Standard implementation
 		h_ << empty_line
 			<< "template <class S>\n"
 			"class Servant <S, " << QName (vt) << "> :\n"
+			<< indent <<
+			"public Aggregated <S, " << QName (vt) << '>';
 
-			<< indent
-
-			<< "public ValueTraits <S>,\n";
-
-		if (concrete_itf && concrete_itf->interface_kind () != InterfaceKind::PSEUDO)
-			h_ << "public ValueImplBase <S, ValueBase>";
-		else
-			h_ << "public ValueImpl <S, ValueBase>";
+		if (!concrete_itf || concrete_itf->interface_kind () == InterfaceKind::PSEUDO)
+			h_ << ",\n"
+			"public RefCountBase <S>";
 
 		if (concrete_itf)
-			h_ << ",\npublic Servant <S, " << QName (*concrete_itf) << '>';
+			h_ << ",\n"
+			"public Servant <S, " << QName (*concrete_itf) << ">";
 
 		bool abstract_base = false;
 		std::vector <const ValueType*> concrete_bases;
@@ -499,50 +555,12 @@ void Servant::end (const ValueType& vt)
 			h_ << ",\n"
 			"public InterfaceImpl <S, AbstractBase>";
 
-		h_ << ",\n"
-			"public ValueImpl <S, " << QName (vt) << '>';
-
-		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
-			h_ << ",\n"
-				"public ValueBaseFactory <" << QName (vt) << '>';
-		} else {
-			h_ << ",\n"
-				"public ValueBaseNoFactory";
-		}
-
-		if (vt.modifier () == ValueType::Modifier::TRUNCATABLE) {
-			h_ << ",\n"
-				"public ValueTruncatable <&" << TC_Name (*vt.bases ().front ()) << ">";
-		} else {
-			h_ << ",\n"
-				"public ValueNonTruncatable";
-		}
-
-		h_ << unindent
-
-			<< "\n"
+		h_ << "\n"
 			"{\n"
-			"public:\n"
-
-			<< indent
-			<< "typedef " << QName (vt) << " PrimaryInterface;\n"
-			"\n"
-			"Interface* _query_valuetype (String_in id) noexcept\n"
-			"{\n"
-			<< indent
-			<< "return FindInterface <" << QName (vt);
-
-		for (auto b : all_bases) {
-			h_ << ", " << QName (*b);
-		}
-		if (concrete_itf && concrete_itf->interface_kind () == InterfaceKind::PSEUDO)
-			h_ << ", " << QName (*concrete_itf);
-		h_ << ">::find (static_cast <S&> (*this), id);\n"
-			<< unindent
-			<< "}\n\n";
+			"public:\n";
 
 		if (abstract_base)
-			h_ << "using InterfaceImpl <S, AbstractBase>::_get_abstract_base;\n\n";
+			h_ << "using InterfaceImpl <S, AbstractBase>::_get_abstract_base;\n";
 
 		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
 			h_ << "void _marshal (I_ptr <IORequest> rq) const\n"
@@ -560,9 +578,6 @@ void Servant::end (const ValueType& vt)
 			}
 			h_ << "ValueData <" << QName (vt) << ">::_unmarshal (rq);\n"
 				<< unindent << "}\n\n";
-		} else {
-			h_ << "using ValueBaseNoFactory::__marshal;\n"
-				"using ValueBaseNoFactory::__unmarshal;\n\n";
 		}
 
 		h_ << unindent
@@ -635,8 +650,7 @@ void Servant::end (const ValueType& vt)
 			// Return default value on exception
 			h_ << "return Type <" << QName (vt) << ">::ret ();\n";
 
-			h_ << unindent
-				<< "}\n\n";
+			h_ << unindent << "}\n\n";
 		}
 
 		skeleton_end (vt, FACTORY_SUFFIX);
@@ -644,8 +658,7 @@ void Servant::end (const ValueType& vt)
 			"{ // base\n"
 			<< indent
 			<< "S::template _wide_val <ValueFactoryBase, " << QName (vt) << FACTORY_SUFFIX ">\n"
-			<< unindent
-			<< "},\n"
+			<< unindent << "},\n"
 			"{ // EPV\n"
 			<< indent;
 

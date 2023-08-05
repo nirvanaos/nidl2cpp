@@ -55,9 +55,9 @@ public:
 			att (p.attribute ())
 		{}
 
-		Param (const AST::Member& m) :
-			type (m),
-			att (AST::Parameter::Attribute::IN)
+		Param (const AST::Type& t, AST::Parameter::Attribute pa = AST::Parameter::Attribute::IN) :
+			type (t),
+			att (pa)
 		{}
 
 		const AST::Type& type;
@@ -71,6 +71,15 @@ public:
 		{}
 
 		const AST::OperationBase& op;
+	};
+
+	struct PollerSignature
+	{
+		PollerSignature (const AST::Operation& o) :
+			op (o)
+		{}
+
+		const AST::Operation& op;
 	};
 
 	struct ConstType
@@ -188,5 +197,6 @@ private:
 Code& operator << (Code& stm, const Client::Param& t);
 Code& operator << (Code& stm, const Client::Signature& op);
 Code& operator << (Code& stm, const Client::ConstType& op);
+Code& operator << (Code& stm, const Client::PollerSignature& op);
 
 #endif

@@ -62,6 +62,24 @@ Code& operator << (Code& stm, const Client::Signature& op)
 	return stm << ")";
 }
 
+Code& operator << (Code& stm, const Client::PollerSignature& op)
+{
+	stm << op.op.name () << " ("
+		<< Client::Param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " ami_timeout";
+
+	if (op.op.tkind () != Type::Kind::VOID)
+		stm << ", " << Client::Param (op.op, Parameter::Attribute::OUT) << " ami_return_val";
+
+	// inout/out parameters
+	for (auto param : op.op) {
+		if (param->attribute () != Parameter::Attribute::IN)
+			stm << ", " << Client::Param (static_cast <const Type&> (*param), Parameter::Attribute::OUT)
+			<< ' ' << param->name ();
+	}
+
+	return stm << ")";
+}
+
 void Client::end (const Root&)
 {
 	h_.close ();
@@ -362,7 +380,6 @@ void Client::type_code_func (const NamedItem& item)
 
 void Client::begin_interface (const IV_Base& container)
 {
-	type_code_decl (container);
 	type_code_def (container);
 
 	h_.namespace_open ("CORBA/Internal");
@@ -554,9 +571,8 @@ void Client::end_interface (const IV_Base& container)
 			case Item::Kind::OPERATION: {
 				const Operation& op = static_cast <const Operation&> (item);
 
-				h_ << "\ntemplate <class T>\n";
-
-				h_ << VRet (op) << " Client <T, " << QName (container) << ">::" << Signature (op) << "\n"
+				h_ << "\ntemplate <class T>\n"
+					<< VRet (op) << " Client <T, " << QName (container) << ">::" << Signature (op) << "\n"
 					"{\n"
 					<< indent;
 
@@ -622,13 +638,11 @@ void Client::end_interface (const IV_Base& container)
 					<< "}\n";
 
 				if (!(att && att->readonly ())) {
-					h_ << "\ntemplate <class T>\n";
-
-					h_ << "void Client <T, " << QName (container) << ">::" << m.name ()
+					h_ << "\ntemplate <class T>\n"
+						"void Client <T, " << QName (container) << ">::" << m.name ()
 						<< " (" << Param (m) << " val)\n"
-						"{\n"
+						"{\n" << indent;
 
-					<< indent;
 					environment (att ? att->setraises () : Raises ());
 					h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n"
 						"(_b._epv ().epv._set_" << m.name () << ") (&_b, &val, &_env);\n"
@@ -638,9 +652,8 @@ void Client::end_interface (const IV_Base& container)
 				}
 
 				if (m.kind () == Item::Kind::STATE_MEMBER && is_var_len (m)) {
-					h_ << "\ntemplate <class T>\n";
-
-					h_ << "void Client <T, " << QName (container) << ">::" << m.name ()
+					h_ << "\ntemplate <class T>\n"
+						"void Client <T, " << QName (container) << ">::" << m.name ()
 						<< " (" << Var (m) << "&& val)\n"
 						"{\n"
 
@@ -776,13 +789,8 @@ void Client::begin (const Interface& itf)
 void Client::end (const Interface& itf)
 {
 	end_interface (itf);
-	
-	switch (itf.interface_kind ()) {
-	case InterfaceKind::UNCONSTRAINED:
-	case InterfaceKind::LOCAL:
-		if (!is_stateless (itf))
-			generate_poller (itf);
-	}
+	if (async_supported (itf))
+		generate_poller (itf);
 }
 
 void Client::begin (const ValueType& itf)
@@ -2174,4 +2182,179 @@ void Client::generate_poller (const Interface& itf)
 		<< "template <>\n"
 		"const Char RepIdOf <" << ParentName (itf) << id << ">::id [] = \""
 		<< rep_id << "\";\n\n";
+
+	// Type code define
+	cpp_.namespace_close ();
+	cpp_ << empty_line
+		<< "NIRVANA_OLF_SECTION_N (" << (export_count_++) << ')';
+	cpp_ << " extern const " << Namespace ("Nirvana") << "ImportInterfaceT <" << Namespace ("CORBA") << "TypeCode>\n"
+		<< ParentName (itf) << "_tc_" << static_cast <const std::string&> (id) << " = { Nirvana::OLF_IMPORT_INTERFACE, "
+		"CORBA::Internal::RepIdOf <" << ParentName (itf) << id
+		<< ">::id, CORBA::Internal::RepIdOf <CORBA::TypeCode>::id };\n\n";
+
+	// Bridge
+	h_.namespace_open ("CORBA/Internal");
+	h_ << empty_line <<
+		"NIRVANA_BRIDGE_BEGIN (" << ParentName (itf) << id << ")\n";
+
+	h_ << "NIRVANA_BASE_ENTRY (ValueBase, CORBA_ValueBase)\n";
+
+	{
+		Interfaces base_interfaces = itf.get_all_bases ();
+		for (auto b : base_interfaces) {
+			if (async_supported (*b)) {
+				std::string proc_name;
+				Identifier base_poller = make_poller_name (*b);
+				{
+					ScopedName sn = b->scoped_name ();
+					for (ScopedName::const_iterator it = sn.begin (), end = sn.end () - 1; it != end; ++it) {
+						proc_name += '_';
+						proc_name += *it;
+					}
+					proc_name += '_';
+					proc_name += base_poller;
+				}
+				h_ << "NIRVANA_BASE_ENTRY (" << ParentName (*b) << base_poller << ", " << proc_name << ")\n";
+			}
+		}
+	}
+	h_ << "NIRVANA_BRIDGE_EPV\n";
+
+	for (auto item : itf) {
+		switch (item->kind ()) {
+
+		case Item::Kind::OPERATION: {
+			const Operation& op = static_cast <const Operation&> (*item);
+			h_ << "void (*" << op.name () << ") (Bridge <" << ParentName (itf) << id << ">*"
+
+				// ami_timeout
+				<< ", " << ABI_param (Type (BasicType::ULONG), Parameter::Attribute::IN);
+
+			// ami_return_val
+			if (op.tkind () != Type::Kind::VOID)
+				h_ << ", " << ABI_param (op, Parameter::Attribute::OUT);
+
+			// inout/out parameters
+			for (auto param : op) {
+				if (param->attribute () != Parameter::Attribute::IN)
+					h_ << ", " << ABI_param (*param);
+			}
+
+			h_ << ", Interface*);\n";
+
+		} break;
+
+		case Item::Kind::ATTRIBUTE: {
+			const Attribute& att = static_cast <const Attribute&> (*item);
+
+			h_ << "void (*get_" << att.name () << ") (Bridge <" << ParentName (itf) << id << ">*"
+				<< ", " << ABI_param (Type (BasicType::ULONG), Parameter::Attribute::IN) // ami_timeout
+				<< ", " << ABI_param (att, Parameter::Attribute::OUT) // ami_return_val
+				<< ", Interface*);\n";
+
+			if (!att.readonly ())
+				h_ << "void (*set_" << att.name () << ") (Bridge <" << ParentName (itf) << id << ">*"
+					<< ", " << ABI_param (Type (BasicType::ULONG), Parameter::Attribute::IN) // ami_timeout
+					<< ", Interface*);\n";
+
+		} break;
+		}
+	}
+
+	h_ << "NIRVANA_BRIDGE_END ()\n"
+		"\n"
+		// Client interface
+		"template <class T>\n"
+		"class Client <T, " << ParentName (itf) << id << "> : public T\n"
+		<< "{\n"
+		"public:\n"
+		<< indent;
+
+	for (auto item : itf) {
+		switch (item->kind ()) {
+
+		case Item::Kind::OPERATION:
+			h_ << "void " << PollerSignature (static_cast <const Operation&> (*item)) << ";\n";
+			break;
+
+		case Item::Kind::ATTRIBUTE: {
+			const Attribute& att = static_cast <const Attribute&> (*item);
+
+			h_ << "void get_" << att.name () << " ("
+				<< Param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " ami_timeout, "
+				<< Param (att, Parameter::Attribute::OUT) << " ami_return_val);\n";
+
+			if (!att.readonly ())
+				h_ << "void set_" << att.name () << " ("
+					<< Param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " ami_timeout);\n";
+
+		} break;
+		}
+	}
+
+	h_ << unindent << "};\n";
+
+	// Client operations
+	for (auto item : itf) {
+		switch (item->kind ()) {
+
+		case Item::Kind::OPERATION: {
+			const Operation& op = static_cast <const Operation&> (*item);
+
+			h_ << "\ntemplate <class T>\n";
+
+			h_ << "void Client <T, " << ParentName (itf) << id << ">::" << PollerSignature (op) << "\n"
+				"{\n" << indent;
+
+			environment (op.raises ());
+			h_ << "Bridge < " << ParentName (itf) << id << ">& _b (T::_get_bridge (_env));\n";
+
+			h_ << "(_b._epv ().epv." << op.name () << ") (&_b, &ami_timeout";
+
+			if (op.tkind () != Type::Kind::VOID)
+				h_ << ", &ami_return_val";
+
+			for (auto param : op) {
+				if (param->attribute () != Parameter::Attribute::IN)
+					h_ << ", &" << param->name ();
+			}
+			h_ << ", &_env);\n"
+				<< "_env.check ();\n";
+
+			h_ << unindent << "}\n";
+
+		} break;
+
+		case Item::Kind::ATTRIBUTE: {
+			const Attribute& att = static_cast <const Attribute&> (*item);
+
+			h_ << "\ntemplate <class T>\n";
+
+			h_ << "void Client <T, " << ParentName (itf) << id << ">::get_" << att.name () << " ("
+				<< Param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " ami_timeout, "
+				<< Param (att, Parameter::Attribute::OUT) << " ami_return_val)\n"
+				"{\n" << indent;
+
+			environment (att.getraises ());
+			h_ << "Bridge < " << ParentName (itf) << id << ">& _b (T::_get_bridge (_env));\n"
+				"(_b._epv ().epv.get_" << att.name () << ") (&_b, &ami_timeout, &ami_return_val, &_env);\n"
+				"_env.check ();\n"
+				<< unindent << "}\n";
+
+			if (!att.readonly ()) {
+				h_ << "\ntemplate <class T>\n"
+					"void Client <T, " << ParentName (itf) << id << ">::set_" << att.name () << " ("
+					<< Param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " ami_timeout)\n"
+					"{\n" << indent;
+
+				environment (att.setraises ());
+				h_ << "Bridge < " << ParentName (itf) << id << ">& _b (T::_get_bridge (_env));\n"
+					"(_b._epv ().epv.set_" << att.name () << ") (&_b, &ami_timeout, &_env);\n"
+					"_env.check ();\n"
+					<< unindent << "}\n";
+			}
+
+		} break;
+		}
+	}
 }

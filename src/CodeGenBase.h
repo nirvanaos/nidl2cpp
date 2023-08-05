@@ -131,6 +131,10 @@ protected:
 	static bool is_immutable (const AST::Interface& itf) noexcept;
 	static bool is_stateless (const AST::Interface& itf) noexcept;
 
+	static bool is_custom (const AST::Operation& op) noexcept;
+	static bool is_custom (const AST::Interface& itf) noexcept;
+
+	static bool async_supported (const AST::Interface& itf) noexcept;
 	static AST::Identifier make_poller_name (const AST::Interface& itf);
 	bool make_async_repository_id (const AST::Interface& itf, const AST::Identifier& async_name, std::string& id);
 
@@ -207,8 +211,8 @@ struct ABI_param
 		att (p.attribute ())
 	{}
 
-	ABI_param (const AST::Member& m, AST::Parameter::Attribute pa = AST::Parameter::Attribute::IN) :
-		type (m),
+	ABI_param (const AST::Type& t, AST::Parameter::Attribute pa = AST::Parameter::Attribute::IN) :
+		type (t),
 		att (pa)
 	{}
 

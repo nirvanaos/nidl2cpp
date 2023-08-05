@@ -59,8 +59,6 @@ private:
 	virtual void end (const AST::ValueType& item);
 	virtual void leaf (const AST::ValueBox& item);
 
-	static bool is_custom (const AST::Operation& op);
-
 	static void get_parameters (const AST::Operation& op, Members& params_in, Members& params_out);
 
 	static std::string export_name (const AST::NamedItem& item);

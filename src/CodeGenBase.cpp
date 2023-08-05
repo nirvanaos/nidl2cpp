@@ -669,7 +669,7 @@ bool CodeGenBase::is_special_base (const Interface& itf) noexcept
 	return false;
 }
 
-bool CodeGenBase::is_immutable (const AST::Interface& itf) noexcept
+bool CodeGenBase::is_immutable (const Interface& itf) noexcept
 {
 	const ItemScope* parent = itf.parent ();
 	if (parent && !parent->parent ()) {
@@ -681,7 +681,7 @@ bool CodeGenBase::is_immutable (const AST::Interface& itf) noexcept
 	return false;
 }
 
-bool CodeGenBase::is_stateless (const AST::Interface& itf) noexcept
+bool CodeGenBase::is_stateless (const Interface& itf) noexcept
 {
 	bool stateless = is_special_base (itf) || is_immutable (itf);
 	if (!stateless) {
@@ -696,7 +696,49 @@ bool CodeGenBase::is_stateless (const AST::Interface& itf) noexcept
 	return stateless;
 }
 
-Identifier CodeGenBase::make_poller_name (const AST::Interface& itf)
+bool CodeGenBase::is_custom (const Operation& op) noexcept
+{
+	bool custom = is_native (op);
+	if (!custom) {
+		for (auto par : op) {
+			if (is_native (*par)) {
+				custom = true;
+				break;
+			}
+		}
+	}
+	return custom;
+}
+
+bool CodeGenBase::is_custom (const Interface& itf) noexcept
+{
+	for (const Item* item : itf) {
+		switch (item->kind ()) {
+			case Item::Kind::OPERATION:
+				if (is_custom (static_cast <const Operation&> (*item)))
+					return true;
+				break;
+			case Item::Kind::ATTRIBUTE:
+				if (is_native (static_cast <const Attribute&> (*item)))
+					return true;
+				break;
+		}
+	}
+	return false;
+}
+
+bool CodeGenBase::async_supported (const Interface& itf) noexcept
+{
+	switch (itf.interface_kind ()) {
+	case InterfaceKind::UNCONSTRAINED:
+	case InterfaceKind::LOCAL:
+		if (!is_stateless (itf) && !is_custom (itf))
+			return true;
+	}
+	return false;
+}
+
+Identifier CodeGenBase::make_poller_name (const Interface& itf)
 {
 	const Symbols& scope = *itf.parent ();
 	std::string name = "AMI_" + itf.name () + "Poller";

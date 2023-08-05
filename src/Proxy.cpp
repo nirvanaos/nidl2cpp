@@ -217,20 +217,6 @@ void Proxy::implement (const Attribute& att, bool no_rq)
 		<< static_cast <const std::string&> (att.name()) << "[" << att.setraises().size() << "];\n";
 }
 
-bool Proxy::is_custom (const AST::Operation& op)
-{
-	bool custom = is_native (op);
-	if (!custom) {
-		for (auto par : op) {
-			if (is_native (*par)) {
-				custom = true;
-				break;
-			}
-		}
-	}
-	return custom;
-}
-
 void Proxy::end (const Interface& itf)
 {
 	if (itf.interface_kind () == InterfaceKind::PSEUDO)

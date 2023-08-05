@@ -231,28 +231,6 @@ bool Proxy::is_custom (const AST::Operation& op)
 	return custom;
 }
 
-bool Proxy::is_special_base (const Interface& itf) noexcept
-{
-	const ItemScope* parent = itf.parent ();
-	if (parent && !parent->parent ()) {
-		if (parent->name () == "CORBA")
-			return itf.name () == "Policy" || itf.name () == "Current";
-	}
-	return false;
-}
-
-bool Proxy::is_immutable (const AST::Interface& itf) noexcept
-{
-	const ItemScope* parent = itf.parent ();
-	if (parent && !parent->parent ()) {
-		if (parent->name () == "CosTime")
-			return itf.name () == "TIO" || itf.name () == "UTO";
-		else if (parent->name () == "CORBA")
-			return itf.name () == "DomainManager";
-	}
-	return false;
-}
-
 void Proxy::end (const Interface& itf)
 {
 	if (itf.interface_kind () == InterfaceKind::PSEUDO)
@@ -262,17 +240,7 @@ void Proxy::end (const Interface& itf)
 	cpp_.empty_line ();
 	type_code_name (itf);
 
-	Interfaces bases = itf.get_all_bases ();
-
-	bool stateless = is_special_base (itf) || is_immutable (itf);
-	if (!stateless) {
-		for (auto base : bases) {
-			if (is_special_base (*base)) {
-				stateless = true;
-				break;
-			}
-		}
-	}
+	bool stateless = is_stateless (itf);
 
 	bool local_stateless = stateless && (itf.interface_kind () == InterfaceKind::LOCAL);
 
@@ -282,6 +250,8 @@ void Proxy::end (const Interface& itf)
 		"template <>\n"
 		"class Proxy <" << QName (itf) << "> : public " << proxy_base << " <" << QName (itf) << '>'
 		<< indent;
+
+	Interfaces bases = itf.get_all_bases ();
 
 	for (auto p : bases) {
 		cpp_ << ",\n"

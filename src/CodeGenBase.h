@@ -27,14 +27,17 @@
 #define NIDL2CPP_CODEGENBASE_H_
 #pragma once
 
+#include <unordered_set>
 #include "Code.h"
 #include "Options.h"
-#include <unordered_set>
+#include <BE/MessageOut.h>
 
 #define FACTORY_SUFFIX "_factory"
 #define EXCEPTION_SUFFIX "::_Data"
 
-class CodeGenBase : public AST::CodeGen
+class CodeGenBase :
+	public AST::CodeGen,
+	public BE::MessageOut
 {
 public:
 	static bool is_keyword (const AST::Identifier& id);
@@ -119,11 +122,17 @@ protected:
 	virtual void leaf (const AST::ValueFactory&) {}
 	virtual void leaf (const AST::ValueBox&) {}
 
-protected:
 	static void marshal_members (Code& stm, const Members& members, const char* func, const char* prefix);
 	static void marshal_member (Code& stm, const AST::Member& m, const char* func, const char* prefix);
 	static void unmarshal_members (Code& stm, const Members& members, const char* prefix);
 	static void unmarshal_member (Code& stm, const AST::Member& m, const char* prefix);
+
+	static bool is_special_base (const AST::Interface& itf) noexcept;
+	static bool is_immutable (const AST::Interface& itf) noexcept;
+	static bool is_stateless (const AST::Interface& itf) noexcept;
+
+	static AST::Identifier make_poller_name (const AST::Interface& itf);
+	bool make_async_repository_id (const AST::Interface& itf, const AST::Identifier& async_name, std::string& id);
 
 private:
 	static bool pred (const char* l, const char* r)

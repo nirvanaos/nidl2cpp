@@ -92,9 +92,6 @@ private:
 
 	Code& exp (const AST::NamedItem& item);
 
-	static bool is_special_base (const AST::Interface& itf) noexcept;
-	static bool is_immutable (const AST::Interface& itf) noexcept;
-
 private:
 	Code cpp_;
 	bool custom_;

@@ -168,11 +168,15 @@ private:
 
 	void define_swap (const AST::ItemWithId& item);
 
+	void define_itf_suppl (const AST::Identifier& name);
+
 	void implement_marshaling (const AST::StructBase& item);
 
 	void marshal_union (const AST::Union& u, bool out);
 
 	void CDR_size (const AST::StructBase& item, const char* prefix);
+
+	void generate_poller (const AST::Interface& itf);
 
 private:
 	Header h_; // .h file

@@ -659,6 +659,72 @@ void CodeGenBase::unmarshal_members (Code& stm, const Members& members, const ch
 	stm.unindent ();
 }
 
+bool CodeGenBase::is_special_base (const Interface& itf) noexcept
+{
+	const ItemScope* parent = itf.parent ();
+	if (parent && !parent->parent ()) {
+		if (parent->name () == "CORBA")
+			return itf.name () == "Policy" || itf.name () == "Current";
+	}
+	return false;
+}
+
+bool CodeGenBase::is_immutable (const AST::Interface& itf) noexcept
+{
+	const ItemScope* parent = itf.parent ();
+	if (parent && !parent->parent ()) {
+		if (parent->name () == "CosTime")
+			return itf.name () == "TIO" || itf.name () == "UTO";
+		else if (parent->name () == "CORBA")
+			return itf.name () == "DomainManager";
+	}
+	return false;
+}
+
+bool CodeGenBase::is_stateless (const AST::Interface& itf) noexcept
+{
+	bool stateless = is_special_base (itf) || is_immutable (itf);
+	if (!stateless) {
+		Interfaces bases = itf.get_all_bases ();
+		for (auto base : bases) {
+			if (is_special_base (*base)) {
+				stateless = true;
+				break;
+			}
+		}
+	}
+	return stateless;
+}
+
+Identifier CodeGenBase::make_poller_name (const AST::Interface& itf)
+{
+	const Symbols& scope = *itf.parent ();
+	std::string name = "AMI_" + itf.name () + "Poller";
+	while (scope.find (static_cast <const Identifier&> (name))) {
+		name.insert (0, "AMI_");
+	}
+	return Identifier (std::move (static_cast <Identifier&> (name)));
+}
+
+bool CodeGenBase::make_async_repository_id (const Interface& itf, const Identifier& async_name, std::string& id)
+{
+	std::string rep_id = itf.repository_id ();
+	size_t name_end = rep_id.rfind (':');
+	if (name_end != std::string::npos) {
+		size_t name_begin = rep_id.rfind ('/', name_end);
+		if (name_begin != std::string::npos) {
+			++name_begin;
+			size_t name_len = name_end - name_begin;
+			if (itf.name () == rep_id.substr (name_begin, name_len).c_str ()) {
+				rep_id.replace (name_begin, name_len, async_name);
+				return true;
+			}
+		}
+	}
+	message (itf, MessageType::ERROR, "Can not generate repository id for " + async_name + " from \"" + rep_id + '\"');
+	return false;
+}
+
 Code& operator << (Code& stm, const QName& qn)
 {
 	return stm << ParentName (qn.item) << qn.item.name ();

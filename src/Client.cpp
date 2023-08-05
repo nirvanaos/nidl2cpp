@@ -254,21 +254,9 @@ void Client::forward_interface (const ItemWithId& item)
 	forward_define (item);
 	forward_decl (item);
 
-	// A namespace level swap must be provided
-	if (options ().legacy)
-		h_ << "#ifndef LEGACY_CORBA_CPP\n";
-	
-	h_ << "inline void swap (" <<
-		Namespace ("IDL") << "traits <" << item.name () << ">::ref_type& x, " <<
-		Namespace ("IDL") << "traits <" << item.name () << ">::ref_type& y)\n" <<
-		"{\n" << indent <<
-		Namespace ("std") << "swap (x, y);\n"
-		<< unindent << "}\n";
-	
-	if (options ().legacy)
-		h_ << "#endif\n";
+	define_itf_suppl (item.name ());
 
-	h_ << std::endl;
+	// Define type
 	h_.namespace_open ("CORBA/Internal");
 	h_ << empty_line
 		<< "template <>\n"
@@ -314,7 +302,6 @@ void Client::forward_interface (const ItemWithId& item)
 		"{";
 
 	if (has_type_code) {
-		h_ << std::endl;
 		h_.indent ();
 		type_code_func (item);
 		h_.unindent ();
@@ -324,17 +311,30 @@ void Client::forward_interface (const ItemWithId& item)
 	rep_id_of (item);
 
 	h_.namespace_close ();
+
 	h_ << empty_line
 		<< "#endif\n"; // Close forward guard
+}
+
+void Client::define_itf_suppl (const Identifier& name)
+{
+	// A namespace level swap must be provided
+	if (options ().legacy)
+		h_ << "#ifndef LEGACY_CORBA_CPP\n";
+
+	h_ << "inline void swap (" <<
+		Namespace ("IDL") << "traits <" << name << ">::ref_type& x, " <<
+		Namespace ("IDL") << "traits <" << name << ">::ref_type& y)\n" <<
+		"{\n" << indent <<
+		Namespace ("std") << "swap (x, y);\n"
+		<< unindent << "}\n";
 
 	if (options ().legacy) {
-		h_.namespace_open (item);
-		h_ <<
-			"#ifdef LEGACY_CORBA_CPP\n"
-			"typedef " << Namespace ("CORBA/Internal") << "I_ptr <" << item.name () << "> "
-			<< static_cast <const std::string&> (item.name ()) << "_ptr;\n"
-			"typedef " << Namespace ("CORBA/Internal") << "I_var <" << item.name () << "> "
-			<< static_cast <const std::string&> (item.name ()) << "_var;\n"
+		h_ << "#else\n"
+			"typedef " << Namespace ("CORBA/Internal") << "I_ptr <" << name << "> "
+			<< static_cast <const std::string&> (name) << "_ptr;\n"
+			"typedef " << Namespace ("CORBA/Internal") << "I_var <" << name << "> "
+			<< static_cast <const std::string&> (name) << "_var;\n"
 			"#endif\n";
 	}
 }
@@ -776,6 +776,13 @@ void Client::begin (const Interface& itf)
 void Client::end (const Interface& itf)
 {
 	end_interface (itf);
+	
+	switch (itf.interface_kind ()) {
+	case InterfaceKind::UNCONSTRAINED:
+	case InterfaceKind::LOCAL:
+		if (!is_stateless (itf))
+			generate_poller (itf);
+	}
 }
 
 void Client::begin (const ValueType& itf)
@@ -2047,10 +2054,17 @@ void Client::define_swap (const ItemWithId& item)
 {
 	// A namespace level swap() must be provided to exchange the values of two structs in an efficient manner.
 	h_.namespace_open (item);
+	
+	if (options ().legacy)
+		h_ << "#ifndef LEGACY_CORBA_CPP\n";
+
 	h_ << "inline void swap (" << QName (item) << "& x, " << QName (item) << "& y)\n"
 		"{\n" << indent <<
 		Namespace ("std") << "swap (x, y);\n"
 		<< unindent << "}\n";
+	
+	if (options ().legacy)
+		h_ << "#endif\n";
 }
 
 void Client::implement_marshaling (const StructBase& item)
@@ -2125,3 +2139,39 @@ void Client::marshal_union (const Union& u, bool out)
 		<< unindent << "}\n";
 }
 
+void Client::generate_poller (const Interface& itf)
+{
+	Identifier id = make_poller_name (itf);
+	std::string rep_id;
+	if (!make_async_repository_id (itf, id, rep_id))
+		return;
+
+	h_.namespace_open (itf);
+	h_ << empty_line
+		<< "class " << id << ";\n"
+		"extern const " << Namespace ("Nirvana") << "ImportInterfaceT <"
+		<< Namespace ("CORBA") << "TypeCode> _tc_"
+		<< static_cast <const std::string&> (id) << ";\n";
+
+	define_itf_suppl (id);
+
+	// Define type
+	h_.namespace_open ("CORBA/Internal");
+	h_ << empty_line
+		<< "template <>\n"
+		"struct Type <" << ParentName (itf) << id << "> : TypeValue <" << ParentName (itf) << id << ">\n"
+		"{" << indent
+
+		<< "static I_ptr <TypeCode> type_code ()\n"
+		"{\n" << indent
+		<< "return " << ParentName (itf) << "_tc_" << static_cast <const std::string&> (id) << ";\n"
+		<< unindent << "}\n"
+
+		<< unindent << "};\n";
+
+	// Repository id
+	h_ << empty_line
+		<< "template <>\n"
+		"const Char RepIdOf <" << ParentName (itf) << id << ">::id [] = \""
+		<< rep_id << "\";\n\n";
+}

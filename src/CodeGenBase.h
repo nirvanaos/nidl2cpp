@@ -138,6 +138,16 @@ protected:
 	static AST::Identifier make_poller_name (const AST::Interface& itf);
 	bool make_async_repository_id (const AST::Interface& itf, const AST::Identifier& async_name, std::string& id);
 
+	struct AsyncBase
+	{
+		const AST::Interface* itf;
+		AST::Identifier name;
+	};
+
+	typedef std::vector <AsyncBase> AsyncBases;
+
+	static AsyncBases get_poller_bases (const AST::Interface& itf);
+
 private:
 	static bool pred (const char* l, const char* r)
 	{

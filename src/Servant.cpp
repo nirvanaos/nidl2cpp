@@ -113,9 +113,8 @@ void Servant::epv (bool val_with_concrete_itf)
 			"{ // EPV\n"
 			<< indent;
 
-		if (val_with_concrete_itf) {
+		if (val_with_concrete_itf)
 			h_ << SKELETON_FUNC_PREFIX "this";
-		}
 		
 		auto n = epv_.begin ();
 		if (n != epv_.end ()) {
@@ -326,6 +325,9 @@ void Servant::end (const Interface& itf)
 			h_ << "#endif\n";
 		}
 	}
+
+	if (async_supported (itf))
+		generate_poller (itf);
 }
 
 void Servant::end (const ValueType& vt)
@@ -439,16 +441,15 @@ void Servant::end (const ValueType& vt)
 		}
 
 		// ValueImpl
-		h_ << "template <class S>\n"
+		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
+			h_ << "template <class S>\n"
 			"class ValueImpl <S, " << QName (vt) << "> :\n"
 			<< indent
-			<< "public ValueImplBase <S, " << QName (vt) << ">\n";
-		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
-			h_ << ",\n"
-				"public ValueData <" << QName (vt) << ">\n";
-		}
-		h_ << unindent
+			<< "public ValueImplBase <S, " << QName (vt) << ">,\n"
+				"public ValueData <" << QName (vt) << ">\n"
+			<< unindent
 			<< "{};";
+		}
 
 		// Aggregated
 
@@ -457,7 +458,7 @@ void Servant::end (const ValueType& vt)
 			"class Aggregated <S, " << QName (vt) << "> :"
 			<< indent
 			<< "public ValueTraits <S>,\n"
-			<< "public ValueImpl <S, " << QName (vt) << '>';
+				"public ValueImpl <S, " << QName (vt) << '>';
 
 		if (concrete_itf && concrete_itf->interface_kind () != InterfaceKind::PSEUDO)
 			h_ << ",\n"
@@ -506,7 +507,7 @@ void Servant::end (const ValueType& vt)
 				"using ValueBaseNoFactory::__unmarshal;\n";
 		}
 
-		h_ << unindent << "};\n"; // End AggregateBase
+		h_ << unindent << "};\n"; // End Aggregated
 
 		// Standard implementation
 		h_ << empty_line
@@ -903,4 +904,148 @@ void Servant::catch_block ()
 		<< "set_unknown_exception (_env);\n"
 		<< unindent
 		<< "}\n";
+}
+
+void Servant::generate_poller (const Interface& itf)
+{
+	Identifier id = make_poller_name (itf);
+
+	// Skeleton begin
+	h_.namespace_open ("CORBA/Internal");
+	h_ << empty_line
+		<< "template <class S>\n"
+		"class Skeleton <S, " << ParentName (itf) << id << ">\n"
+		"{\n"
+		"public:\n"
+		<< indent
+		<< "static const typename Bridge <" << ParentName (itf) << id << ">::EPV epv_;\n\n"
+		<< unindent
+		<< "protected:\n"
+		<< indent;
+
+	for (auto item : itf) {
+		switch (item->kind ()) {
+		case Item::Kind::OPERATION: {
+			const Operation& op = static_cast <const Operation&> (*item);
+
+			std::vector <AsyncParam> params;
+			params.reserve (op.size () + 2);
+			params.emplace_back (Parameter::Attribute::IN, Type (BasicType::ULONG), "ami_timeout");
+			if (op.tkind () != Type::Kind::VOID)
+				params.emplace_back (Parameter::Attribute::OUT, op, "ami_return_val");
+			for (auto param : op) {
+				if (param->attribute () != Parameter::Attribute::IN)
+					params.emplace_back (Parameter::Attribute::OUT, *param, param->name ());
+			}
+
+			h_ << "static void ";
+
+			{
+				std::string name = SKELETON_FUNC_PREFIX;
+				name += op.name ();
+				h_ << ' ' << name << " (Bridge <" << ParentName (itf) << id << ">* _b";
+				epv_.push_back (std::move (name));
+			}
+
+			for (const auto& param : params) {
+				h_ << ", " << ABI_param (param.type, param.att) << ' ' << param.name;
+			}
+
+			h_ << ", Interface* _env)\n"
+				"{\n"
+				<< indent
+				<< "try {\n"
+				<< indent;
+			h_ << "S::_implementation (_b)." << op.name () << " (";
+
+			{
+				auto param = params.begin ();
+				servant_param (param->type, param->name, param->att);
+				for (++param; param != params.end (); ++param) {
+					h_ << ", ";
+					servant_param (param->type, param->name, param->att);
+				}
+			}
+			h_ << ");\n";
+			catch_block ();
+
+			h_ << unindent
+				<< "}\n\n";
+		} break;
+
+		case Item::Kind::ATTRIBUTE: {
+			const Attribute& att = static_cast <const Attribute&> (*item);
+
+		} break;
+		}
+	}
+
+	// Skeleton end
+	h_ << unindent
+		<< "};\n"
+		"\ntemplate <class S>\n"
+		"const Bridge <" << ParentName (itf) << id << ">::EPV Skeleton <S, "
+		<< ParentName (itf) << id << ">::epv_ = {\n"
+		<< indent
+		<< "{ // header\n"
+		<< indent
+		<< "RepIdOf <" << ParentName (itf) << id << ">::id,\n"
+		"S::template __duplicate <" << ParentName (itf) << id << ">,\n"
+		"S::template __release <" << ParentName (itf) << id << ">\n"
+		<< unindent
+		<< "}";
+
+	// Bases
+
+	h_ << ",\n"
+		"{ // base\n"
+		<< indent
+		<< "S::template _wide_val <ValueBase, " << ParentName (itf) << id << '>';
+
+	const AsyncBases bases = get_poller_bases (itf);
+
+	for (const auto& b : bases) {
+		h_ << ",\n"
+			"S::template _wide_val <" << ParentName (*b.itf) << b.name << ", " << ParentName (itf) << id << '>';
+	}
+
+	h_ << std::endl
+		<< unindent
+		<< "}";
+
+	// EPV
+	epv (false);
+
+	if (!options ().no_servant) {
+
+		// Aggregated
+		h_ << empty_line
+			<< "template <class S>\n"
+			"class Aggregated <S, " << ParentName (itf) << id << "> :\n"
+			<< indent
+			<< "public ValueTraits <S>,\n"
+			"public ValueImpl <S, " << ParentName (itf) << id << ">,\n"
+			"public ValueImpl <S, ValueBase>,\n"
+			"public ValueBaseNoFactory,\n"
+			"public ValueNonTruncatable\n"
+			<< unindent <<
+			"{\n"
+			"public:\n"
+			<< indent
+			<< "typedef " << ParentName (itf) << id << " PrimaryInterface;\n"
+			"\n"
+			"Interface* _query_valuetype (String_in id) noexcept\n"
+			"{\n"
+			<< indent
+			<< "return FindInterface <" << ParentName (itf) << id;
+
+		for (const auto& b : bases) {
+			h_ << ", " << ParentName (*b.itf) << b.name;
+		}
+		h_ << ">::find (static_cast <S&> (*this), id);\n"
+			<< unindent << "}\n"
+			"using ValueBaseNoFactory::__marshal;\n"
+			"using ValueBaseNoFactory::__unmarshal;\n"
+		<< unindent << "};\n"; // End Aggregated
+	}
 }

@@ -2199,24 +2199,17 @@ void Client::generate_poller (const Interface& itf)
 
 	h_ << "NIRVANA_BASE_ENTRY (ValueBase, CORBA_ValueBase)\n";
 
-	{
-		Interfaces base_interfaces = itf.get_all_bases ();
-		for (auto b : base_interfaces) {
-			if (async_supported (*b)) {
-				std::string proc_name;
-				Identifier base_poller = make_poller_name (*b);
-				{
-					ScopedName sn = b->scoped_name ();
-					for (ScopedName::const_iterator it = sn.begin (), end = sn.end () - 1; it != end; ++it) {
-						proc_name += '_';
-						proc_name += *it;
-					}
-					proc_name += '_';
-					proc_name += base_poller;
-				}
-				h_ << "NIRVANA_BASE_ENTRY (" << ParentName (*b) << base_poller << ", " << proc_name << ")\n";
-			}
+	AsyncBases bases = get_poller_bases (itf);
+	for (const auto& b : bases) {
+		std::string proc_name;
+		ScopedName sn = b.itf->scoped_name ();
+		for (ScopedName::const_iterator it = sn.begin (), end = sn.end () - 1; it != end; ++it) {
+			proc_name += '_';
+			proc_name += *it;
 		}
+		proc_name += '_';
+		proc_name += b.name;
+		h_ << "NIRVANA_BASE_ENTRY (" << ParentName (*b.itf) << b.name << ", " << proc_name << ")\n";
 	}
 	h_ << "NIRVANA_BRIDGE_EPV\n";
 
@@ -2237,7 +2230,7 @@ void Client::generate_poller (const Interface& itf)
 			// inout/out parameters
 			for (auto param : op) {
 				if (param->attribute () != Parameter::Attribute::IN)
-					h_ << ", " << ABI_param (*param);
+					h_ << ", " << ABI_param (*param, Parameter::Attribute::OUT);
 			}
 
 			h_ << ", Interface*);\n";
@@ -2357,4 +2350,18 @@ void Client::generate_poller (const Interface& itf)
 		} break;
 		}
 	}
+
+	// Interface definition
+	h_.namespace_open (itf);
+	h_ << empty_line
+		<< "class " << id << " :\n"
+		<< indent <<
+		"public " << Namespace ("CORBA/Internal") << "ClientInterface <" << id;
+	for (const auto& b : bases) {
+		h_ << ", " << ParentName (*b.itf) << b.name;
+	}
+	h_ << ", " << Namespace ("CORBA") << "ValueBase"
+		<< ">\n"
+		<< unindent <<
+		"{};\n";
 }

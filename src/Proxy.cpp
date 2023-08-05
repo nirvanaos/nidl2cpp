@@ -564,6 +564,9 @@ void Proxy::end (const Interface& itf)
 	cpp_ << "NIRVANA_EXPORT (" << export_name (itf) << ", CORBA::Internal::RepIdOf <" << QName (itf)
 		<< ">::id, CORBA::Internal::PseudoBase, CORBA::Internal::ProxyFactoryImpl"
 		<< " <" << QName (itf) << ">)\n";
+
+	if (async_supported (itf))
+		generate_poller (itf);
 }
 
 void Proxy::md_operation (const Interface& itf, const OpMetadata& op, bool no_rq)
@@ -878,4 +881,38 @@ void Proxy::leaf (const Union& item)
 	// Export TypeCode
 	cpp_.namespace_close ();
 	exp (item) << "TypeCodeUnion <" << QName (item) << ">)\n";
+}
+
+void Proxy::generate_poller (const Interface& itf)
+{
+	Identifier id = make_poller_name (itf);
+
+	cpp_.namespace_open ("CORBA/Internal");
+
+	cpp_ << empty_line
+		<< "template <>\n"
+		"const Char TypeCodeName <" << ParentName (itf) << id << ">::name_ [] = \""
+		<< static_cast <const std::string&> (id) << "\";\n";
+
+	cpp_ << empty_line <<
+		"template <>\n"
+		"class TypeCodeValue <" << ParentName (itf) << id << "> : public TypeCodeValueAbstract <"
+		<< ParentName (itf) << id << ">\n"
+		"{};\n";
+
+	cpp_.namespace_close ();
+
+	std::string export_name = "_exp";
+	ScopedName sn = itf.scoped_name ();
+	for (auto it = sn.begin (), end = sn.end () - 1; it != end; ++it) {
+		export_name += '_';
+		export_name += *it;
+	}
+	export_name += '_';
+	export_name += id;
+
+	cpp_ << "NIRVANA_EXPORT (" << export_name << ", CORBA::Internal::RepIdOf <"
+		<< ParentName (itf) << id << ">::id, CORBA"
+			"::TypeCode, CORBA::Internal::TypeCodeValue <"
+			<< ParentName (itf) << id << ">)\n";
 }

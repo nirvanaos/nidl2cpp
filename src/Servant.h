@@ -73,6 +73,15 @@ private:
 
 	void attribute (const AST::Member& m);
 
+	void generate_poller (const AST::Interface& itf);
+
+	struct AsyncParam
+	{
+		AST::Parameter::Attribute att;
+		const AST::Type type;
+		const AST::Identifier name;
+	};
+
 private:
 	Header h_;
 	std::vector<std::string> epv_;

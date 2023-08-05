@@ -767,6 +767,18 @@ bool CodeGenBase::make_async_repository_id (const Interface& itf, const Identifi
 	return false;
 }
 
+CodeGenBase::AsyncBases CodeGenBase::get_poller_bases (const Interface& itf)
+{
+	AsyncBases ret;
+	Interfaces base_interfaces = itf.get_all_bases ();
+	ret.reserve (base_interfaces.size ());
+	for (auto b : base_interfaces) {
+		if (async_supported (*b))
+			ret.emplace_back (b, make_poller_name (*b));
+	}
+	return ret;
+}
+
 Code& operator << (Code& stm, const QName& qn)
 {
 	return stm << ParentName (qn.item) << qn.item.name ();

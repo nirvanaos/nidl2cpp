@@ -90,6 +90,8 @@ private:
 
 	Code& exp (const AST::NamedItem& item);
 
+	void generate_poller (const AST::Interface& itf);
+
 private:
 	Code cpp_;
 	bool custom_;

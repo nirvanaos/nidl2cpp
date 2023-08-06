@@ -458,35 +458,29 @@ void Servant::end (const ValueType& vt)
 
 		h_ << empty_line
 			<< "template <class S>\n"
-			"class Aggregated <S, " << QName (vt) << "> :"
+			"class Aggregated <S, " << QName (vt) << "> :\n"
 			<< indent
-			<< "public ValueTraits <S>,\n"
-				"public ValueImpl <S, " << QName (vt) << '>';
+			<< "public ValueTraits <S>,\n";
 
 		if (concrete_itf && concrete_itf->interface_kind () != InterfaceKind::PSEUDO)
-			h_ << ",\n"
-				"public ValueImplBase <S, ValueBase>";
+			h_ << "public ValueImplBase <S, ValueBase>,\n";
 		else
-			h_ << ",\n"
-				"public ValueImpl <S, ValueBase>";
+			h_ << "public ValueImpl <S, ValueBase>,\n";
+
+		h_ << "public ValueImpl <S, " << QName (vt) << ">,\n";
 
 		if (vt.modifier () != ValueType::Modifier::ABSTRACT)
-			h_ << ",\n"
-				"public ValueBaseFactory <" << QName (vt) << ">";
+			h_ << "public ValueBaseFactory <" << QName (vt) << ">,\n";
 		else
-			h_ << ",\n"
-				"public ValueBaseNoFactory";
+			h_ << "public ValueBaseNoFactory,\n";
 
 		if (vt.modifier () == ValueType::Modifier::TRUNCATABLE)
-			h_ << ",\n"
-				"public ValueTruncatable <&" << TC_Name (*vt.bases ().front ()) << '>';
+			h_ << "public ValueTruncatable <&" << TC_Name (*vt.bases ().front ()) << ">\n";
 		else
-			h_ << ",\n"
-				"public ValueNonTruncatable";
+			h_ << "public ValueNonTruncatable\n";
 
 		h_ << unindent
-			<< "\n"
-			"{\n"
+			<< "{\n"
 			"public:\n"
 			<< indent
 			<< "typedef " << QName (vt) << " PrimaryInterface;\n"

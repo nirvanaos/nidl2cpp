@@ -27,6 +27,9 @@
 #include "Servant.h"
 
 #define SKELETON_FUNC_PREFIX "_s_"
+#define SKELETON_GETTER_PREFIX "_s__get_"
+#define SKELETON_SETTER_PREFIX "_s__set_"
+#define SKELETON_MOVE_PREFIX "_s__move_"
 
 using std::filesystem::path;
 using namespace AST;
@@ -811,7 +814,7 @@ void Servant::attribute (const Member& m)
 
 	h_ << "static " << ABI_ret (m, attributes_by_ref_);
 	{
-		std::string name = SKELETON_FUNC_PREFIX "get_";
+		std::string name = SKELETON_GETTER_PREFIX;
 		name += m.name ();
 		h_ << ' ' << name << " (Bridge <" << QName (itf) << ">* _b, Interface* _env)\n"
 			"{\n";
@@ -834,7 +837,7 @@ void Servant::attribute (const Member& m)
 
 	if (!(m.kind () == Item::Kind::ATTRIBUTE && static_cast <const Attribute&> (m).readonly ())) {
 		{
-			std::string name = SKELETON_FUNC_PREFIX "set_";
+			std::string name = SKELETON_SETTER_PREFIX;
 			name += m.name ();
 			h_ << "static void " << name << " (Bridge <" << QName (itf) << ">* _b, "
 				<< ABI_param (m) << " val, Interface* _env)\n"
@@ -854,7 +857,7 @@ void Servant::attribute (const Member& m)
 
 	if (m.kind () == Item::Kind::STATE_MEMBER && is_var_len (m)) {
 		{
-			std::string name = SKELETON_FUNC_PREFIX "move_";
+			std::string name = SKELETON_MOVE_PREFIX;
 			name += m.name ();
 			h_ << "static void " << name << " (Bridge <" << QName (itf) << ">* _b, "
 				<< ABI_param (m, Parameter::Attribute::INOUT) << " val, Interface* _env)\n"
@@ -930,9 +933,9 @@ void Servant::generate_poller (const Interface& itf)
 
 			std::vector <AsyncParam> params;
 			params.reserve (op.size () + 2);
-			params.emplace_back (Parameter::Attribute::IN, Type (BasicType::ULONG), "ami_timeout");
+			params.emplace_back (Parameter::Attribute::IN, Type (BasicType::ULONG), AMI_TIMEOUT);
 			if (op.tkind () != Type::Kind::VOID)
-				params.emplace_back (Parameter::Attribute::OUT, op, "ami_return_val");
+				params.emplace_back (Parameter::Attribute::OUT, op, AMI_RETURN_VAL);
 			for (auto param : op) {
 				if (param->attribute () != Parameter::Attribute::IN)
 					params.emplace_back (Parameter::Attribute::OUT, *param, param->name ());
@@ -975,6 +978,42 @@ void Servant::generate_poller (const Interface& itf)
 
 		case Item::Kind::ATTRIBUTE: {
 			const Attribute& att = static_cast <const Attribute&> (*item);
+			{
+				std::string name = SKELETON_FUNC_PREFIX "get_";
+				name += att.name ();
+				h_ << "static void " << name << " (Bridge <" << ParentName (itf) << id << ">* _b, "
+					<< ABI_param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " " AMI_TIMEOUT ", "
+					<< ABI_param (att, Parameter::Attribute::OUT) << " " AMI_RETURN_VAL ", Interface* _env)\n"
+					"{\n";
+				epv_.push_back (std::move (name));
+			}
+			h_ << indent
+				<< "try {\n" << indent
+				<< "S::_implementation (_b).get_" << att.name () << " (";
+			servant_param (Type (BasicType::ULONG), AMI_TIMEOUT, Parameter::Attribute::IN);
+			h_ << ", ";
+			servant_param (att, AMI_RETURN_VAL, Parameter::Attribute::OUT);
+			h_ << ");\n";
+			catch_block ();
+			h_ << unindent << "}\n";
+
+			if (!att.readonly ()) {
+				{
+					std::string name = SKELETON_FUNC_PREFIX "set_";
+					name += att.name ();
+					h_ << "static void " << name << " (Bridge <" << ParentName (itf) << id << ">* _b, "
+						<< ABI_param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " " AMI_TIMEOUT ", Interface* _env)\n"
+						"{\n";
+					epv_.push_back (std::move (name));
+				}
+				h_ << indent
+					<< "try {\n" << indent
+					<< "S::_implementation (_b).set_" << att.name () << " (";
+				servant_param (Type (BasicType::ULONG), AMI_TIMEOUT, Parameter::Attribute::IN);
+				h_ << ");\n";
+				catch_block ();
+				h_ << unindent << "}\n";
+			}
 
 		} break;
 		}
@@ -999,8 +1038,10 @@ void Servant::generate_poller (const Interface& itf)
 
 	h_ << ",\n"
 		"{ // base\n"
-		<< indent
-		<< "S::template _wide_val <ValueBase, " << ParentName (itf) << id << '>';
+		<< indent <<
+		"S::template _wide_val <ValueBase, " << ParentName (itf) << id << ">,\n"
+		"S::template _wide_val <::Messaging::Poller, " << ParentName (itf) << id << ">,\n"
+		"S::template _wide_val <Pollable, " << ParentName (itf) << id << ">";
 
 	const AsyncBases bases = get_poller_bases (itf);
 
@@ -1042,7 +1083,7 @@ void Servant::generate_poller (const Interface& itf)
 		for (const auto& b : bases) {
 			h_ << ", " << ParentName (*b.itf) << b.name;
 		}
-		h_ << ">::find (static_cast <S&> (*this), id);\n"
+		h_ << ", ::Messaging::Poller, Pollable>::find (static_cast <S&> (*this), id);\n"
 			<< unindent << "}\n"
 			"using ValueBaseNoFactory::__marshal;\n"
 			"using ValueBaseNoFactory::__unmarshal;\n"

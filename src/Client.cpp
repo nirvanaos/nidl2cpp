@@ -65,10 +65,10 @@ Code& operator << (Code& stm, const Client::Signature& op)
 Code& operator << (Code& stm, const Client::PollerSignature& op)
 {
 	stm << op.op.name () << " ("
-		<< Client::Param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " ami_timeout";
+		<< Client::Param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " " AMI_TIMEOUT;
 
 	if (op.op.tkind () != Type::Kind::VOID)
-		stm << ", " << Client::Param (op.op, Parameter::Attribute::OUT) << " ami_return_val";
+		stm << ", " << Client::Param (op.op, Parameter::Attribute::OUT) << " " AMI_RETURN_VAL;
 
 	// inout/out parameters
 	for (auto param : op.op) {
@@ -2197,7 +2197,9 @@ void Client::generate_poller (const Interface& itf)
 	h_ << empty_line <<
 		"NIRVANA_BRIDGE_BEGIN (" << ParentName (itf) << id << ")\n";
 
-	h_ << "NIRVANA_BASE_ENTRY (ValueBase, CORBA_ValueBase)\n";
+	h_ << "NIRVANA_BASE_ENTRY (ValueBase, CORBA_ValueBase)\n"
+		"NIRVANA_BASE_ENTRY (Pollable, CORBA_Pollable)\n"
+		"NIRVANA_BASE_ENTRY (::Messaging::Poller, Messaging_Poller)\n";
 
 	AsyncBases bases = get_poller_bases (itf);
 	for (const auto& b : bases) {
@@ -2274,12 +2276,12 @@ void Client::generate_poller (const Interface& itf)
 			const Attribute& att = static_cast <const Attribute&> (*item);
 
 			h_ << "void get_" << att.name () << " ("
-				<< Param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " ami_timeout, "
-				<< Param (att, Parameter::Attribute::OUT) << " ami_return_val);\n";
+				<< Param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " " AMI_TIMEOUT ", "
+				<< Param (att, Parameter::Attribute::OUT) << " " AMI_RETURN_VAL ");\n";
 
 			if (!att.readonly ())
 				h_ << "void set_" << att.name () << " ("
-					<< Param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " ami_timeout);\n";
+					<< Param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " " AMI_TIMEOUT ");\n";
 
 		} break;
 		}
@@ -2302,10 +2304,10 @@ void Client::generate_poller (const Interface& itf)
 			environment (op.raises ());
 			h_ << "Bridge < " << ParentName (itf) << id << ">& _b (T::_get_bridge (_env));\n";
 
-			h_ << "(_b._epv ().epv." << op.name () << ") (&_b, &ami_timeout";
+			h_ << "(_b._epv ().epv." << op.name () << ") (&_b, &" AMI_TIMEOUT;
 
 			if (op.tkind () != Type::Kind::VOID)
-				h_ << ", &ami_return_val";
+				h_ << ", &" AMI_RETURN_VAL;
 
 			for (auto param : op) {
 				if (param->attribute () != Parameter::Attribute::IN)
@@ -2324,25 +2326,25 @@ void Client::generate_poller (const Interface& itf)
 			h_ << "\ntemplate <class T>\n";
 
 			h_ << "void Client <T, " << ParentName (itf) << id << ">::get_" << att.name () << " ("
-				<< Param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " ami_timeout, "
-				<< Param (att, Parameter::Attribute::OUT) << " ami_return_val)\n"
+				<< Param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " " AMI_TIMEOUT ", "
+				<< Param (att, Parameter::Attribute::OUT) << " " AMI_RETURN_VAL ")\n"
 				"{\n" << indent;
 
 			environment (att.getraises ());
 			h_ << "Bridge < " << ParentName (itf) << id << ">& _b (T::_get_bridge (_env));\n"
-				"(_b._epv ().epv.get_" << att.name () << ") (&_b, &ami_timeout, &ami_return_val, &_env);\n"
+				"(_b._epv ().epv.get_" << att.name () << ") (&_b, &" AMI_TIMEOUT ", &" AMI_RETURN_VAL ", &_env); \n"
 				"_env.check ();\n"
 				<< unindent << "}\n";
 
 			if (!att.readonly ()) {
 				h_ << "\ntemplate <class T>\n"
 					"void Client <T, " << ParentName (itf) << id << ">::set_" << att.name () << " ("
-					<< Param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " ami_timeout)\n"
+					<< Param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " " AMI_TIMEOUT ")\n"
 					"{\n" << indent;
 
 				environment (att.setraises ());
 				h_ << "Bridge < " << ParentName (itf) << id << ">& _b (T::_get_bridge (_env));\n"
-					"(_b._epv ().epv.set_" << att.name () << ") (&_b, &ami_timeout, &_env);\n"
+					"(_b._epv ().epv.set_" << att.name () << ") (&_b, &" AMI_TIMEOUT ", &_env);\n"
 					"_env.check ();\n"
 					<< unindent << "}\n";
 			}

@@ -34,6 +34,8 @@
 
 #define FACTORY_SUFFIX "_factory"
 #define EXCEPTION_SUFFIX "::_Data"
+#define AMI_TIMEOUT "ami_timeout"
+#define AMI_RETURN_VAL "ami_return_val"
 
 class CodeGenBase :
 	public AST::CodeGen,
@@ -142,6 +144,11 @@ protected:
 	{
 		const AST::Interface* itf;
 		AST::Identifier name;
+
+		AsyncBase (const AST::Interface* i, AST::Identifier&& n) :
+			itf (i),
+			name (std::move (n))
+		{}
 	};
 
 	typedef std::vector <AsyncBase> AsyncBases;

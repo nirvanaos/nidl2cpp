@@ -80,6 +80,14 @@ private:
 		AST::Parameter::Attribute att;
 		const AST::Type type;
 		const AST::Identifier name;
+
+		AsyncParam (AST::Parameter::Attribute a, const AST::Type& t, const AST::Identifier& n) :
+			att (a), type (t), name (n)
+		{}
+
+		AsyncParam (AST::Parameter::Attribute a, const AST::Type& t, const char* n) :
+			att (a), type (t), name (n)
+		{}
 	};
 
 private:

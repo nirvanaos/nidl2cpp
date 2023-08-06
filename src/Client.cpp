@@ -2150,9 +2150,6 @@ void Client::marshal_union (const Union& u, bool out)
 void Client::generate_poller (const Interface& itf)
 {
 	Identifier id = make_poller_name (itf);
-	std::string rep_id;
-	if (!make_async_repository_id (itf, id, rep_id))
-		return;
 
 	h_.namespace_open (itf);
 	h_ << empty_line
@@ -2178,10 +2175,15 @@ void Client::generate_poller (const Interface& itf)
 		<< unindent << "};\n";
 
 	// Repository id
-	h_ << empty_line
-		<< "template <>\n"
-		"const Char RepIdOf <" << ParentName (itf) << id << ">::id [] = \""
-		<< rep_id << "\";\n\n";
+	{
+		std::string rep_id = make_async_repository_id (itf, id);
+		if (!rep_id.empty ()) {
+			h_ << empty_line
+				<< "template <>\n"
+				"const Char RepIdOf <" << ParentName (itf) << id << ">::id [] = \""
+				<< rep_id << "\";\n\n";
+		}
+	}
 
 	// Type code define
 	cpp_.namespace_close ();

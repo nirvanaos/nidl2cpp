@@ -138,7 +138,7 @@ protected:
 
 	static bool async_supported (const AST::Interface& itf) noexcept;
 	static AST::Identifier make_poller_name (const AST::Interface& itf);
-	bool make_async_repository_id (const AST::Interface& itf, const AST::Identifier& async_name, std::string& id);
+	std::string make_async_repository_id (const AST::Interface& itf, const AST::Identifier& async_name);
 
 	struct AsyncBase
 	{

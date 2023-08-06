@@ -748,9 +748,10 @@ Identifier CodeGenBase::make_poller_name (const Interface& itf)
 	return Identifier (std::move (static_cast <Identifier&> (name)));
 }
 
-bool CodeGenBase::make_async_repository_id (const Interface& itf, const Identifier& async_name, std::string& id)
+std::string CodeGenBase::make_async_repository_id (const Interface& itf, const Identifier& async_name)
 {
 	std::string rep_id = itf.repository_id ();
+	bool error = true;
 	size_t name_end = rep_id.rfind (':');
 	if (name_end != std::string::npos) {
 		size_t name_begin = rep_id.rfind ('/', name_end);
@@ -759,12 +760,15 @@ bool CodeGenBase::make_async_repository_id (const Interface& itf, const Identifi
 			size_t name_len = name_end - name_begin;
 			if (itf.name () == rep_id.substr (name_begin, name_len).c_str ()) {
 				rep_id.replace (name_begin, name_len, async_name);
-				return true;
+				error = false;
 			}
 		}
 	}
-	message (itf, MessageType::ERROR, "Can not generate repository id for " + async_name + " from \"" + rep_id + '\"');
-	return false;
+	if (error) {
+		message (itf, MessageType::ERROR, "Can not generate repository id for " + async_name + " from \"" + rep_id + '\"');
+		rep_id.clear ();
+	}
+	return rep_id;
 }
 
 CodeGenBase::AsyncBases CodeGenBase::get_poller_bases (const Interface& itf)

@@ -459,8 +459,7 @@ void Servant::end (const ValueType& vt)
 		h_ << empty_line
 			<< "template <class S>\n"
 			"class Aggregated <S, " << QName (vt) << "> :\n"
-			<< indent
-			<< "public ValueTraits <S>,\n";
+			<< indent;
 
 		if (concrete_itf && concrete_itf->interface_kind () != InterfaceKind::PSEUDO)
 			h_ << "public ValueImplBase <S, ValueBase>,\n";
@@ -469,10 +468,14 @@ void Servant::end (const ValueType& vt)
 
 		h_ << "public ValueImpl <S, " << QName (vt) << ">,\n";
 
-		if (vt.modifier () != ValueType::Modifier::ABSTRACT)
-			h_ << "public ValueBaseFactory <" << QName (vt) << ">,\n";
-		else
-			h_ << "public ValueBaseNoFactory,\n";
+		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
+			h_ << "public ValueBaseCopy <S>,\n"
+				"public ValueBaseFactory <" << QName (vt) << ">,\n"
+				"public ValueBaseMarshal <S>,\n";
+		} else {
+			h_ << "public ValueBaseNoCopy,\n"
+				"public ValueBaseNoFactory,\n";
+		}
 
 		if (vt.modifier () == ValueType::Modifier::TRUNCATABLE)
 			h_ << "public ValueTruncatable <&" << TC_Name (*vt.bases ().front ()) << ">\n";
@@ -498,11 +501,6 @@ void Servant::end (const ValueType& vt)
 
 		h_ << ">::find (static_cast <S&> (*this), id);\n"
 			<< unindent << "}\n";
-
-		if (vt.modifier () == ValueType::Modifier::ABSTRACT) {
-			h_ << "using ValueBaseNoFactory::__marshal;\n"
-				"using ValueBaseNoFactory::__unmarshal;\n";
-		}
 
 		h_ << unindent << "};\n"; // End Aggregated
 
@@ -1058,9 +1056,9 @@ void Servant::generate_poller (const Interface& itf)
 			<< "template <class S>\n"
 			"class Aggregated <S, " << ParentName (itf) << id << "> :\n"
 			<< indent
-			<< "public ValueTraits <S>,\n"
+			<< "public ValueImpl <S, ValueBase>,\n"
 			"public ValueImpl <S, " << ParentName (itf) << id << ">,\n"
-			"public ValueImpl <S, ValueBase>,\n"
+			"public ValueBaseNoCopy,\n"
 			"public ValueBaseNoFactory,\n"
 			"public ValueNonTruncatable\n"
 			<< unindent <<
@@ -1079,8 +1077,6 @@ void Servant::generate_poller (const Interface& itf)
 		}
 		h_ << ", ::Messaging::Poller, Pollable>::find (static_cast <S&> (*this), id);\n"
 			<< unindent << "}\n"
-			"using ValueBaseNoFactory::__marshal;\n"
-			"using ValueBaseNoFactory::__unmarshal;\n"
-		<< unindent << "};\n"; // End Aggregated
+			<< unindent << "};\n"; // End Aggregated
 	}
 }

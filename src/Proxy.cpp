@@ -826,14 +826,6 @@ void Proxy::end (const ValueType& vt)
 	cpp_ << ">\n"
 		"{};\n";
 
-	if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
-		cpp_ << "\ntemplate <>\n"
-			"Interface* ValueBaseFactory <" << QName (vt) << ">::__factory (Bridge <ValueBase>*, Interface*)\n"
-			"{\n" << indent <<
-			"return ValueFactoryImpl <" << QName (vt) << ">::factory_base ();\n"
-			<< unindent << "}\n";
-	}
-
 	cpp_.namespace_close ();
 	cpp_ << "NIRVANA_EXPORT (" << export_name (vt) << ", CORBA::Internal::RepIdOf <" << QName (vt) << ">::id, CORBA"
 	<< (vt.modifier () != ValueType::Modifier::ABSTRACT ?

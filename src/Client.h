@@ -187,6 +187,8 @@ private:
 
 	void generate_poller (const AST::Interface& itf);
 
+	void environment_poller (const AST::Raises& raises);
+
 private:
 	Header h_; // .h file
 	Code cpp_; // .cpp file.

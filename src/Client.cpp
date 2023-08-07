@@ -988,6 +988,33 @@ void Client::environment (const Raises& raises)
 	}
 }
 
+void Client::environment_poller (const Raises& raises)
+{
+	h_ << "EnvironmentEx < ";
+	if (!raises.empty ()) {
+		bool wrong_transaction_found = false;
+		for (auto exc : raises) {
+			const ItemScope* parent = exc->parent ();
+			if (parent && parent->kind () == Item::Kind::MODULE && parent->name () == "CORBA"
+				&& exc->name () == "WrongTransaction") {
+				wrong_transaction_found = true;
+				break;
+			}
+		}
+
+		auto it = raises.begin ();
+		h_ << QName (**it);
+		for (++it; it != raises.end (); ++it) {
+			h_ << ", " << QName (**it);
+		}
+		if (!wrong_transaction_found)
+			h_ << ", " << Namespace ("CORBA") << "WrongTransaction";
+	} else
+		h_ << Namespace ("CORBA") << "WrongTransaction";
+
+	h_ << "> _env;\n";
+}
+
 Code& operator << (Code& stm, const Client::ConstType& ct)
 {
 	const Type& t = ct.c.dereference_type ();
@@ -2303,7 +2330,7 @@ void Client::generate_poller (const Interface& itf)
 			h_ << "void Client <T, " << ParentName (itf) << id << ">::" << PollerSignature (op) << "\n"
 				"{\n" << indent;
 
-			environment (op.raises ());
+			environment_poller (op.raises ());
 			h_ << "Bridge < " << ParentName (itf) << id << ">& _b (T::_get_bridge (_env));\n";
 
 			h_ << "(_b._epv ().epv." << op.name () << ") (&_b, &" AMI_TIMEOUT;
@@ -2332,7 +2359,7 @@ void Client::generate_poller (const Interface& itf)
 				<< Param (att, Parameter::Attribute::OUT) << " " AMI_RETURN_VAL ")\n"
 				"{\n" << indent;
 
-			environment (att.getraises ());
+			environment_poller (att.getraises ());
 			h_ << "Bridge < " << ParentName (itf) << id << ">& _b (T::_get_bridge (_env));\n"
 				"(_b._epv ().epv.get_" << att.name () << ") (&_b, &" AMI_TIMEOUT ", &" AMI_RETURN_VAL ", &_env); \n"
 				"_env.check ();\n"
@@ -2344,7 +2371,7 @@ void Client::generate_poller (const Interface& itf)
 					<< Param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " " AMI_TIMEOUT ")\n"
 					"{\n" << indent;
 
-				environment (att.setraises ());
+				environment_poller (att.setraises ());
 				h_ << "Bridge < " << ParentName (itf) << id << ">& _b (T::_get_bridge (_env));\n"
 					"(_b._epv ().epv.set_" << att.name () << ") (&_b, &" AMI_TIMEOUT ", &_env);\n"
 					"_env.check ();\n"

@@ -975,15 +975,8 @@ void Client::environment (const Raises& raises)
 {
 	if (raises.empty ())
 		h_ << "Environment _env;\n";
-	else {
-		h_ << "EnvironmentEx < ";
-		auto it = raises.begin ();
-		h_ << QName (**it);
-		for (++it; it != raises.end (); ++it) {
-			h_ << ", " << QName (**it);
-		}
-		h_ << "> _env;\n";
-	}
+	else
+		h_ << "EnvironmentEx <" << raises << "> _env;\n";
 }
 
 void Client::environment_poller (const Raises& raises)

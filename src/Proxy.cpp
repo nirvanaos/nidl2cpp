@@ -552,39 +552,34 @@ void Proxy::generate_proxy (const Interface& itf)
 
 	cpp_ << "\n"
 		"template <>\n"
-		"class Proxy <" << QName (itf) << "> : public " << proxy_base << " <" << QName (itf) << '>'
-		<< indent;
+		"class Proxy <" << QName (itf) << "> : public " << proxy_base << " <" << QName (itf);
 
 	Interfaces bases = itf.get_all_bases ();
-
 	for (auto p : bases) {
-		cpp_ << ",\n"
-			"public ProxyBaseInterface <" << QName (*p) << '>';
+		cpp_ << ", " << QName (*p);
 	}
+
+	cpp_ << '>'
+		<< indent;
+
 	cpp_ << unindent
 		<< "\n{\n"
 		<< indent
-		<< "typedef " << proxy_base << " <" << QName (itf) << "> Base;\n\n"
+		<< "typedef " << proxy_base << " <" << QName (itf);
+	for (auto p : bases) {
+		cpp_ << ", " << QName (*p);
+	}
+	cpp_ << "> Base;\n\n"
 		<< unindent
 		<< "public:\n"
 		<< indent
 
 		// Constructor
-		<< "Proxy (IOReference::_ptr_type proxy_manager, uint16_t interface_idx, Interface*& servant) :\n"
+		<< "Proxy (Object::_ptr_type obj, AbstractBase::_ptr_type ab, IOReference::_ptr_type proxy_manager, uint16_t interface_idx, Interface*& servant) :\n"
 		<< indent
-		<< "Base (proxy_manager, interface_idx, servant)\n"
+		<< "Base (obj, ab, proxy_manager, interface_idx, servant)\n"
 		<< unindent
-		<< '{';
-	if (!bases.empty ()) {
-		cpp_ << std::endl;
-		cpp_.indent ();
-		cpp_ << "Object::_ptr_type obj = static_cast <Object*> (proxy_manager->get_object (RepIdOf <Object>::id));\n";
-		for (auto p : bases) {
-			cpp_ << "ProxyBaseInterface <" << QName (*p) << ">::init (obj);\n";
-		}
-		cpp_.unindent ();
-	}
-	cpp_ << "}\n";
+		<< "{}\n";
 
 	// Operations
 	Metadata metadata;
@@ -942,7 +937,7 @@ void Proxy::generate_poller (const Interface& itf)
 			}
 			cpp_ << ")\n"
 				"{\n" << indent
-				<< "IORequest::_ref_type _reply = get_reply <" << op.raises () << "> (" AMI_TIMEOUT ", " << op_idx << ");\n";
+				<< "IORequest::_ref_type _reply = _get_reply <" << op.raises () << "> (" AMI_TIMEOUT ", " << op_idx << ");\n";
 
 			for (auto param : op) {
 				if (param->attribute () != Parameter::Attribute::IN)
@@ -960,7 +955,7 @@ void Proxy::generate_poller (const Interface& itf)
 			cpp_ << "void get_" << att.name () << " (ULong " AMI_TIMEOUT ", "
 				<< TypePrefix (att) << "Var& " AMI_RETURN_VAL ")\n"
 				"{\n" << indent
-				<< "IORequest::_ref_type _reply = get_reply <" << att.getraises () << "> (" AMI_TIMEOUT ", " << op_idx << ");\n"
+				<< "IORequest::_ref_type _reply = _get_reply <" << att.getraises () << "> (" AMI_TIMEOUT ", " << op_idx << ");\n"
 				<< TypePrefix (att) << "unmarshal (_reply, " AMI_RETURN_VAL ");\n";
 
 			cpp_ << unindent << "}\n";
@@ -969,7 +964,7 @@ void Proxy::generate_poller (const Interface& itf)
 			if (!att.readonly ()) {
 				cpp_ << "void set_" << att.name () << " (ULong " AMI_TIMEOUT ")\n"
 					"{\n" << indent
-					<< "IORequest::_ref_type _reply = get_reply <" << att.setraises () << "> (" AMI_TIMEOUT ", " << op_idx << ");\n";
+					<< "IORequest::_ref_type _reply = _get_reply <" << att.setraises () << "> (" AMI_TIMEOUT ", " << op_idx << ");\n";
 				cpp_ << unindent << "}\n";
 				++op_idx;
 			}

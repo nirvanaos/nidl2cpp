@@ -222,351 +222,14 @@ void Proxy::end (const Interface& itf)
 	if (itf.interface_kind () == InterfaceKind::PSEUDO)
 		return;
 
-	cpp_.namespace_open ("CORBA/Internal");
-	cpp_.empty_line ();
-	type_code_name (itf);
-
-	bool stateless = is_stateless (itf);
-
-	bool local_stateless = stateless && (itf.interface_kind () == InterfaceKind::LOCAL);
-
-	const char* proxy_base = stateless ? "ProxyBaseStateless" : "ProxyBase";
-
-	cpp_ << "\n"
-		"template <>\n"
-		"class Proxy <" << QName (itf) << "> : public " << proxy_base << " <" << QName (itf) << '>'
-		<< indent;
-
-	Interfaces bases = itf.get_all_bases ();
-
-	for (auto p : bases) {
-		cpp_ << ",\n"
-			"public ProxyBaseInterface <" << QName (*p) << '>';
-	}
-	cpp_ << unindent
-		<< "\n{\n"
-		<< indent
-		<< "typedef " << proxy_base << " <" << QName (itf) << "> Base;\n\n"
-		<< unindent
-		<< "public:\n"
-		<< indent
-
-		// Constructor
-		<< "Proxy (IOReference::_ptr_type proxy_manager, uint16_t interface_idx, Interface*& servant) :\n"
-		<< indent
-		<< "Base (proxy_manager, interface_idx, servant)\n"
-		<< unindent
-		<< '{';
-	if (!bases.empty ()) {
-		cpp_ << std::endl;
-		cpp_.indent ();
-		cpp_ << "Object::_ptr_type obj = static_cast <Object*> (proxy_manager->get_object (RepIdOf <Object>::id));\n";
-		for (auto p : bases) {
-			cpp_ << "ProxyBaseInterface <" << QName (*p) << ">::init (obj);\n";
-		}
-		cpp_.unindent ();
-	}
-	cpp_ << "}\n";
-
-	// Operations
-	Metadata metadata;
-	for (auto it = itf.begin (); it != itf.end (); ++it) {
-		const Item& item = **it;
-		switch (item.kind ()) {
-
-			case Item::Kind::OPERATION: {
-				const Operation& op = static_cast <const Operation&> (item);
-				
-				implement (op, local_stateless);
-
-				metadata.emplace_back ();
-				OpMetadata& op_md = metadata.back ();
-				op_md.name = op.name ();
-				// Escape fault tolerance FT_HB operation.
-				if (op.name () == "FT_HB")
-					op_md.name.insert (0, 1, '_');
-				op_md.type = &op;
-				op_md.raises = &op.raises ();
-				op_md.context = &op.context ();
-				get_parameters (op, op_md.params_in, op_md.params_out);
-
-				cpp_ << ServantOp (op) << " const";
-				if (is_custom (op)) {
-					cpp_ << ";\n"
-						"static const UShort " PREFIX_OP_IDX << static_cast <const std::string&> (op.name ())
-						<< " = " << (metadata.size () - 1) << ";\n";
-				} else {
-					
-					cpp_ << "\n{\n" << indent;
-
-					if (stateless) {
-						if (!local_stateless)
-							cpp_ << "if (servant ())\n" << indent;
-							
-						if (op.tkind () != Type::Kind::VOID)
-							cpp_ << "return ";
-						cpp_ << "servant ()->" << op.name () << " (";
-						{
-							auto it = op.begin ();
-							if (it != op.end ()) {
-								cpp_ << (*it)->name ();
-								for (++it; it != op.end (); ++it) {
-									cpp_ << ", " << (*it)->name ();
-								}
-							}
-						}
-						cpp_ << ");\n";
-
-						if (!local_stateless)
-							cpp_ << unindent << "else {\n" << indent;
-					}
-
-					if (!local_stateless) {
-						// Create request
-						cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
-							<< (metadata.size () - 1) << "), " << (op.oneway () ? "0" : "3") << ", nullptr);\n";
-
-						// Marshal input
-						for (auto p : op_md.params_in) {
-							cpp_ << TypePrefix (*p) << "marshal_in (" << p->name () << ", _call);\n";
-						}
-
-						// Call
-						assert (!op.oneway () || (op_md.params_out.empty () && op.tkind () == Type::Kind::VOID));
-
-						cpp_ << "_call->invoke ();\n";
-
-						if (!op.oneway ()) {
-
-							cpp_ << "check_request (_call);\n";
-
-							// Unmarshal output
-
-							for (auto p : op_md.params_out) {
-								cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";
-							}
-							if (op.tkind () != Type::Kind::VOID) {
-								cpp_ << Var (op) << " _ret;\n"
-									<< TypePrefix (op) << "unmarshal (_call, _ret);\n";
-							}
-							cpp_ << "_call->unmarshal_end ();\n";
-
-							if (op.tkind () != Type::Kind::VOID)
-								cpp_ << "return _ret;\n";
-						}
-
-						if (stateless)
-							cpp_ << unindent << "}\n";
-					}
-
-					cpp_ << unindent << "}\n\n";
-				}
-			} break;
-
-			case Item::Kind::ATTRIBUTE: {
-				const Attribute& att = static_cast <const Attribute&> (item);
-
-				implement (att, local_stateless);
-
-				metadata.emplace_back ();
-				{
-					OpMetadata& op_md = metadata.back ();
-					op_md.name = "_get_";
-					op_md.name += att.name ();
-					op_md.type = &att;
-					op_md.raises = &att.getraises ();
-					op_md.context = nullptr;
-				}
-
-				bool custom = is_native (att);
-
-				cpp_ << VRet (att) << ' ' << att.name () << " () const";
-				if (custom) {
-					cpp_ << ";\n"
-						"static const UShort " PREFIX_OP_IDX "_get_" << static_cast <const std::string&> (att.name ())
-						<< " = " << (metadata.size () - 1) << ";\n";
-				} else {
-
-					cpp_ << "\n{\n" << indent;
-
-					if (stateless) {
-						if (!local_stateless)
-							cpp_ << "if (servant ())\n" << indent;
-
-						cpp_ << "return servant ()->" << att.name () << " ();\n";
-						
-						if (!local_stateless)
-							cpp_ << unindent << "else {\n" << indent;
-					}
-
-					if (!local_stateless) {
-						cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
-							<< (metadata.size () - 1) << "), 3, nullptr);\n"
-							"_call->invoke ();\n"
-							"check_request (_call);\n"
-
-							<< Var (att) << " _ret;\n"
-							<< TypePrefix (att) << "unmarshal (_call, _ret);\n"
-							"return _ret;\n";
-
-						if (stateless)
-							cpp_ << unindent << "}\n";
-					}
-
-					cpp_ << unindent << "}\n\n";
-				}
-
-				if (!att.readonly ()) {
-
-					metadata.emplace_back ();
-					{
-						OpMetadata& op_md = metadata.back ();
-						op_md.name = "_set_";
-						op_md.name += att.name ();
-						op_md.type = nullptr;
-						op_md.raises = &att.setraises ();
-						op_md.context = nullptr;
-						op_md.params_in.push_back (&att);
-					}
-
-					cpp_ << "void " << att.name () << " (" << ServantParam (att) << " val) const";
-					if (custom) {
-						cpp_ << ";\n"
-							"static const UShort " PREFIX_OP_IDX "_set_" << static_cast <const std::string&> (att.name ())
-							<< " = " << (metadata.size () - 1) << ";\n";
-					} else {
-
-						cpp_ << "\n{\n" << indent;
-
-						if (stateless) {
-							if (!local_stateless)
-								cpp_ << "if (servant ())\n" << indent;
-
-							cpp_ << "servant ()->" << att.name () << " (val);\n";
-							
-							if (!local_stateless)
-								cpp_ << unindent << "else {\n" << indent;
-						}
-
-						if (!local_stateless) {
-							cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
-								<< (metadata.size () - 1) << "), 3, nullptr);\n"
-								<< TypePrefix (att) << "marshal_in (val, _call);\n"
-								"_call->invoke ();\n"
-								"check_request (_call);\n";
-
-							if (stateless)
-								cpp_ << unindent << "}\n";
-						}
-
-						cpp_ << unindent << "}\n\n";
-					}
-				}
-			} break;
-		}
-	}
-
-	cpp_ << "static const char* const __interfaces [];\n";
-	if (!metadata.empty ())
-		cpp_ << "static const Operation __operations [];\n";
-
-	cpp_ << unindent << "};\n\n";
-
-	if (!metadata.empty ()) {
-
-		for (const auto& op : metadata) {
-
-			if (!op.params_in.empty ()) {
-				cpp_ << "const Parameter Proxy <" << QName (itf) << ">::" PREFIX_OP_PARAM_IN << op.name
-					<< " [" << op.params_in.size () << "] = {\n";
-				if (op.type) {
-					md_members (op.params_in);
-				} else {
-					// _set_ operation
-					assert (op.params_in.size () == 1);
-					cpp_.indent ();
-					md_member (*op.params_in.front (), std::string ());
-					cpp_ << std::endl
-						<< unindent;
-				}
-				cpp_ << "};\n";
-			}
-
-			if (!op.params_out.empty ()) {
-				cpp_ << "const Parameter Proxy <" << QName (itf) << ">::" PREFIX_OP_PARAM_OUT << op.name
-					<< " [" << op.params_out.size () << "] = {\n";
-				md_members (op.params_out);
-				cpp_ << "};\n";
-			}
-
-			if (!op.raises->empty ()) {
-				cpp_ << "const TypeCodeImport* const Proxy <" << QName(itf) << ">::" PREFIX_OP_RAISES << op.name
-					<< " [" << op.raises->size() << "] = {\n";
-				auto it = op.raises->begin();
-				cpp_ << '&' << TC_Name(**it);
-				for (++it; it != op.raises->end(); ++it) {
-					cpp_ << ",\n"
-						"&" << TC_Name(**it);
-				}
-				cpp_ << std::endl;
-				cpp_ << "};\n";
-			}
-
-			if (op.context && !op.context->empty ()) {
-				cpp_ << "const Char* const Proxy <" << QName(itf) << ">::" PREFIX_OP_CONTEXT << op.name
-					<< " [" << op.context->size() << "] = {\n";
-				auto it = op.context->begin();
-				cpp_ << '"' << *it << '"';
-				for (++it; it != op.context->end(); ++it) {
-					cpp_ << ",\n"
-						"\"" << *it << '"';
-				}
-				cpp_ << std::endl;
-				cpp_ << "};\n";
-			}
-		}
-
-		cpp_ << "const Operation Proxy <" << QName (itf) << ">::__operations [" << metadata.size () << "] = {\n"
-			<< indent;
-
-		auto it = metadata.cbegin ();
-		md_operation (itf, *it, local_stateless);
-		for (++it; it != metadata.cend (); ++it) {
-			cpp_ << ",\n";
-			md_operation (itf, *it, local_stateless);
-		}
-
-		cpp_ << unindent
-			<< "\n};\n";
-	}
-
-	cpp_ << "const Char* const Proxy <" << QName (itf) << ">::__interfaces [] = {\n"
-		<< indent
-		<< "RepIdOf <" << QName (itf) << ">::id";
-	for (auto p : bases) {
-		cpp_ << ",\n"
-			<< "RepIdOf <" << QName (*p) << ">::id";
-	}
-	cpp_ << unindent << "\n};\n"
-
-		<< "template <>\n"
-		"const InterfaceMetadata MetadataOf <" << QName (itf) << ">::metadata_ = {\n"
-		<< indent
-		<< "{Proxy <" << QName (itf) << ">::__interfaces, countof (Proxy <" << QName (itf) << ">::__interfaces)},\n";
-	if (metadata.empty ())
-		cpp_ << "{nullptr, 0},\n";
-	else
-		cpp_ << "{Proxy <" << QName (itf) << ">::__operations, countof (Proxy <" << QName (itf) << ">::__operations)},\n";
-	cpp_ << (local_stateless ? "InterfaceMetadata::FLAG_LOCAL_STATELESS" : "0");
-	cpp_ << "\n" << unindent << "};\n";
+	generate_proxy (itf);
+	if (async_supported (itf))
+		generate_poller (itf);
 
 	cpp_.namespace_close ();
 	cpp_ << "NIRVANA_EXPORT (" << export_name (itf) << ", CORBA::Internal::RepIdOf <" << QName (itf)
 		<< ">::id, CORBA::Internal::PseudoBase, CORBA::Internal::ProxyFactoryImpl"
 		<< " <" << QName (itf) << ">)\n";
-
-	if (async_supported (itf))
-		generate_poller (itf);
 }
 
 void Proxy::md_operation (const Interface& itf, const OpMetadata& op, bool no_rq)
@@ -875,6 +538,346 @@ void Proxy::leaf (const Union& item)
 	exp (item) << "TypeCodeUnion <" << QName (item) << ">)\n";
 }
 
+void Proxy::generate_proxy (const Interface& itf)
+{
+	cpp_.namespace_open ("CORBA/Internal");
+	cpp_.empty_line ();
+	type_code_name (itf);
+
+	bool stateless = is_stateless (itf);
+
+	bool local_stateless = stateless && (itf.interface_kind () == InterfaceKind::LOCAL);
+
+	const char* proxy_base = stateless ? "ProxyBaseStateless" : "ProxyBase";
+
+	cpp_ << "\n"
+		"template <>\n"
+		"class Proxy <" << QName (itf) << "> : public " << proxy_base << " <" << QName (itf) << '>'
+		<< indent;
+
+	Interfaces bases = itf.get_all_bases ();
+
+	for (auto p : bases) {
+		cpp_ << ",\n"
+			"public ProxyBaseInterface <" << QName (*p) << '>';
+	}
+	cpp_ << unindent
+		<< "\n{\n"
+		<< indent
+		<< "typedef " << proxy_base << " <" << QName (itf) << "> Base;\n\n"
+		<< unindent
+		<< "public:\n"
+		<< indent
+
+		// Constructor
+		<< "Proxy (IOReference::_ptr_type proxy_manager, uint16_t interface_idx, Interface*& servant) :\n"
+		<< indent
+		<< "Base (proxy_manager, interface_idx, servant)\n"
+		<< unindent
+		<< '{';
+	if (!bases.empty ()) {
+		cpp_ << std::endl;
+		cpp_.indent ();
+		cpp_ << "Object::_ptr_type obj = static_cast <Object*> (proxy_manager->get_object (RepIdOf <Object>::id));\n";
+		for (auto p : bases) {
+			cpp_ << "ProxyBaseInterface <" << QName (*p) << ">::init (obj);\n";
+		}
+		cpp_.unindent ();
+	}
+	cpp_ << "}\n";
+
+	// Operations
+	Metadata metadata;
+	for (auto it = itf.begin (); it != itf.end (); ++it) {
+		const Item& item = **it;
+		switch (item.kind ()) {
+
+		case Item::Kind::OPERATION: {
+			const Operation& op = static_cast <const Operation&> (item);
+
+			implement (op, local_stateless);
+
+			metadata.emplace_back ();
+			OpMetadata& op_md = metadata.back ();
+			op_md.name = op.name ();
+			// Escape fault tolerance FT_HB operation.
+			if (op.name () == "FT_HB")
+				op_md.name.insert (0, 1, '_');
+			op_md.type = &op;
+			op_md.raises = &op.raises ();
+			op_md.context = &op.context ();
+			get_parameters (op, op_md.params_in, op_md.params_out);
+
+			cpp_ << ServantOp (op) << " const";
+			if (is_custom (op)) {
+				cpp_ << ";\n"
+					"static const UShort " PREFIX_OP_IDX << static_cast <const std::string&> (op.name ())
+					<< " = " << (metadata.size () - 1) << ";\n";
+			} else {
+
+				cpp_ << "\n{\n" << indent;
+
+				if (stateless) {
+					if (!local_stateless)
+						cpp_ << "if (servant ())\n" << indent;
+
+					if (op.tkind () != Type::Kind::VOID)
+						cpp_ << "return ";
+					cpp_ << "servant ()->" << op.name () << " (";
+					{
+						auto it = op.begin ();
+						if (it != op.end ()) {
+							cpp_ << (*it)->name ();
+							for (++it; it != op.end (); ++it) {
+								cpp_ << ", " << (*it)->name ();
+							}
+						}
+					}
+					cpp_ << ");\n";
+
+					if (!local_stateless)
+						cpp_ << unindent << "else {\n" << indent;
+				}
+
+				if (!local_stateless) {
+					// Create request
+					cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
+						<< (metadata.size () - 1) << "), " << (op.oneway () ? "0" : "3") << ", nullptr);\n";
+
+					// Marshal input
+					for (auto p : op_md.params_in) {
+						cpp_ << TypePrefix (*p) << "marshal_in (" << p->name () << ", _call);\n";
+					}
+
+					// Call
+					assert (!op.oneway () || (op_md.params_out.empty () && op.tkind () == Type::Kind::VOID));
+
+					cpp_ << "_call->invoke ();\n";
+
+					if (!op.oneway ()) {
+
+						cpp_ << "check_request (_call);\n";
+
+						// Unmarshal output
+
+						for (auto p : op_md.params_out) {
+							cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";
+						}
+						if (op.tkind () != Type::Kind::VOID) {
+							cpp_ << Var (op) << " _ret;\n"
+								<< TypePrefix (op) << "unmarshal (_call, _ret);\n";
+						}
+						cpp_ << "_call->unmarshal_end ();\n";
+
+						if (op.tkind () != Type::Kind::VOID)
+							cpp_ << "return _ret;\n";
+					}
+
+					if (stateless)
+						cpp_ << unindent << "}\n";
+				}
+
+				cpp_ << unindent << "}\n\n";
+			}
+		} break;
+
+		case Item::Kind::ATTRIBUTE: {
+			const Attribute& att = static_cast <const Attribute&> (item);
+
+			implement (att, local_stateless);
+
+			metadata.emplace_back ();
+			{
+				OpMetadata& op_md = metadata.back ();
+				op_md.name = "_get_";
+				op_md.name += att.name ();
+				op_md.type = &att;
+				op_md.raises = &att.getraises ();
+				op_md.context = nullptr;
+			}
+
+			bool custom = is_native (att);
+
+			cpp_ << VRet (att) << ' ' << att.name () << " () const";
+			if (custom) {
+				cpp_ << ";\n"
+					"static const UShort " PREFIX_OP_IDX "_get_" << static_cast <const std::string&> (att.name ())
+					<< " = " << (metadata.size () - 1) << ";\n";
+			} else {
+
+				cpp_ << "\n{\n" << indent;
+
+				if (stateless) {
+					if (!local_stateless)
+						cpp_ << "if (servant ())\n" << indent;
+
+					cpp_ << "return servant ()->" << att.name () << " ();\n";
+
+					if (!local_stateless)
+						cpp_ << unindent << "else {\n" << indent;
+				}
+
+				if (!local_stateless) {
+					cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
+						<< (metadata.size () - 1) << "), 3, nullptr);\n"
+						"_call->invoke ();\n"
+						"check_request (_call);\n"
+
+						<< Var (att) << " _ret;\n"
+						<< TypePrefix (att) << "unmarshal (_call, _ret);\n"
+						"return _ret;\n";
+
+					if (stateless)
+						cpp_ << unindent << "}\n";
+				}
+
+				cpp_ << unindent << "}\n\n";
+			}
+
+			if (!att.readonly ()) {
+
+				metadata.emplace_back ();
+				{
+					OpMetadata& op_md = metadata.back ();
+					op_md.name = "_set_";
+					op_md.name += att.name ();
+					op_md.type = nullptr;
+					op_md.raises = &att.setraises ();
+					op_md.context = nullptr;
+					op_md.params_in.push_back (&att);
+				}
+
+				cpp_ << "void " << att.name () << " (" << ServantParam (att) << " val) const";
+				if (custom) {
+					cpp_ << ";\n"
+						"static const UShort " PREFIX_OP_IDX "_set_" << static_cast <const std::string&> (att.name ())
+						<< " = " << (metadata.size () - 1) << ";\n";
+				} else {
+
+					cpp_ << "\n{\n" << indent;
+
+					if (stateless) {
+						if (!local_stateless)
+							cpp_ << "if (servant ())\n" << indent;
+
+						cpp_ << "servant ()->" << att.name () << " (val);\n";
+
+						if (!local_stateless)
+							cpp_ << unindent << "else {\n" << indent;
+					}
+
+					if (!local_stateless) {
+						cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
+							<< (metadata.size () - 1) << "), 3, nullptr);\n"
+							<< TypePrefix (att) << "marshal_in (val, _call);\n"
+							"_call->invoke ();\n"
+							"check_request (_call);\n";
+
+						if (stateless)
+							cpp_ << unindent << "}\n";
+					}
+
+					cpp_ << unindent << "}\n\n";
+				}
+			}
+		} break;
+		}
+	}
+
+	cpp_ << "static const char* const __interfaces [];\n";
+	if (!metadata.empty ())
+		cpp_ << "static const Operation __operations [];\n";
+
+	cpp_ << unindent << "};\n\n";
+
+	if (!metadata.empty ()) {
+
+		for (const auto& op : metadata) {
+
+			if (!op.params_in.empty ()) {
+				cpp_ << "const Parameter Proxy <" << QName (itf) << ">::" PREFIX_OP_PARAM_IN << op.name
+					<< " [" << op.params_in.size () << "] = {\n";
+				if (op.type) {
+					md_members (op.params_in);
+				} else {
+					// _set_ operation
+					assert (op.params_in.size () == 1);
+					cpp_.indent ();
+					md_member (*op.params_in.front (), std::string ());
+					cpp_ << std::endl
+						<< unindent;
+				}
+				cpp_ << "};\n";
+			}
+
+			if (!op.params_out.empty ()) {
+				cpp_ << "const Parameter Proxy <" << QName (itf) << ">::" PREFIX_OP_PARAM_OUT << op.name
+					<< " [" << op.params_out.size () << "] = {\n";
+				md_members (op.params_out);
+				cpp_ << "};\n";
+			}
+
+			if (!op.raises->empty ()) {
+				cpp_ << "const TypeCodeImport* const Proxy <" << QName (itf) << ">::" PREFIX_OP_RAISES << op.name
+					<< " [" << op.raises->size () << "] = {\n";
+				auto it = op.raises->begin ();
+				cpp_ << '&' << TC_Name (**it);
+				for (++it; it != op.raises->end (); ++it) {
+					cpp_ << ",\n"
+						"&" << TC_Name (**it);
+				}
+				cpp_ << std::endl;
+				cpp_ << "};\n";
+			}
+
+			if (op.context && !op.context->empty ()) {
+				cpp_ << "const Char* const Proxy <" << QName (itf) << ">::" PREFIX_OP_CONTEXT << op.name
+					<< " [" << op.context->size () << "] = {\n";
+				auto it = op.context->begin ();
+				cpp_ << '"' << *it << '"';
+				for (++it; it != op.context->end (); ++it) {
+					cpp_ << ",\n"
+						"\"" << *it << '"';
+				}
+				cpp_ << std::endl;
+				cpp_ << "};\n";
+			}
+		}
+
+		cpp_ << "const Operation Proxy <" << QName (itf) << ">::__operations [" << metadata.size () << "] = {\n"
+			<< indent;
+
+		auto it = metadata.cbegin ();
+		md_operation (itf, *it, local_stateless);
+		for (++it; it != metadata.cend (); ++it) {
+			cpp_ << ",\n";
+			md_operation (itf, *it, local_stateless);
+		}
+
+		cpp_ << unindent
+			<< "\n};\n";
+	}
+
+	cpp_ << "const Char* const Proxy <" << QName (itf) << ">::__interfaces [] = {\n"
+		<< indent
+		<< "RepIdOf <" << QName (itf) << ">::id";
+	for (auto p : bases) {
+		cpp_ << ",\n"
+			<< "RepIdOf <" << QName (*p) << ">::id";
+	}
+	cpp_ << unindent << "\n};\n"
+		<< "template <>\n"
+		"const InterfaceMetadata MetadataOf <" << QName (itf) << ">::metadata_ = {\n"
+		<< indent
+		<< "{Proxy <" << QName (itf) << ">::__interfaces, countof (Proxy <" << QName (itf) << ">::__interfaces)},\n";
+	if (metadata.empty ())
+		cpp_ << "{nullptr, 0},\n";
+	else
+		cpp_ << "{Proxy <" << QName (itf) << ">::__operations, countof (Proxy <" << QName (itf) << ">::__operations)},\n";
+	cpp_ << (local_stateless ? "InterfaceMetadata::FLAG_LOCAL_STATELESS" : "0");
+	cpp_ << "\n" << unindent << "};\n";
+}
+
 void Proxy::generate_poller (const Interface& itf)
 {
 	Identifier id = make_poller_name (itf);
@@ -892,6 +895,92 @@ void Proxy::generate_poller (const Interface& itf)
 		<< ParentName (itf) << id << ">\n"
 		"{};\n";
 
+	cpp_.empty_line ();
+
+	cpp_ << "\n"
+		"template <>\n"
+		"class Poller <" << ParentName (itf) << id << "> : public PollerBase <" << ParentName (itf) << id;
+	
+	AsyncBases bases = get_poller_bases (itf);
+	for (const auto& b : bases) {
+		cpp_ << ", " << ParentName (*b.itf) << b.name;
+	}
+	
+	cpp_ << ">\n"
+		"{\n"
+		<< indent
+		<< "typedef PollerBase <" << ParentName (itf) << id;
+	for (const auto& b : bases) {
+		cpp_ << ", " << ParentName (*b.itf) << b.name;
+	}
+
+	cpp_ << "> Base;\n\n"
+		<< unindent
+		<< "public:\n"
+		<< indent
+
+		// Constructor
+		<< "Poller (ValueBase::_ptr_type vb, Messaging::Poller::_ptr_type aggregate, UShort interface_idx) :\n"
+		<< indent
+		<< "Base (vb, aggregate, interface_idx)\n"
+		<< unindent
+		<< "{}\n";
+
+	// Operations
+	unsigned op_idx = 0;
+	for (auto item : itf) {
+		switch (item->kind ()) {
+
+		case Item::Kind::OPERATION: {
+			const Operation& op = static_cast <const Operation&> (*item);
+			cpp_ << "void " << op.name () << " (ULong " AMI_TIMEOUT;
+			if (op.tkind () != Type::Kind::VOID)
+				cpp_ << ", " << TypePrefix (op) << "Var& " AMI_RETURN_VAL;
+			for (auto param : op) {
+				if (param->attribute () != Parameter::Attribute::IN)
+					cpp_ << ", " << TypePrefix (*param) << "Var& " << param->name ();
+			}
+			cpp_ << ")\n"
+				"{\n" << indent
+				<< "IORequest::_ref_type _reply = get_reply <" << op.raises () << "> (" AMI_TIMEOUT ", " << op_idx << ");\n";
+
+			for (auto param : op) {
+				if (param->attribute () != Parameter::Attribute::IN)
+					cpp_ << TypePrefix (*param) << "unmarshal (_reply, " << param->name () << ");\n";
+			}
+			if (op.tkind () != Type::Kind::VOID)
+				cpp_ << TypePrefix (op) << "unmarshal (_reply, " AMI_RETURN_VAL ");\n";
+
+			cpp_ << unindent << "}\n";
+			++op_idx;
+		} break;
+
+		case Item::Kind::ATTRIBUTE: {
+			const Attribute& att = static_cast <const Attribute&> (*item);
+			cpp_ << "void get_" << att.name () << " (ULong " AMI_TIMEOUT ", "
+				<< TypePrefix (att) << "Var& " AMI_RETURN_VAL ")\n"
+				"{\n" << indent
+				<< "IORequest::_ref_type _reply = get_reply <" << att.getraises () << "> (" AMI_TIMEOUT ", " << op_idx << ");\n"
+				<< TypePrefix (att) << "unmarshal (_reply, " AMI_RETURN_VAL ");\n";
+
+			cpp_ << unindent << "}\n";
+			++op_idx;
+
+			if (!att.readonly ()) {
+				cpp_ << "void set_" << att.name () << " (ULong " AMI_TIMEOUT ")\n"
+					"{\n" << indent
+					<< "IORequest::_ref_type _reply = get_reply <" << att.setraises () << "> (" AMI_TIMEOUT ", " << op_idx << ");\n";
+				cpp_ << unindent << "}\n";
+				++op_idx;
+			}
+		} break;
+
+		}
+	}
+
+	// End of Poller
+	cpp_ << unindent << "};\n";
+
 	cpp_.namespace_close ();
 
 	std::string export_name = "_exp";
@@ -905,6 +994,7 @@ void Proxy::generate_poller (const Interface& itf)
 
 	cpp_ << "NIRVANA_EXPORT (" << export_name << ", CORBA::Internal::RepIdOf <"
 		<< ParentName (itf) << id << ">::id, CORBA"
-			"::TypeCode, CORBA::Internal::TypeCodeValue <"
-			<< ParentName (itf) << id << ">)\n";
+		"::TypeCode, CORBA::Internal::TypeCodeValue <"
+		<< ParentName (itf) << id << ">)\n";
+
 }

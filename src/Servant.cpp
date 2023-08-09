@@ -62,7 +62,7 @@ void Servant::begin (const ValueType& vt)
 
 	const Interface* concrete_itf = get_concrete_supports (vt);
 	if (concrete_itf && concrete_itf->interface_kind () != InterfaceKind::PSEUDO) {
-		h_ << "static Interface* " SKELETON_FUNC_PREFIX "this (Bridge <" << QName (vt) << ">* _b, Interface* _env)\n"
+		h_ << "static Interface* " SKELETON_FUNC_PREFIX "this (Bridge <" << QName (vt) << ">* _b, Interface* _env) noexcept\n"
 			"{\n"
 			<< indent <<
 			"try {\n"
@@ -625,7 +625,7 @@ void Servant::end (const ValueType& vt)
 			for (auto p : *f) {
 				h_ << ", " << ABI_param (*p) << ' ' << p->name ();
 			}
-			h_ << ", Interface* _env)\n"
+			h_ << ", Interface* _env) noexcept\n"
 				"{\n"
 				<< indent
 				<< "try {\n"
@@ -760,7 +760,7 @@ void Servant::leaf (const Operation& op)
 		h_ << ", " << ABI_param (**it) << ' ' << (*it)->name ();
 	}
 
-	h_ << ", Interface* _env)\n"
+	h_ << ", Interface* _env) noexcept\n"
 		"{\n"
 		<< indent
 		<< "try {\n"
@@ -808,7 +808,7 @@ void Servant::attribute (const Member& m)
 	{
 		std::string name = SKELETON_GETTER_PREFIX;
 		name += m.name ();
-		h_ << ' ' << name << " (Bridge <" << QName (itf) << ">* _b, Interface* _env)\n"
+		h_ << ' ' << name << " (Bridge <" << QName (itf) << ">* _b, Interface* _env) noexcept\n"
 			"{\n";
 		epv_.push_back (std::move (name));
 	}
@@ -832,7 +832,7 @@ void Servant::attribute (const Member& m)
 			std::string name = SKELETON_SETTER_PREFIX;
 			name += m.name ();
 			h_ << "static void " << name << " (Bridge <" << QName (itf) << ">* _b, "
-				<< ABI_param (m) << " val, Interface* _env)\n"
+				<< ABI_param (m) << " val, Interface* _env) noexcept\n"
 				"{\n";
 			epv_.push_back (std::move (name));
 		}
@@ -852,7 +852,7 @@ void Servant::attribute (const Member& m)
 			std::string name = SKELETON_MOVE_PREFIX;
 			name += m.name ();
 			h_ << "static void " << name << " (Bridge <" << QName (itf) << ">* _b, "
-				<< ABI_param (m, Parameter::Attribute::INOUT) << " val, Interface* _env)\n"
+				<< ABI_param (m, Parameter::Attribute::INOUT) << " val, Interface* _env) noexcept\n"
 				"{\n";
 			epv_.push_back (std::move (name));
 		}
@@ -973,8 +973,8 @@ void Servant::generate_poller (const Interface& itf)
 			{
 				std::string name = SKELETON_FUNC_PREFIX "get_";
 				name += att.name ();
-				h_ << "static void " << name << " (Bridge <" << ParentName (itf) << id << ">* _b, "
-					<< ABI_param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " " AMI_TIMEOUT ", "
+				h_ << "static void " << name << " (Bridge <" << ParentName (itf) << id << ">* _b,"
+					"ULong " AMI_TIMEOUT ", "
 					<< ABI_param (att, Parameter::Attribute::OUT) << " " AMI_RETURN_VAL ", Interface* _env)\n"
 					"{\n";
 				epv_.push_back (std::move (name));
@@ -994,7 +994,7 @@ void Servant::generate_poller (const Interface& itf)
 					std::string name = SKELETON_FUNC_PREFIX "set_";
 					name += att.name ();
 					h_ << "static void " << name << " (Bridge <" << ParentName (itf) << id << ">* _b, "
-						<< ABI_param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " " AMI_TIMEOUT ", Interface* _env)\n"
+						"ULong " AMI_TIMEOUT ", Interface* _env)\n"
 						"{\n";
 					epv_.push_back (std::move (name));
 				}
@@ -1032,8 +1032,8 @@ void Servant::generate_poller (const Interface& itf)
 		"{ // base\n"
 		<< indent <<
 		"S::template _wide_val <ValueBase, " << ParentName (itf) << id << ">,\n"
-		"S::template _wide_val <::Messaging::Poller, " << ParentName (itf) << id << ">,\n"
-		"S::template _wide_val <Pollable, " << ParentName (itf) << id << ">";
+		"S::template _wide_val <Pollable, " << ParentName (itf) << id << ">,\n"
+		"S::template _wide_val <::Messaging::Poller, " << ParentName (itf) << id << ">";
 
 	const AsyncBases bases = get_poller_bases (itf);
 

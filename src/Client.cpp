@@ -64,17 +64,15 @@ Code& operator << (Code& stm, const Client::Signature& op)
 
 Code& operator << (Code& stm, const Client::PollerSignature& op)
 {
-	stm << op.op.name () << " ("
-		<< Client::Param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " " AMI_TIMEOUT;
+	stm << op.op.name () << " (ULong " AMI_TIMEOUT;
 
 	if (op.op.tkind () != Type::Kind::VOID)
-		stm << ", " << Client::Param (op.op, Parameter::Attribute::OUT) << " " AMI_RETURN_VAL;
+		stm << ", " << TypePrefix (op.op) << "C_out " AMI_RETURN_VAL;
 
 	// inout/out parameters
 	for (auto param : op.op) {
 		if (param->attribute () != Parameter::Attribute::IN)
-			stm << ", " << Client::Param (static_cast <const Type&> (*param), Parameter::Attribute::OUT)
-			<< ' ' << param->name ();
+			stm << ", " << TypePrefix (*param) << "C_out " << param->name ();
 	}
 
 	return stm << ")";
@@ -2304,13 +2302,11 @@ void Client::generate_poller (const Interface& itf)
 		case Item::Kind::ATTRIBUTE: {
 			const Attribute& att = static_cast <const Attribute&> (*item);
 
-			h_ << "void get_" << att.name () << " ("
-				<< Param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " " AMI_TIMEOUT ", "
+			h_ << "void get_" << att.name () << " (ULong " AMI_TIMEOUT ", "
 				<< Param (att, Parameter::Attribute::OUT) << " " AMI_RETURN_VAL ");\n";
 
 			if (!att.readonly ())
-				h_ << "void set_" << att.name () << " ("
-					<< Param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " " AMI_TIMEOUT ");\n";
+				h_ << "void set_" << att.name () << " (ULong " AMI_TIMEOUT ");\n";
 
 		} break;
 		}
@@ -2354,8 +2350,8 @@ void Client::generate_poller (const Interface& itf)
 
 			h_ << "\ntemplate <class T>\n";
 
-			h_ << "void Client <T, " << ParentName (itf) << id << ">::get_" << att.name () << " ("
-				<< Param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " " AMI_TIMEOUT ", "
+			h_ << "void Client <T, " << ParentName (itf) << id << ">::get_" << att.name ()
+				<< " (ULong " AMI_TIMEOUT ", "
 				<< Param (att, Parameter::Attribute::OUT) << " " AMI_RETURN_VAL ")\n"
 				"{\n" << indent;
 
@@ -2367,8 +2363,8 @@ void Client::generate_poller (const Interface& itf)
 
 			if (!att.readonly ()) {
 				h_ << "\ntemplate <class T>\n"
-					"void Client <T, " << ParentName (itf) << id << ">::set_" << att.name () << " ("
-					<< Param (Type (BasicType::ULONG), Parameter::Attribute::IN) << " " AMI_TIMEOUT ")\n"
+					"void Client <T, " << ParentName (itf) << id << ">::set_" << att.name ()
+					<< " (ULong " AMI_TIMEOUT ")\n"
 					"{\n" << indent;
 
 				environment_poller (att.setraises ());

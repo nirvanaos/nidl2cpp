@@ -414,3 +414,16 @@ Code& operator << (Code& stm, const Variant& var)
 
 	return stm;
 }
+
+Code& operator << (Code& stm, const Raises& raises)
+{
+	if (!raises.empty ()) {
+		Raises::const_iterator it = raises.begin ();
+		stm << QName (**it);
+		for (++it; it != raises.end (); ++it) {
+			stm << ", " << QName (**it);
+		}
+	}
+
+	return stm;
+}

@@ -58,21 +58,17 @@ private:
 	void skeleton_begin (const AST::IV_Base& item, const char* suffix = "");
 	void skeleton_end (const AST::IV_Base& item, const char* suffix = "");
 	void epv (bool val_with_concrete_itf = false);
-
+	
 	void servant_param (const AST::Parameter& param)
 	{
 		servant_param (param, param.name (), param.attribute ());
 	}
-
 	void servant_param (const AST::Type& t, const std::string& name, AST::Parameter::Attribute att = AST::Parameter::Attribute::IN);
 
 	void catch_block ();
-
 	void implementation_suffix (const AST::InterfaceKind ik);
 	void implementation_parameters (const AST::Interface& primary, const AST::Interfaces& bases);
-
 	void attribute (const AST::Member& m);
-
 	void generate_poller (const AST::Interface& itf);
 
 	struct AsyncParam

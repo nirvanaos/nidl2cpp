@@ -182,6 +182,7 @@ Code& operator << (Code& stm, const std::string& s)
 Code& operator << (Code& stm, const AST::Identifier& id);
 Code& operator << (Code& stm, const AST::Type& t);
 Code& operator << (Code& stm, const AST::Variant& var);
+Code& operator << (Code& stm, const AST::Raises& raises);
 
 inline Code& indent (Code& stm)
 {

@@ -163,30 +163,18 @@ private:
 	static bool has_check (const AST::Type& type);
 	static bool is_nested (const AST::NamedItem& item);
 	void h_namespace_open (const AST::NamedItem& item);
-
 	void implement_nested_items (const AST::IV_Base& parent);
-
 	void native_itf_template (const AST::Operation& op);
-
 	void bridge_bases (const Bases& bases);
-
 	static size_t version (const std::string& rep_id);
-
 	void assign_union (const AST::Union& item, bool move);
 	void element_case (const AST::UnionElement& el);
-
 	void define_swap (const AST::ItemWithId& item);
-
 	void define_itf_suppl (const AST::Identifier& name);
-
 	void implement_marshaling (const AST::StructBase& item);
-
 	void marshal_union (const AST::Union& u, bool out);
-
 	void CDR_size (const AST::StructBase& item, const char* prefix);
-
 	void generate_poller (const AST::Interface& itf);
-
 	void environment_poller (const AST::Raises& raises);
 
 private:

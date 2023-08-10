@@ -137,7 +137,19 @@ protected:
 	static bool is_custom (const AST::Interface& itf) noexcept;
 
 	static bool async_supported (const AST::Interface& itf) noexcept;
-	static AST::Identifier make_poller_name (const AST::Interface& itf);
+	
+	static AST::Identifier make_async_name (const AST::Interface& itf, const char* suffix);
+
+	static AST::Identifier make_poller_name (const AST::Interface& itf)
+	{
+		return make_async_name (itf, "Poller");
+	}
+
+	static AST::Identifier make_handler_name (const AST::Interface& itf)
+	{
+		return make_async_name (itf, "Handler");
+	}
+
 	std::string make_async_repository_id (const AST::Interface& itf, const AST::Identifier& async_name);
 
 	struct AsyncBase
@@ -153,7 +165,17 @@ protected:
 
 	typedef std::vector <AsyncBase> AsyncBases;
 
-	static AsyncBases get_poller_bases (const AST::Interface& itf);
+	static AsyncBases get_async_bases (const AST::Interface& itf, const char* suffix);
+
+	static AsyncBases get_poller_bases (const AST::Interface& itf)
+	{
+		return get_async_bases (itf, "Poller");
+	}
+
+	static AsyncBases get_handler_bases (const AST::Interface& itf)
+	{
+		return get_async_bases (itf, "Handler");
+	}
 
 private:
 	static bool pred (const char* l, const char* r)

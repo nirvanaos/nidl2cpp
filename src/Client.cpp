@@ -787,8 +787,10 @@ void Client::begin (const Interface& itf)
 void Client::end (const Interface& itf)
 {
 	end_interface (itf);
-	if (async_supported (itf))
+	if (async_supported (itf)) {
 		generate_poller (itf);
+		generate_handler (itf);
+	}
 }
 
 void Client::begin (const ValueType& itf)
@@ -2165,10 +2167,8 @@ void Client::marshal_union (const Union& u, bool out)
 		<< unindent << "}\n";
 }
 
-void Client::generate_poller (const Interface& itf)
+void Client::async_bridge_begin (const AST::Interface& itf, const AST::Identifier& id)
 {
-	Identifier id = make_poller_name (itf);
-
 	h_.namespace_open (itf);
 	h_ << empty_line
 		<< "class " << id << ";\n"
@@ -2216,12 +2216,10 @@ void Client::generate_poller (const Interface& itf)
 	h_.namespace_open ("CORBA/Internal");
 	h_ << empty_line <<
 		"NIRVANA_BRIDGE_BEGIN (" << ParentName (itf) << id << ")\n";
+}
 
-	h_ << "NIRVANA_BASE_ENTRY (ValueBase, CORBA_ValueBase)\n"
-		"NIRVANA_BASE_ENTRY (Pollable, CORBA_Pollable)\n"
-		"NIRVANA_BASE_ENTRY (::Messaging::Poller, Messaging_Poller)\n";
-
-	AsyncBases bases = get_poller_bases (itf);
+void Client::async_bridge_bases (const AsyncBases& bases)
+{
 	for (const auto& b : bases) {
 		std::string proc_name;
 		ScopedName sn = b.itf->scoped_name ();
@@ -2234,16 +2232,27 @@ void Client::generate_poller (const Interface& itf)
 		h_ << "NIRVANA_BASE_ENTRY (" << ParentName (*b.itf) << b.name << ", " << proc_name << ")\n";
 	}
 	h_ << "NIRVANA_BRIDGE_EPV\n";
+}
+
+void Client::generate_poller (const Interface& itf)
+{
+	Identifier id = make_poller_name (itf);
+
+	async_bridge_begin (itf, id);
+
+	h_ << "NIRVANA_BASE_ENTRY (ValueBase, CORBA_ValueBase)\n"
+		"NIRVANA_BASE_ENTRY (Pollable, CORBA_Pollable)\n"
+		"NIRVANA_BASE_ENTRY (::Messaging::Poller, Messaging_Poller)\n";
+
+	AsyncBases bases = get_poller_bases (itf);
+	async_bridge_bases (bases);
 
 	for (auto item : itf) {
 		switch (item->kind ()) {
 
 		case Item::Kind::OPERATION: {
 			const Operation& op = static_cast <const Operation&> (*item);
-			h_ << "void (*" << op.name () << ") (Bridge <" << ParentName (itf) << id << ">*"
-
-				// ami_timeout
-				<< ", " << ABI_param (Type (BasicType::ULONG), Parameter::Attribute::IN);
+			h_ << "void (*" << op.name () << ") (Bridge <" << ParentName (itf) << id << ">*, ULong";
 
 			// ami_return_val
 			if (op.tkind () != Type::Kind::VOID)
@@ -2262,15 +2271,13 @@ void Client::generate_poller (const Interface& itf)
 		case Item::Kind::ATTRIBUTE: {
 			const Attribute& att = static_cast <const Attribute&> (*item);
 
-			h_ << "void (*get_" << att.name () << ") (Bridge <" << ParentName (itf) << id << ">*"
-				<< ", " << ABI_param (Type (BasicType::ULONG), Parameter::Attribute::IN) // ami_timeout
-				<< ", " << ABI_param (att, Parameter::Attribute::OUT) // ami_return_val
+			h_ << "void (*get_" << att.name () << ") (Bridge <" << ParentName (itf) << id << ">*, ULong"
+				", " << ABI_param (att, Parameter::Attribute::OUT) // ami_return_val
 				<< ", Interface*);\n";
 
 			if (!att.readonly ())
-				h_ << "void (*set_" << att.name () << ") (Bridge <" << ParentName (itf) << id << ">*"
-					<< ", " << ABI_param (Type (BasicType::ULONG), Parameter::Attribute::IN) // ami_timeout
-					<< ", Interface*);\n";
+				h_ << "void (*set_" << att.name () << ") (Bridge <" << ParentName (itf) << id
+				<< ">*, ULong, Interface*);\n";
 
 		} break;
 		}
@@ -2384,4 +2391,53 @@ void Client::generate_poller (const Interface& itf)
 		<< ">\n"
 		<< unindent <<
 		"{};\n";
+}
+
+void Client::generate_handler (const Interface& itf)
+{
+	Identifier id = make_handler_name (itf);
+
+	async_bridge_begin (itf, id);
+	h_ << "NIRVANA_BASE_ENTRY (Object, CORBA_Object)\n";
+
+	AsyncBases bases = get_handler_bases (itf);
+	async_bridge_bases (bases);
+
+	for (auto item : itf) {
+		switch (item->kind ()) {
+
+		case Item::Kind::OPERATION: {
+			const Operation& op = static_cast <const Operation&> (*item);
+			h_ << "void (*" << op.name () << ") (Bridge <" << ParentName (itf) << id << ">*";
+
+			// ami_return_val
+			if (op.tkind () != Type::Kind::VOID)
+				h_ << ", " << ABI_param (op, Parameter::Attribute::IN);
+
+			// inout/out parameters
+			for (auto param : op) {
+				if (param->attribute () != Parameter::Attribute::IN)
+					h_ << ", " << ABI_param (*param, Parameter::Attribute::IN);
+			}
+
+			h_ << ", Interface*);\n";
+
+		} break;
+
+		case Item::Kind::ATTRIBUTE: {
+			const Attribute& att = static_cast <const Attribute&> (*item);
+
+			h_ << "void (*get_" << att.name () << ") (Bridge <" << ParentName (itf) << id << ">*"
+				", " << ABI_param (att, Parameter::Attribute::IN) // ami_return_val
+				<< ", Interface*);\n";
+
+			if (!att.readonly ())
+				h_ << "void (*set_" << att.name () << ") (Bridge <" << ParentName (itf) << id
+				<< ">*, Interface*);\n";
+
+		} break;
+		}
+	}
+
+	h_ << "NIRVANA_BRIDGE_END ()\n";
 }

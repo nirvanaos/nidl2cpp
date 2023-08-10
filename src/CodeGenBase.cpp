@@ -738,10 +738,10 @@ bool CodeGenBase::async_supported (const Interface& itf) noexcept
 	return false;
 }
 
-Identifier CodeGenBase::make_poller_name (const Interface& itf)
+Identifier CodeGenBase::make_async_name (const Interface& itf, const char* suffix)
 {
 	const Symbols& scope = *itf.parent ();
-	std::string name = "AMI_" + itf.name () + "Poller";
+	std::string name = "AMI_" + itf.name () + suffix;
 	while (scope.find (static_cast <const Identifier&> (name))) {
 		name.insert (0, "AMI_");
 	}
@@ -771,14 +771,14 @@ std::string CodeGenBase::make_async_repository_id (const Interface& itf, const I
 	return rep_id;
 }
 
-CodeGenBase::AsyncBases CodeGenBase::get_poller_bases (const Interface& itf)
+CodeGenBase::AsyncBases CodeGenBase::get_async_bases (const Interface& itf, const char* suffix)
 {
 	AsyncBases ret;
 	Interfaces base_interfaces = itf.get_all_bases ();
 	ret.reserve (base_interfaces.size ());
 	for (auto b : base_interfaces) {
 		if (async_supported (*b))
-			ret.emplace_back (b, make_poller_name (*b));
+			ret.emplace_back (b, make_async_name (*b, suffix));
 	}
 	return ret;
 }

@@ -875,38 +875,37 @@ void Proxy::generate_proxy (const Interface& itf)
 
 void Proxy::generate_poller (const Interface& itf)
 {
-	Identifier id = make_poller_name (itf);
+	AMI_Name ami (itf, AMI_POLLER);
 
 	cpp_.namespace_open ("CORBA/Internal");
 
 	cpp_ << empty_line
 		<< "template <>\n"
-		"const Char TypeCodeName <" << ParentName (itf) << id << ">::name_ [] = \""
-		<< static_cast <const std::string&> (id) << "\";\n";
+		"const Char TypeCodeName <" << ami << ">::name_ [] = \"" << ami.name << "\";\n";
 
 	cpp_ << empty_line <<
 		"template <>\n"
-		"class TypeCodeValue <" << ParentName (itf) << id << "> : public TypeCodeValueAbstract <"
-		<< ParentName (itf) << id << ">\n"
+		"class TypeCodeValue <" << ami << "> : public TypeCodeValueAbstract <"
+		<< ami << ">\n"
 		"{};\n";
 
 	cpp_.empty_line ();
 
 	cpp_ << "\n"
 		"template <>\n"
-		"class Poller <" << ParentName (itf) << id << "> : public PollerBase <" << ParentName (itf) << id;
+		"class Poller <" << ami << "> : public PollerBase <" << ami;
 	
-	AsyncBases bases = get_poller_bases (itf);
+	AMI_Bases bases = ami.bases ();
 	for (const auto& b : bases) {
-		cpp_ << ", " << ParentName (*b.itf) << b.name;
+		cpp_ << ", " << b;
 	}
 	
 	cpp_ << ">\n"
 		"{\n"
 		<< indent
-		<< "typedef PollerBase <" << ParentName (itf) << id;
+		<< "typedef PollerBase <" << ami;
 	for (const auto& b : bases) {
-		cpp_ << ", " << ParentName (*b.itf) << b.name;
+		cpp_ << ", " << b;
 	}
 
 	cpp_ << "> Base;\n\n"
@@ -985,11 +984,10 @@ void Proxy::generate_poller (const Interface& itf)
 		export_name += *it;
 	}
 	export_name += '_';
-	export_name += id;
+	export_name += ami.name;
 
 	cpp_ << "NIRVANA_EXPORT (" << export_name << ", CORBA::Internal::RepIdOf <"
-		<< ParentName (itf) << id << ">::id, CORBA"
+		<< ami << ">::id, CORBA"
 		"::TypeCode, CORBA::Internal::TypeCodeValue <"
-		<< ParentName (itf) << id << ">)\n";
-
+		<< ami << ">)\n";
 }

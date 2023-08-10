@@ -177,8 +177,8 @@ private:
 	void generate_poller (const AST::Interface& itf);
 	void environment_poller (const AST::Raises& raises);
 	void generate_handler (const AST::Interface& itf);
-	void async_bridge_begin (const AST::Interface& itf, const AST::Identifier& id);
-	void async_bridge_bases (const AsyncBases& bases);
+	void async_bridge_begin (const AMI_Name& ami, bool handler);
+	void async_bridge_bases (const AMI_Bases& bases);
 
 private:
 	Header h_; // .h file

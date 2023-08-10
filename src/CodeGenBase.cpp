@@ -738,19 +738,20 @@ bool CodeGenBase::async_supported (const Interface& itf) noexcept
 	return false;
 }
 
-Identifier CodeGenBase::make_async_name (const Interface& itf, const char* suffix)
+CodeGenBase::AMI_Name::AMI_Name (const Interface& i, const char* suffix) :
+	itf (i),
+	name ("AMI_" + i.name () + suffix),
+	suf (suffix)
 {
-	const Symbols& scope = *itf.parent ();
-	std::string name = "AMI_" + itf.name () + suffix;
+	const Symbols& scope = *i.parent ();
 	while (scope.find (static_cast <const Identifier&> (name))) {
 		name.insert (0, "AMI_");
 	}
-	return Identifier (std::move (static_cast <Identifier&> (name)));
 }
 
-std::string CodeGenBase::make_async_repository_id (const Interface& itf, const Identifier& async_name)
+std::string CodeGenBase::make_async_repository_id (const AMI_Name& async_name)
 {
-	std::string rep_id = itf.repository_id ();
+	std::string rep_id = async_name.itf.repository_id ();
 	bool error = true;
 	size_t name_end = rep_id.rfind (':');
 	if (name_end != std::string::npos) {
@@ -758,27 +759,27 @@ std::string CodeGenBase::make_async_repository_id (const Interface& itf, const I
 		if (name_begin != std::string::npos) {
 			++name_begin;
 			size_t name_len = name_end - name_begin;
-			if (itf.name () == rep_id.substr (name_begin, name_len).c_str ()) {
-				rep_id.replace (name_begin, name_len, async_name);
+			if (async_name.itf.name () == rep_id.substr (name_begin, name_len).c_str ()) {
+				rep_id.replace (name_begin, name_len, async_name.name);
 				error = false;
 			}
 		}
 	}
 	if (error) {
-		message (itf, MessageType::ERROR, "Can not generate repository id for " + async_name + " from \"" + rep_id + '\"');
+		message (async_name.itf, MessageType::ERROR, "Can not generate repository id for " + async_name.name + " from \"" + rep_id + '\"');
 		rep_id.clear ();
 	}
 	return rep_id;
 }
 
-CodeGenBase::AsyncBases CodeGenBase::get_async_bases (const Interface& itf, const char* suffix)
+CodeGenBase::AMI_Bases CodeGenBase::AMI_Name::bases () const
 {
-	AsyncBases ret;
+	AMI_Bases ret;
 	Interfaces base_interfaces = itf.get_all_bases ();
 	ret.reserve (base_interfaces.size ());
 	for (auto b : base_interfaces) {
 		if (async_supported (*b))
-			ret.emplace_back (b, make_async_name (*b, suffix));
+			ret.emplace_back (*b, suf);
 	}
 	return ret;
 }
@@ -1003,4 +1004,9 @@ Code& operator << (Code& stm, const MemberInit& m)
 {
 	return stm << m.prefix << m.member.name () << " (std::move ("
 		<< m.member.name () << "))";
+}
+
+Code& operator << (Code& stm, const CodeGenBase::AMI_Name& val)
+{
+	return stm << ParentName (val.itf) << val.name;
 }

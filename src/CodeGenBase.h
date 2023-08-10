@@ -36,6 +36,8 @@
 #define EXCEPTION_SUFFIX "::_Data"
 #define AMI_TIMEOUT "ami_timeout"
 #define AMI_RETURN_VAL "ami_return_val"
+#define AMI_POLLER "Poller"
+#define AMI_HANDLER "Handler"
 
 class CodeGenBase :
 	public AST::CodeGen,
@@ -90,6 +92,21 @@ public:
 	static bool is_bounded (const AST::Type& type);
 	void init_union (Code& stm, const AST::UnionElement& init_el, const char* prefix = "");
 
+	struct AMI_Name;
+
+	typedef std::vector <AMI_Name> AMI_Bases;
+
+	struct AMI_Name
+	{
+		const AST::Interface& itf;
+		std::string name;
+		const char* suf;
+
+		AMI_Name (const AST::Interface& i, const char* suffix);
+
+		AMI_Bases bases () const;
+	};
+
 protected:
 	CodeGenBase (const Options& options) :
 		options_ (options)
@@ -138,44 +155,7 @@ protected:
 
 	static bool async_supported (const AST::Interface& itf) noexcept;
 	
-	static AST::Identifier make_async_name (const AST::Interface& itf, const char* suffix);
-
-	static AST::Identifier make_poller_name (const AST::Interface& itf)
-	{
-		return make_async_name (itf, "Poller");
-	}
-
-	static AST::Identifier make_handler_name (const AST::Interface& itf)
-	{
-		return make_async_name (itf, "Handler");
-	}
-
-	std::string make_async_repository_id (const AST::Interface& itf, const AST::Identifier& async_name);
-
-	struct AsyncBase
-	{
-		const AST::Interface* itf;
-		AST::Identifier name;
-
-		AsyncBase (const AST::Interface* i, AST::Identifier&& n) :
-			itf (i),
-			name (std::move (n))
-		{}
-	};
-
-	typedef std::vector <AsyncBase> AsyncBases;
-
-	static AsyncBases get_async_bases (const AST::Interface& itf, const char* suffix);
-
-	static AsyncBases get_poller_bases (const AST::Interface& itf)
-	{
-		return get_async_bases (itf, "Poller");
-	}
-
-	static AsyncBases get_handler_bases (const AST::Interface& itf)
-	{
-		return get_async_bases (itf, "Handler");
-	}
+	std::string make_async_repository_id (const AMI_Name& async_name);
 
 private:
 	static bool pred (const char* l, const char* r)
@@ -429,5 +409,7 @@ struct MemberInit
 };
 
 Code& operator << (Code& stm, const MemberInit& val);
+
+Code& operator << (Code& stm, const CodeGenBase::AMI_Name& val);
 
 #endif

@@ -903,17 +903,17 @@ void Servant::catch_block ()
 
 void Servant::generate_poller (const Interface& itf)
 {
-	Identifier id = make_poller_name (itf);
+	AMI_Name ami (itf, AMI_POLLER);
 
 	// Skeleton begin
 	h_.namespace_open ("CORBA/Internal");
 	h_ << empty_line
 		<< "template <class S>\n"
-		"class Skeleton <S, " << ParentName (itf) << id << ">\n"
+		"class Skeleton <S, " << ami << ">\n"
 		"{\n"
 		"public:\n"
 		<< indent
-		<< "static const typename Bridge <" << ParentName (itf) << id << ">::EPV epv_;\n\n"
+		<< "static const typename Bridge <" << ami << ">::EPV epv_;\n\n"
 		<< unindent
 		<< "protected:\n"
 		<< indent;
@@ -923,7 +923,7 @@ void Servant::generate_poller (const Interface& itf)
 		case Item::Kind::OPERATION: {
 			const Operation& op = static_cast <const Operation&> (*item);
 
-			std::vector <AsyncParam> params;
+			std::vector <AMI_Param> params;
 			params.reserve (op.size () + 2);
 			params.emplace_back (Parameter::Attribute::IN, Type (BasicType::ULONG), AMI_TIMEOUT);
 			if (op.tkind () != Type::Kind::VOID)
@@ -938,7 +938,7 @@ void Servant::generate_poller (const Interface& itf)
 			{
 				std::string name = SKELETON_FUNC_PREFIX;
 				name += op.name ();
-				h_ << ' ' << name << " (Bridge <" << ParentName (itf) << id << ">* _b";
+				h_ << ' ' << name << " (Bridge <" << ami << ">* _b";
 				epv_.push_back (std::move (name));
 			}
 
@@ -973,7 +973,7 @@ void Servant::generate_poller (const Interface& itf)
 			{
 				std::string name = SKELETON_FUNC_PREFIX "get_";
 				name += att.name ();
-				h_ << "static void " << name << " (Bridge <" << ParentName (itf) << id << ">* _b,"
+				h_ << "static void " << name << " (Bridge <" << ami << ">* _b,"
 					"ULong " AMI_TIMEOUT ", "
 					<< ABI_param (att, Parameter::Attribute::OUT) << " " AMI_RETURN_VAL ", Interface* _env)\n"
 					"{\n";
@@ -993,7 +993,7 @@ void Servant::generate_poller (const Interface& itf)
 				{
 					std::string name = SKELETON_FUNC_PREFIX "set_";
 					name += att.name ();
-					h_ << "static void " << name << " (Bridge <" << ParentName (itf) << id << ">* _b, "
+					h_ << "static void " << name << " (Bridge <" << ami << ">* _b, "
 						"ULong " AMI_TIMEOUT ", Interface* _env)\n"
 						"{\n";
 					epv_.push_back (std::move (name));
@@ -1015,14 +1015,13 @@ void Servant::generate_poller (const Interface& itf)
 	h_ << unindent
 		<< "};\n"
 		"\ntemplate <class S>\n"
-		"const Bridge <" << ParentName (itf) << id << ">::EPV Skeleton <S, "
-		<< ParentName (itf) << id << ">::epv_ = {\n"
+		"const Bridge <" << ami << ">::EPV Skeleton <S, " << ami << ">::epv_ = {\n"
 		<< indent
 		<< "{ // header\n"
 		<< indent
-		<< "RepIdOf <" << ParentName (itf) << id << ">::id,\n"
-		"S::template __duplicate <" << ParentName (itf) << id << ">,\n"
-		"S::template __release <" << ParentName (itf) << id << ">\n"
+		<< "RepIdOf <" << ami << ">::id,\n"
+		"S::template __duplicate <" << ami << ">,\n"
+		"S::template __release <" << ami << ">\n"
 		<< unindent
 		<< "}";
 
@@ -1031,15 +1030,15 @@ void Servant::generate_poller (const Interface& itf)
 	h_ << ",\n"
 		"{ // base\n"
 		<< indent <<
-		"S::template _wide_val <ValueBase, " << ParentName (itf) << id << ">,\n"
-		"S::template _wide_val <Pollable, " << ParentName (itf) << id << ">,\n"
-		"S::template _wide_val <::Messaging::Poller, " << ParentName (itf) << id << ">";
+		"S::template _wide_val <ValueBase, " << ami << ">,\n"
+		"S::template _wide_val <Pollable, " << ami << ">,\n"
+		"S::template _wide_val <::Messaging::Poller, " << ami << ">";
 
-	const AsyncBases bases = get_poller_bases (itf);
+	const AMI_Bases bases = ami.bases ();
 
 	for (const auto& b : bases) {
 		h_ << ",\n"
-			"S::template _wide_val <" << ParentName (*b.itf) << b.name << ", " << ParentName (itf) << id << '>';
+			"S::template _wide_val <" << b << ", " << ami << '>';
 	}
 
 	h_ << std::endl
@@ -1054,10 +1053,10 @@ void Servant::generate_poller (const Interface& itf)
 		// Aggregated
 		h_ << empty_line
 			<< "template <class S>\n"
-			"class Aggregated <S, " << ParentName (itf) << id << "> :\n"
+			"class Aggregated <S, " << ami << "> :\n"
 			<< indent
 			<< "public ValueImpl <S, ValueBase>,\n"
-			"public ValueImpl <S, " << ParentName (itf) << id << ">,\n"
+			"public ValueImpl <S, " << ami << ">,\n"
 			"public ValueBaseNoCopy,\n"
 			"public ValueBaseNoFactory,\n"
 			"public ValueNonTruncatable\n"
@@ -1065,15 +1064,15 @@ void Servant::generate_poller (const Interface& itf)
 			"{\n"
 			"public:\n"
 			<< indent
-			<< "typedef " << ParentName (itf) << id << " PrimaryInterface;\n"
+			<< "typedef " << ami << " PrimaryInterface;\n"
 			"\n"
 			"Interface* _query_valuetype (String_in id) noexcept\n"
 			"{\n"
 			<< indent
-			<< "return FindInterface <" << ParentName (itf) << id;
+			<< "return FindInterface <" << ami;
 
 		for (const auto& b : bases) {
-			h_ << ", " << ParentName (*b.itf) << b.name;
+			h_ << ", " << b;
 		}
 		h_ << ", ::Messaging::Poller, Pollable>::find (static_cast <S&> (*this), id);\n"
 			<< unindent << "}\n"

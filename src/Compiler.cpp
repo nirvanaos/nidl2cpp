@@ -52,8 +52,9 @@ void Compiler::print_usage_info (const char* exe_name)
 		"\t-server_suffix <suffix> The suffix for server file name. Default is _s.\n"
 		"\t-proxy_suffix <suffix>  The suffix for proxy file name. Default is _p.\n"
 		"\t-legacy                 Generate code compatible with C++ language mapping 1.3.\n"
-		"\t                        To enable compatibility define macro LEGACY_CORBA_CPP.\n"
-		"\t-no_servant             Do not generate servant implementations.\n";
+		"\t                        To enable the compatibility define macro LEGACY_CORBA_CPP.\n"
+		"\t-no_servant             Do not generate servant implementations.\n"
+		"\t-inc_cpp <file>         Add additional include file to each .cpp file\n";
 }
 
 const char* Compiler::option (const char* arg, const char* opt)
@@ -105,6 +106,8 @@ bool Compiler::parse_command_line (CmdLine& args)
 		legacy = true;
 	else if ((arg = option (args.arg (), "no_servant")))
 		no_servant = true;
+	else if ((arg = option (args.arg (), "inc_cpp")))
+		inc_cpp = args.parameter (arg);
 
 	if (arg) {
 		args.next ();

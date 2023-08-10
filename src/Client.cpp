@@ -2397,7 +2397,8 @@ void Client::generate_handler (const Interface& itf)
 	AMI_Name ami (itf, AMI_HANDLER);
 
 	async_bridge_begin (ami, true);
-	h_ << "NIRVANA_BASE_ENTRY (Object, CORBA_Object)\n";
+	h_ << "NIRVANA_BASE_ENTRY (Object, CORBA_Object)\n"
+		"NIRVANA_BASE_ENTRY (::Messaging::ReplyHandler, Messaging_ReplyHandler)\n";
 
 	AMI_Bases bases = ami.bases ();
 	async_bridge_bases (bases);
@@ -2419,7 +2420,8 @@ void Client::generate_handler (const Interface& itf)
 					h_ << ", " << ABI_param (*param, Parameter::Attribute::IN);
 			}
 
-			h_ << ", Interface*);\n";
+			h_ << ", Interface*);\n"
+				"void (*" << op.name () << AMI_EXCEP ") (Bridge <" << ami << ">*, Any*, Interface*);\n";
 
 		} break;
 
@@ -2428,15 +2430,140 @@ void Client::generate_handler (const Interface& itf)
 
 			h_ << "void (*get_" << att.name () << ") (Bridge <" << ami << ">*"
 				", " << ABI_param (att, Parameter::Attribute::IN) // ami_return_val
-				<< ", Interface*);\n";
+				<< ", Interface*);\n"
+				"void (*get_" << att.name () << AMI_EXCEP ") (Bridge <" << ami << ">*, Any*, Interface*);\n";
 
-			if (!att.readonly ())
-				h_ << "void (*set_" << att.name () << ") (Bridge <" << ami
-				<< ">*, Interface*);\n";
+			if (!att.readonly ()) {
+				h_ << "void (*set_" << att.name () << ") (Bridge <" << ami << ">*, Interface*);\n"
+					"void (*set_" << att.name () << AMI_EXCEP ") (Bridge <" << ami << ">*, Any*, Interface*);\n";
+			}
 
 		} break;
 		}
 	}
 
 	h_ << "NIRVANA_BRIDGE_END ()\n";
+
+	// Skeleton begin
+	ami_skeleton_begin (h_, ami);
+
+	std::vector <std::string> epv;
+
+	for (auto item : itf) {
+		switch (item->kind ()) {
+		case Item::Kind::OPERATION: {
+			const Operation& op = static_cast <const Operation&> (*item);
+
+			// No exception callback
+			{
+				std::string name = SKELETON_FUNC_PREFIX + static_cast <std::string> (op.name ());
+				h_ << "static void " << name << " (Bridge <" << ami << ">* _b";
+				epv.push_back (std::move (name));
+			}
+
+			if (op.tkind () != Type::Kind::VOID)
+				h_ << ", " << ABI_param (op, Parameter::Attribute::IN) << " " AMI_RETURN_VAL;
+			for (auto param : op) {
+				if (param->attribute () != Parameter::Attribute::IN)
+					h_ << ", " << ABI_param (*param, Parameter::Attribute::IN) << ' ' << param->name ();
+			}
+			h_ << ", Interface* _env) noexcept\n"
+				"{\n" << indent
+				<< "try {\n" << indent
+				<< "S::_implementation (_b)." << op.name () << " (";
+
+			auto par = op.begin ();
+			while (par != op.end () && (*par)->attribute () == Parameter::Attribute::IN)
+				++par;
+			if (par != op.end ()) {
+				h_ << ABI2Servant (**par, (*par)->name (), Parameter::Attribute::IN);
+				for (++par; par != op.end (); ++par) {
+					if ((*par)->attribute () != Parameter::Attribute::IN)
+						h_ << ", " << ABI2Servant (**par, (*par)->name (), Parameter::Attribute::IN);
+				}
+			}
+			h_ << ");\n"
+				<< CatchBlock ()
+				<< unindent << "}\n\n";
+
+			// Exception callback
+			epv.push_back (excep_handler (ami, op.name (), op.raises ()));
+		} break;
+
+		case Item::Kind::ATTRIBUTE: {
+			const Attribute& att = static_cast <const Attribute&> (*item);
+			// No exception callback
+			{
+				std::string name = SKELETON_FUNC_PREFIX "get_" + static_cast <std::string> (att.name ());
+				h_ << "static void " << name;
+				epv.push_back (std::move (name));
+			}
+			h_ << " (Bridge <" << ami << ">* _b, " << ABI_param (att) << " " AMI_RETURN_VAL ", Interface* _env) noexcept\n"
+				"{\n" << indent
+				<< "try {\n" << indent
+				<< "S::_implementation (_b).get_" << static_cast <std::string> (att.name ())
+				<< " (" << ABI2Servant (att, AMI_RETURN_VAL) << ");\n"
+				<< CatchBlock ()
+				<< unindent
+				<< "}\n\n";
+
+			// Exception callback
+			epv.push_back (excep_handler (ami, "get_" + static_cast <std::string> (att.name ()), att.getraises ()));
+
+			if (!att.readonly ()) {
+
+				// No exception callback
+				{
+					std::string name = SKELETON_FUNC_PREFIX "set_" + static_cast <std::string> (att.name ());
+					h_ << "static void " << name;
+					epv.push_back (std::move (name));
+				}
+				h_ << " (Bridge <" << ami << ">* _b, Interface* _env) noexcept\n"
+					"{\n" << indent
+					<< "try {\n" << indent
+					<< "S::_implementation (_b).set_" << static_cast <std::string> (att.name ()) << " ();\n"
+					<< CatchBlock ()
+					<< unindent
+					<< "}\n\n";
+
+				// Exception callback
+				epv.push_back (excep_handler (ami, "set_" + static_cast <std::string> (att.name ()), att.setraises ()));
+			}
+
+		} break;
+		}
+	}
+
+	ami_skeleton_bases (h_, ami);
+
+	h_ << "S::template _wide_object <" << ami << ">,\n"
+		"S::template _wide < ::Messaging::ReplyHandler, " << ami << '>';
+
+	for (const auto& b : bases) {
+		h_ << ",\n"
+			"S::template _wide <" << b << ", " << ami << '>';
+	}
+
+	h_ << std::endl
+		<< unindent
+		<< "}";
+
+	fill_epv (h_, epv, false);
+}
+
+std::string Client::excep_handler (const AMI_Name& ami, const std::string& op, const AST::Raises& raises)
+{
+	std::string name = SKELETON_FUNC_PREFIX + op + AMI_EXCEP;
+	h_ << "static void " << name
+		<< " (Bridge <" << ami << ">* _b, Any* exc, Interface* _env) noexcept\n"
+		"{\n" << indent
+		<< "try {\n" << indent
+		<< "S::_implementation (_b)." << op
+		<< AMI_EXCEP " (ExceptionHolder::make <" << raises
+		<< "> (std::move (*exc)));\n"
+		<< CatchBlock ()
+		<< unindent
+		<< "}\n\n";
+
+	return name;
 }

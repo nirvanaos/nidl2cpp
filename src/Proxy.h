@@ -40,6 +40,9 @@ public:
 		cpp_ (file, root),
 		custom_ (false)
 	{
+		if (!options.inc_cpp.empty ())
+			cpp_ << "#include \"" << options.inc_cpp << "\"\n";
+
 		cpp_ << "#include <CORBA/Proxy/Proxy.h>\n"
 			"#include ";
 		cpp_.include_header (servant);

@@ -26,11 +26,6 @@
 #include "pch.h"
 #include "Servant.h"
 
-#define SKELETON_FUNC_PREFIX "_s_"
-#define SKELETON_GETTER_PREFIX "_s__get_"
-#define SKELETON_SETTER_PREFIX "_s__set_"
-#define SKELETON_MOVE_PREFIX "_s__move_"
-
 using std::filesystem::path;
 using namespace AST;
 
@@ -67,10 +62,10 @@ void Servant::begin (const ValueType& vt)
 			<< indent <<
 			"try {\n"
 			<< indent <<
-			"return Type <" << QName (*concrete_itf) << ">::ret (S::_implementation (_b)._this ());\n";
-		catch_block ();
-		h_ << "return nullptr;\n";
-		h_ << unindent
+			"return Type <" << QName (*concrete_itf) << ">::ret (S::_implementation (_b)._this ());\n"
+			<< CatchBlock ()
+			<< "return nullptr;\n"
+			<< unindent
 			<< "}\n\n";
 	}
 }
@@ -107,34 +102,6 @@ void Servant::skeleton_end (const IV_Base& item, const char* suffix)
 		"S::template __release <" << QName (item) << suffix << ">\n"
 		<< unindent
 		<< "}";
-}
-
-void Servant::epv (bool val_with_concrete_itf)
-{
-	if (!epv_.empty () || val_with_concrete_itf) {
-		h_ << ",\n"
-			"{ // EPV\n"
-			<< indent;
-
-		if (val_with_concrete_itf)
-			h_ << SKELETON_FUNC_PREFIX "this";
-		
-		auto n = epv_.begin ();
-		if (n != epv_.end ()) {
-			if (!val_with_concrete_itf) {
-				h_ << "S::" << *(n++);
-			}
-			for (; n != epv_.end (); ++n) {
-				h_ << ",\nS::" << *n;
-			}
-		}
-		h_ << unindent
-			<< "\n}";
-		epv_.clear ();
-	}
-
-	h_ << unindent
-		<< "\n};\n";
 }
 
 void Servant::end (const Interface& itf)
@@ -634,17 +601,16 @@ void Servant::end (const ValueType& vt)
 				<< f->name () << " (";
 			if (!f->empty ()) {
 				auto par = f->begin ();
-				servant_param (**par);
+				h_ << ABI2Servant (**par);
 				for (++par; par != f->end (); ++par) {
-					h_ << ", ";
-					servant_param (**par);
+					h_ << ", " << ABI2Servant (**par);
 				}
 			}
-			h_ << "));\n";
-			catch_block ();
+			h_ << "));\n"
+				<< CatchBlock ()
 
-			// Return default value on exception
-			h_ << "return Type <" << QName (vt) << ">::ret ();\n";
+				// Return default value on exception
+				<< "return Type <" << QName (vt) << ">::ret ();\n";
 
 			h_ << unindent << "}\n\n";
 		}
@@ -756,8 +722,8 @@ void Servant::leaf (const Operation& op)
 		epv_.push_back (std::move (name));
 	}
 
-	for (auto it = op.begin (); it != op.end (); ++it) {
-		h_ << ", " << ABI_param (**it) << ' ' << (*it)->name ();
+	for (auto param : op) {
+		h_ << ", " << ABI_param (*param) << ' ' << param->name ();
 	}
 
 	h_ << ", Interface* _env) noexcept\n"
@@ -770,16 +736,15 @@ void Servant::leaf (const Operation& op)
 	h_ << "S::_implementation (_b)." << op.name () << " (";
 	if (!op.empty ()) {
 		auto par = op.begin ();
-		servant_param (**par);
+		h_ << ABI2Servant (**par);
 		for (++par; par != op.end (); ++par) {
-			h_ << ", ";
-			servant_param (**par);
+			h_ << ", " << ABI2Servant (**par);
 		}
 	}
 	if (op.tkind () != Type::Kind::VOID)
 		h_ << ')';
-	h_ << ");\n";
-	catch_block ();
+	h_ << ");\n"
+		<< CatchBlock ();
 	if (op.tkind () != Type::Kind::VOID) {
 		// Return default value on exception
 		h_ << "return " << TypePrefix (op) << "ret ();\n";
@@ -818,9 +783,9 @@ void Servant::attribute (const Member& m)
 		<< "return " << TypePrefix (m);
 	if (attributes_by_ref_)
 		h_ << "VT_";
-	h_ << "ret (S::_implementation (_b)." << m.name () << " ());\n";
-	catch_block ();
-	h_ << "return " << TypePrefix (m);
+	h_ << "ret (S::_implementation (_b)." << m.name () << " ());\n"
+		<< CatchBlock ()
+		<< "return " << TypePrefix (m);
 	if (attributes_by_ref_)
 		h_ << "VT_";
 	h_ << "ret ();\n"
@@ -839,11 +804,9 @@ void Servant::attribute (const Member& m)
 		h_ << indent
 			<< "try {\n"
 			<< indent
-			<< "S::_implementation (_b)." << m.name () << " (";
-		servant_param (m, "val");
-		h_ << ");\n";
-		catch_block ();
-		h_ << unindent
+			<< "S::_implementation (_b)." << m.name () << " (" << ABI2Servant (m, "val") << ");\n"
+			<< CatchBlock ()
+			<< unindent
 			<< "}\n";
 	}
 
@@ -859,46 +822,14 @@ void Servant::attribute (const Member& m)
 		h_ << indent
 			<< "try {\n"
 			<< indent
-			<< "S::_implementation (_b)." << m.name () << " (std::move (";
-		servant_param (m, "val", Parameter::Attribute::INOUT);
-		h_ << "));\n";
-		catch_block ();
-		h_ << unindent
+			<< "S::_implementation (_b)." << m.name () << " (std::move ("
+			<< ABI2Servant (m, "val", Parameter::Attribute::INOUT) << "));\n"
+			<< CatchBlock ()
+			<< unindent
 			<< "}\n";
 	}
 
 	h_ << std::endl;
-}
-
-void Servant::servant_param (const Type& t, const std::string& name, Parameter::Attribute att)
-{
-	h_ << TypePrefix (t);
-	switch (att) {
-		case Parameter::Attribute::IN:
-			h_ << "in";
-			break;
-		case Parameter::Attribute::OUT:
-			h_ << "out";
-			break;
-		case Parameter::Attribute::INOUT:
-			h_ << "inout";
-			break;
-	}
-	h_ << " (" << name << ')';
-}
-
-void Servant::catch_block ()
-{
-	h_ << unindent
-		<< "} catch (Exception& e) {\n"
-		<< indent
-		<< "set_exception (_env, e);\n"
-		<< unindent
-		<< "} catch (...) {\n"
-		<< indent
-		<< "set_unknown_exception (_env);\n"
-		<< unindent
-		<< "}\n";
 }
 
 void Servant::generate_poller (const Interface& itf)
@@ -906,17 +837,7 @@ void Servant::generate_poller (const Interface& itf)
 	AMI_Name ami (itf, AMI_POLLER);
 
 	// Skeleton begin
-	h_.namespace_open ("CORBA/Internal");
-	h_ << empty_line
-		<< "template <class S>\n"
-		"class Skeleton <S, " << ami << ">\n"
-		"{\n"
-		"public:\n"
-		<< indent
-		<< "static const typename Bridge <" << ami << ">::EPV epv_;\n\n"
-		<< unindent
-		<< "protected:\n"
-		<< indent;
+	ami_skeleton_begin (h_, ami);
 
 	for (auto item : itf) {
 		switch (item->kind ()) {
@@ -955,16 +876,14 @@ void Servant::generate_poller (const Interface& itf)
 
 			{
 				auto param = params.begin ();
-				servant_param (param->type, param->name, param->att);
+				h_ << ABI2Servant (param->type, param->name, param->att);
 				for (++param; param != params.end (); ++param) {
-					h_ << ", ";
-					servant_param (param->type, param->name, param->att);
+					h_ << ", " << ABI2Servant (param->type, param->name, param->att);
 				}
 			}
-			h_ << ");\n";
-			catch_block ();
-
-			h_ << unindent
+			h_ << ");\n"
+				<< CatchBlock ()
+				<< unindent
 				<< "}\n\n";
 		} break;
 
@@ -981,13 +900,13 @@ void Servant::generate_poller (const Interface& itf)
 			}
 			h_ << indent
 				<< "try {\n" << indent
-				<< "S::_implementation (_b).get_" << att.name () << " (";
-			servant_param (Type (BasicType::ULONG), AMI_TIMEOUT, Parameter::Attribute::IN);
-			h_ << ", ";
-			servant_param (att, AMI_RETURN_VAL, Parameter::Attribute::OUT);
-			h_ << ");\n";
-			catch_block ();
-			h_ << unindent << "}\n";
+				<< "S::_implementation (_b).get_" << att.name () << " ("
+				<< ABI2Servant (Type (BasicType::ULONG), AMI_TIMEOUT, Parameter::Attribute::IN)
+				<< ", "
+				<< ABI2Servant (att, AMI_RETURN_VAL, Parameter::Attribute::OUT)
+				<< ");\n"
+				<< CatchBlock ()
+				<< unindent << "}\n";
 
 			if (!att.readonly ()) {
 				{
@@ -1000,37 +919,21 @@ void Servant::generate_poller (const Interface& itf)
 				}
 				h_ << indent
 					<< "try {\n" << indent
-					<< "S::_implementation (_b).set_" << att.name () << " (";
-				servant_param (Type (BasicType::ULONG), AMI_TIMEOUT, Parameter::Attribute::IN);
-				h_ << ");\n";
-				catch_block ();
-				h_ << unindent << "}\n";
+					<< "S::_implementation (_b).set_" << att.name () << " ("
+					<< ABI2Servant (Type (BasicType::ULONG), AMI_TIMEOUT, Parameter::Attribute::IN)
+					<< ");\n"
+					<< CatchBlock ()
+					<< unindent << "}\n";
 			}
 
 		} break;
 		}
 	}
 
-	// Skeleton end
-	h_ << unindent
-		<< "};\n"
-		"\ntemplate <class S>\n"
-		"const Bridge <" << ami << ">::EPV Skeleton <S, " << ami << ">::epv_ = {\n"
-		<< indent
-		<< "{ // header\n"
-		<< indent
-		<< "RepIdOf <" << ami << ">::id,\n"
-		"S::template __duplicate <" << ami << ">,\n"
-		"S::template __release <" << ami << ">\n"
-		<< unindent
-		<< "}";
-
 	// Bases
+	ami_skeleton_bases (h_, ami);
 
-	h_ << ",\n"
-		"{ // base\n"
-		<< indent <<
-		"S::template _wide_val <ValueBase, " << ami << ">,\n"
+	h_ << "S::template _wide_val <ValueBase, " << ami << ">,\n"
 		"S::template _wide_val <Pollable, " << ami << ">,\n"
 		"S::template _wide_val <::Messaging::Poller, " << ami << ">";
 

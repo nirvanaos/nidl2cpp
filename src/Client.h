@@ -41,6 +41,9 @@ public:
 		cpp_ (file_cpp, root),
 		export_count_ (0)
 	{
+		if (!options.inc_cpp.empty ())
+			cpp_ << "#include \"" << options.inc_cpp << "\"\n";
+
 		cpp_ << "#include <CORBA/CORBA.h>\n"
 			"#include <Nirvana/OLF.h>\n"
 			"#include ";
@@ -179,6 +182,7 @@ private:
 	void generate_handler (const AST::Interface& itf);
 	void async_bridge_begin (const AMI_Name& ami, bool handler);
 	void async_bridge_bases (const AMI_Bases& bases);
+	std::string excep_handler (const AMI_Name& ami, const std::string& op, const AST::Raises& raises);
 
 private:
 	Header h_; // .h file

@@ -34,10 +34,17 @@
 
 #define FACTORY_SUFFIX "_factory"
 #define EXCEPTION_SUFFIX "::_Data"
+
+#define SKELETON_FUNC_PREFIX "_s_"
+#define SKELETON_GETTER_PREFIX "_s__get_"
+#define SKELETON_SETTER_PREFIX "_s__set_"
+#define SKELETON_MOVE_PREFIX "_s__move_"
+
 #define AMI_TIMEOUT "ami_timeout"
 #define AMI_RETURN_VAL "ami_return_val"
 #define AMI_POLLER "Poller"
 #define AMI_HANDLER "Handler"
+#define AMI_EXCEP "_excep"
 
 class CodeGenBase :
 	public AST::CodeGen,
@@ -92,6 +99,29 @@ public:
 	static bool is_bounded (const AST::Type& type);
 	void init_union (Code& stm, const AST::UnionElement& init_el, const char* prefix = "");
 
+	struct ABI2Servant
+	{
+		ABI2Servant (const AST::Type& t, const AST::Identifier& n,
+			AST::Parameter::Attribute a = AST::Parameter::Attribute::IN) :
+			type (t),
+			name (n),
+			att (a)
+		{}
+
+		ABI2Servant (const AST::Parameter& p) :
+			type (p),
+			name (p.name ()),
+			att (p.attribute ())
+		{}
+
+		const AST::Type& type;
+		const AST::Identifier& name;
+		const AST::Parameter::Attribute att;
+	};
+
+	struct CatchBlock
+	{};
+
 	struct AMI_Name;
 
 	typedef std::vector <AMI_Name> AMI_Bases;
@@ -106,6 +136,10 @@ public:
 
 		AMI_Bases bases () const;
 	};
+
+	static void ami_skeleton_begin (Code& stm, const AMI_Name& ami);
+	static void ami_skeleton_bases (Code& stm, const AMI_Name& ami);
+	static void fill_epv (Code& stm, const std::vector <std::string>& epv, bool val_with_concrete_itf = false);
 
 protected:
 	CodeGenBase (const Options& options) :
@@ -411,5 +445,7 @@ struct MemberInit
 Code& operator << (Code& stm, const MemberInit& val);
 
 Code& operator << (Code& stm, const CodeGenBase::AMI_Name& val);
+Code& operator << (Code& stm, const CodeGenBase::ABI2Servant& val);
+Code& operator << (Code& stm, const CodeGenBase::CatchBlock&);
 
 #endif

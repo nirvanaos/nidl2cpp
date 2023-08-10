@@ -729,11 +729,28 @@ bool CodeGenBase::is_custom (const Interface& itf) noexcept
 
 bool CodeGenBase::async_supported (const Interface& itf) noexcept
 {
+	static const char* const system_modules [] = {
+		"CORBA",
+		"PortableServer",
+		"Messaging"
+	};
+
 	switch (itf.interface_kind ()) {
 	case InterfaceKind::UNCONSTRAINED:
-	case InterfaceKind::LOCAL:
-		if (!is_stateless (itf) && !is_custom (itf))
+		return !is_stateless (itf) && !is_custom (itf);
+
+	case InterfaceKind::LOCAL: {
+		if (!is_stateless (itf) && !is_custom (itf)) {
+			auto parent = itf.parent ();
+			if (parent && !parent->parent ()) {
+				for (auto p = system_modules; p != std::end (system_modules); ++p) {
+					if (parent->name () == *p)
+						return false; // CORBA local interfaces are not considered as asynchronous
+				}
+			}
 			return true;
+		}
+	}
 	}
 	return false;
 }
@@ -770,6 +787,66 @@ std::string CodeGenBase::make_async_repository_id (const AMI_Name& async_name)
 		rep_id.clear ();
 	}
 	return rep_id;
+}
+
+void CodeGenBase::ami_skeleton_begin (Code& stm, const AMI_Name& ami)
+{
+	stm.namespace_open ("CORBA/Internal");
+	stm << empty_line
+		<< "template <class S>\n"
+		"class Skeleton <S, " << ami << ">\n"
+		"{\n"
+		"public:\n"
+		<< indent
+		<< "static const typename Bridge <" << ami << ">::EPV epv_;\n\n"
+		<< unindent
+		<< "protected:\n"
+		<< indent;
+}
+
+void CodeGenBase::ami_skeleton_bases (Code& stm, const AMI_Name& ami)
+{
+	stm << unindent
+		<< "};\n"
+		"\ntemplate <class S>\n"
+		"const Bridge <" << ami << ">::EPV Skeleton <S, " << ami << ">::epv_ = {\n"
+		<< indent
+		<< "{ // header\n"
+		<< indent
+		<< "RepIdOf <" << ami << ">::id,\n"
+		"S::template __duplicate <" << ami << ">,\n"
+		"S::template __release <" << ami << ">\n"
+		<< unindent
+		<< "},\n"
+		"{ // base\n"
+		<< indent;
+}
+
+void CodeGenBase::fill_epv (Code& stm, const std::vector <std::string>& epv, bool val_with_concrete_itf)
+{
+	if (!epv.empty () || val_with_concrete_itf) {
+		stm << ",\n"
+			"{ // EPV\n"
+			<< indent;
+
+		if (val_with_concrete_itf)
+			stm << SKELETON_FUNC_PREFIX "this";
+
+		auto n = epv.begin ();
+		if (n != epv.end ()) {
+			if (!val_with_concrete_itf) {
+				stm << "S::" << *(n++);
+			}
+			for (; n != epv.end (); ++n) {
+				stm << ",\nS::" << *n;
+			}
+		}
+		stm << unindent
+			<< "\n}";
+	}
+
+	stm << unindent
+		<< "\n};\n";
 }
 
 CodeGenBase::AMI_Bases CodeGenBase::AMI_Name::bases () const
@@ -1009,4 +1086,35 @@ Code& operator << (Code& stm, const MemberInit& m)
 Code& operator << (Code& stm, const CodeGenBase::AMI_Name& val)
 {
 	return stm << ParentName (val.itf) << val.name;
+}
+
+Code& operator << (Code& stm, const CodeGenBase::ABI2Servant& val)
+{
+	stm << TypePrefix (val.type);
+	switch (val.att) {
+	case Parameter::Attribute::IN:
+		stm << "in";
+		break;
+	case Parameter::Attribute::OUT:
+		stm << "out";
+		break;
+	case Parameter::Attribute::INOUT:
+		stm << "inout";
+		break;
+	}
+	return stm << " (" << val.name << ')';
+}
+
+Code& operator << (Code& stm, const CodeGenBase::CatchBlock&)
+{
+	return stm << unindent
+		<< "} catch (Exception& e) {\n"
+		<< indent
+		<< "set_exception (_env, e);\n"
+		<< unindent
+		<< "} catch (...) {\n"
+		<< indent
+		<< "set_unknown_exception (_env);\n"
+		<< unindent
+		<< "}\n";
 }

@@ -57,14 +57,13 @@ protected:
 private:
 	void skeleton_begin (const AST::IV_Base& item, const char* suffix = "");
 	void skeleton_end (const AST::IV_Base& item, const char* suffix = "");
-	void epv (bool val_with_concrete_itf = false);
 	
-	void servant_param (const AST::Parameter& param)
+	void epv (bool val_with_concrete_itf = false)
 	{
-		servant_param (param, param.name (), param.attribute ());
+		fill_epv (h_, epv_, val_with_concrete_itf);
+		epv_.clear ();
 	}
-	void servant_param (const AST::Type& t, const std::string& name, AST::Parameter::Attribute att = AST::Parameter::Attribute::IN);
-
+	
 	void catch_block ();
 	void implementation_suffix (const AST::InterfaceKind ik);
 	void implementation_parameters (const AST::Interface& primary, const AST::Interfaces& bases);
@@ -88,7 +87,7 @@ private:
 
 private:
 	Header h_;
-	std::vector<std::string> epv_;
+	std::vector <std::string> epv_;
 	bool attributes_by_ref_;
 };
 

@@ -45,6 +45,7 @@ public:
 	std::string client_suffix;
 	std::string servant_suffix;
 	std::string proxy_suffix;
+	std::string inc_cpp;
 	bool client, server, proxy;
 	bool legacy;
 	bool no_servant;

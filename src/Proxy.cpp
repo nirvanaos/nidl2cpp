@@ -223,8 +223,6 @@ void Proxy::end (const Interface& itf)
 		return;
 
 	generate_proxy (itf);
-	if (async_supported (itf))
-		generate_poller (itf);
 
 	cpp_.namespace_close ();
 	cpp_ << "NIRVANA_EXPORT (" << export_name (itf) << ", CORBA::Internal::RepIdOf <" << QName (itf)
@@ -872,7 +870,7 @@ void Proxy::generate_proxy (const Interface& itf)
 	cpp_ << (local_stateless ? "InterfaceMetadata::FLAG_LOCAL_STATELESS" : "0");
 	cpp_ << "\n" << unindent << "};\n";
 }
-
+/*
 void Proxy::generate_poller (const Interface& itf)
 {
 	AMI_Name ami (itf, AMI_POLLER);
@@ -991,3 +989,4 @@ void Proxy::generate_poller (const Interface& itf)
 		"::TypeCode, CORBA::Internal::TypeCodeValue <"
 		<< ami << ">)\n";
 }
+*/

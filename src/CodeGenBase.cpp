@@ -755,73 +755,6 @@ bool CodeGenBase::async_supported (const Interface& itf) noexcept
 	return false;
 }
 
-CodeGenBase::AMI_Name::AMI_Name (const Interface& i, const char* suffix) :
-	itf (i),
-	name ("AMI_" + i.name () + suffix),
-	suf (suffix)
-{
-	const Symbols& scope = *i.parent ();
-	while (scope.find (static_cast <const Identifier&> (name))) {
-		name.insert (0, "AMI_");
-	}
-}
-
-std::string CodeGenBase::make_async_repository_id (const AMI_Name& async_name)
-{
-	std::string rep_id = async_name.itf.repository_id ();
-	bool error = true;
-	size_t name_end = rep_id.rfind (':');
-	if (name_end != std::string::npos) {
-		size_t name_begin = rep_id.rfind ('/', name_end);
-		if (name_begin != std::string::npos) {
-			++name_begin;
-			size_t name_len = name_end - name_begin;
-			if (async_name.itf.name () == rep_id.substr (name_begin, name_len).c_str ()) {
-				rep_id.replace (name_begin, name_len, async_name.name);
-				error = false;
-			}
-		}
-	}
-	if (error) {
-		message (async_name.itf, MessageType::ERROR, "Can not generate repository id for " + async_name.name + " from \"" + rep_id + '\"');
-		rep_id.clear ();
-	}
-	return rep_id;
-}
-
-void CodeGenBase::ami_skeleton_begin (Code& stm, const AMI_Name& ami)
-{
-	stm.namespace_open ("CORBA/Internal");
-	stm << empty_line
-		<< "template <class S>\n"
-		"class Skeleton <S, " << ami << ">\n"
-		"{\n"
-		"public:\n"
-		<< indent
-		<< "static const typename Bridge <" << ami << ">::EPV epv_;\n\n"
-		<< unindent
-		<< "protected:\n"
-		<< indent;
-}
-
-void CodeGenBase::ami_skeleton_bases (Code& stm, const AMI_Name& ami)
-{
-	stm << unindent
-		<< "};\n"
-		"\ntemplate <class S>\n"
-		"const Bridge <" << ami << ">::EPV Skeleton <S, " << ami << ">::epv_ = {\n"
-		<< indent
-		<< "{ // header\n"
-		<< indent
-		<< "RepIdOf <" << ami << ">::id,\n"
-		"S::template __duplicate <" << ami << ">,\n"
-		"S::template __release <" << ami << ">\n"
-		<< unindent
-		<< "},\n"
-		"{ // base\n"
-		<< indent;
-}
-
 void CodeGenBase::fill_epv (Code& stm, const std::vector <std::string>& epv, bool val_with_concrete_itf)
 {
 	if (!epv.empty () || val_with_concrete_itf) {
@@ -847,30 +780,6 @@ void CodeGenBase::fill_epv (Code& stm, const std::vector <std::string>& epv, boo
 
 	stm << unindent
 		<< "\n};\n";
-}
-
-CodeGenBase::AMI_Bases CodeGenBase::AMI_Name::all_bases () const
-{
-	AMI_Bases ret;
-	Interfaces base_interfaces = itf.get_all_bases ();
-	ret.reserve (base_interfaces.size ());
-	for (auto b : base_interfaces) {
-		if (async_supported (*b))
-			ret.emplace_back (*b, suf);
-	}
-	return ret;
-}
-
-CodeGenBase::AMI_Bases CodeGenBase::AMI_Name::direct_bases () const
-{
-	AMI_Bases ret;
-	Interfaces base_interfaces = itf.bases ();
-	ret.reserve (base_interfaces.size ());
-	for (auto b : base_interfaces) {
-		if (async_supported (*b))
-			ret.emplace_back (*b, suf);
-	}
-	return ret;
 }
 
 Code& operator << (Code& stm, const QName& qn)
@@ -1093,40 +1002,4 @@ Code& operator << (Code& stm, const MemberInit& m)
 {
 	return stm << m.prefix << m.member.name () << " (std::move ("
 		<< m.member.name () << "))";
-}
-
-Code& operator << (Code& stm, const CodeGenBase::AMI_Name& val)
-{
-	return stm << ParentName (val.itf) << val.name;
-}
-
-Code& operator << (Code& stm, const CodeGenBase::ABI2Servant& val)
-{
-	stm << TypePrefix (val.type);
-	switch (val.att) {
-	case Parameter::Attribute::IN:
-		stm << "in";
-		break;
-	case Parameter::Attribute::OUT:
-		stm << "out";
-		break;
-	case Parameter::Attribute::INOUT:
-		stm << "inout";
-		break;
-	}
-	return stm << " (" << val.name << ')';
-}
-
-Code& operator << (Code& stm, const CodeGenBase::CatchBlock&)
-{
-	return stm << unindent
-		<< "} catch (Exception& e) {\n"
-		<< indent
-		<< "set_exception (_env, e);\n"
-		<< unindent
-		<< "} catch (...) {\n"
-		<< indent
-		<< "set_unknown_exception (_env);\n"
-		<< unindent
-		<< "}\n";
 }

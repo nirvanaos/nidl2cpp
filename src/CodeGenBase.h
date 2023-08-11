@@ -100,47 +100,6 @@ public:
 	static bool is_bounded (const AST::Type& type);
 	void init_union (Code& stm, const AST::UnionElement& init_el, const char* prefix = "");
 
-	struct ABI2Servant
-	{
-		ABI2Servant (const AST::Type& t, const AST::Identifier& n,
-			AST::Parameter::Attribute a = AST::Parameter::Attribute::IN) :
-			type (t),
-			name (n),
-			att (a)
-		{}
-
-		ABI2Servant (const AST::Parameter& p) :
-			type (p),
-			name (p.name ()),
-			att (p.attribute ())
-		{}
-
-		const AST::Type& type;
-		const AST::Identifier& name;
-		const AST::Parameter::Attribute att;
-	};
-
-	struct CatchBlock
-	{};
-
-	struct AMI_Name;
-
-	typedef std::vector <AMI_Name> AMI_Bases;
-
-	struct AMI_Name
-	{
-		const AST::Interface& itf;
-		std::string name;
-		const char* suf;
-
-		AMI_Name (const AST::Interface& i, const char* suffix);
-
-		AMI_Bases all_bases () const;
-		AMI_Bases direct_bases () const;
-	};
-
-	static void ami_skeleton_begin (Code& stm, const AMI_Name& ami);
-	static void ami_skeleton_bases (Code& stm, const AMI_Name& ami);
 	static void fill_epv (Code& stm, const std::vector <std::string>& epv, bool val_with_concrete_itf = false);
 
 protected:
@@ -192,8 +151,6 @@ protected:
 
 	static bool async_supported (const AST::Interface& itf) noexcept;
 	
-	std::string make_async_repository_id (const AMI_Name& async_name);
-
 private:
 	static bool pred (const char* l, const char* r)
 	{
@@ -446,9 +403,5 @@ struct MemberInit
 };
 
 Code& operator << (Code& stm, const MemberInit& val);
-
-Code& operator << (Code& stm, const CodeGenBase::AMI_Name& val);
-Code& operator << (Code& stm, const CodeGenBase::ABI2Servant& val);
-Code& operator << (Code& stm, const CodeGenBase::CatchBlock&);
 
 #endif

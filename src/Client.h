@@ -177,12 +177,6 @@ private:
 	void implement_marshaling (const AST::StructBase& item);
 	void marshal_union (const AST::Union& u, bool out);
 	void CDR_size (const AST::StructBase& item, const char* prefix);
-	void generate_poller (const AST::Interface& itf);
-	void environment_poller (const AST::Raises& raises);
-	void generate_handler (const AST::Interface& itf);
-	void async_bridge_begin (const AMI_Name& ami, bool handler);
-	void async_bridge_bases (const AMI_Bases& bases);
-	std::string excep_handler (const AMI_Name& ami, const std::string& op, const AST::Raises& raises);
 
 private:
 	Header h_; // .h file

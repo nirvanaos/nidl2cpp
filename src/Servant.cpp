@@ -295,9 +295,6 @@ void Servant::end (const Interface& itf)
 			h_ << "#endif\n";
 		}
 	}
-
-	if (async_supported (itf))
-		generate_poller (itf);
 }
 
 void Servant::end (const ValueType& vt)
@@ -832,153 +829,50 @@ void Servant::attribute (const Member& m)
 	h_ << std::endl;
 }
 
-void Servant::generate_poller (const Interface& itf)
+std::string Servant::excep_handler (const Interface& ami, const std::string& op, const Raises& raises)
 {
-	AMI_Name ami (itf, AMI_POLLER);
-
-	// Skeleton begin
-	ami_skeleton_begin (h_, ami);
-
-	for (auto item : itf) {
-		switch (item->kind ()) {
-		case Item::Kind::OPERATION: {
-			const Operation& op = static_cast <const Operation&> (*item);
-
-			std::vector <AMI_Param> params;
-			params.reserve (op.size () + 2);
-			params.emplace_back (Parameter::Attribute::IN, Type (BasicType::ULONG), AMI_TIMEOUT);
-			if (op.tkind () != Type::Kind::VOID)
-				params.emplace_back (Parameter::Attribute::OUT, op, AMI_RETURN_VAL);
-			for (auto param : op) {
-				if (param->attribute () != Parameter::Attribute::IN)
-					params.emplace_back (Parameter::Attribute::OUT, *param, param->name ());
-			}
-
-			h_ << "static void ";
-
-			{
-				std::string name = SKELETON_FUNC_PREFIX;
-				name += op.name ();
-				h_ << ' ' << name << " (Bridge <" << ami << ">* _b";
-				epv_.push_back (std::move (name));
-			}
-
-			for (const auto& param : params) {
-				h_ << ", " << ABI_param (param.type, param.att) << ' ' << param.name;
-			}
-
-			h_ << ", Interface* _env)\n"
-				"{\n"
-				<< indent
-				<< "try {\n"
-				<< indent;
-			h_ << "S::_implementation (_b)." << op.name () << " (";
-
-			{
-				auto param = params.begin ();
-				h_ << ABI2Servant (param->type, param->name, param->att);
-				for (++param; param != params.end (); ++param) {
-					h_ << ", " << ABI2Servant (param->type, param->name, param->att);
-				}
-			}
-			h_ << ");\n"
-				<< CatchBlock ()
-				<< unindent
-				<< "}\n\n";
-		} break;
-
-		case Item::Kind::ATTRIBUTE: {
-			const Attribute& att = static_cast <const Attribute&> (*item);
-			{
-				std::string name = SKELETON_FUNC_PREFIX "get_";
-				name += att.name ();
-				h_ << "static void " << name << " (Bridge <" << ami << ">* _b,"
-					"ULong " AMI_TIMEOUT ", "
-					<< ABI_param (att, Parameter::Attribute::OUT) << " " AMI_RETURN_VAL ", Interface* _env)\n"
-					"{\n";
-				epv_.push_back (std::move (name));
-			}
-			h_ << indent
-				<< "try {\n" << indent
-				<< "S::_implementation (_b).get_" << att.name () << " ("
-				<< ABI2Servant (Type (BasicType::ULONG), AMI_TIMEOUT, Parameter::Attribute::IN)
-				<< ", "
-				<< ABI2Servant (att, AMI_RETURN_VAL, Parameter::Attribute::OUT)
-				<< ");\n"
-				<< CatchBlock ()
-				<< unindent << "}\n";
-
-			if (!att.readonly ()) {
-				{
-					std::string name = SKELETON_FUNC_PREFIX "set_";
-					name += att.name ();
-					h_ << "static void " << name << " (Bridge <" << ami << ">* _b, "
-						"ULong " AMI_TIMEOUT ", Interface* _env)\n"
-						"{\n";
-					epv_.push_back (std::move (name));
-				}
-				h_ << indent
-					<< "try {\n" << indent
-					<< "S::_implementation (_b).set_" << att.name () << " ("
-					<< ABI2Servant (Type (BasicType::ULONG), AMI_TIMEOUT, Parameter::Attribute::IN)
-					<< ");\n"
-					<< CatchBlock ()
-					<< unindent << "}\n";
-			}
-
-		} break;
-		}
-	}
-
-	// Bases
-	ami_skeleton_bases (h_, ami);
-
-	h_ << "S::template _wide_val <ValueBase, " << ami << ">,\n"
-		"S::template _wide_val <Pollable, " << ami << ">,\n"
-		"S::template _wide_val <::Messaging::Poller, " << ami << ">";
-
-	const AMI_Bases bases = ami.all_bases ();
-
-	for (const auto& b : bases) {
-		h_ << ",\n"
-			"S::template _wide_val <" << b << ", " << ami << '>';
-	}
-
-	h_ << std::endl
+	std::string name = SKELETON_FUNC_PREFIX + op + AMI_EXCEP;
+	h_ << "static void " << name
+		<< " (Bridge <" << QName (ami) << ">* _b, Any* exc, Interface* _env) noexcept\n"
+		"{\n" << indent
+		<< "try {\n" << indent
+		<< "S::_implementation (_b)." << op
+		<< AMI_EXCEP " (ExceptionHolder::make <" << raises
+		<< "> (std::move (*exc)));\n"
+		<< CatchBlock ()
 		<< unindent
-		<< "}";
+		<< "}\n\n";
 
-	// EPV
-	epv (false);
+	return name;
+}
 
-	if (!options ().no_servant) {
-
-		// Aggregated
-		h_ << empty_line
-			<< "template <class S>\n"
-			"class Aggregated <S, " << ami << "> :\n"
-			<< indent
-			<< "public ValueImpl <S, ValueBase>,\n"
-			"public ValueImpl <S, " << ami << ">,\n"
-			"public ValueBaseNoCopy,\n"
-			"public ValueBaseNoFactory,\n"
-			"public ValueNonTruncatable\n"
-			<< unindent <<
-			"{\n"
-			"public:\n"
-			<< indent
-			<< "typedef " << ami << " PrimaryInterface;\n"
-			"\n"
-			"Interface* _query_valuetype (String_in id) noexcept\n"
-			"{\n"
-			<< indent
-			<< "return FindInterface <" << ami;
-
-		for (const auto& b : bases) {
-			h_ << ", " << b;
-		}
-		h_ << ", ::Messaging::Poller, Pollable>::find (static_cast <S&> (*this), id);\n"
-			<< unindent << "}\n"
-			<< unindent << "};\n"; // End Aggregated
+Code& operator << (Code& stm, const Servant::ABI2Servant& val)
+{
+	stm << TypePrefix (val.type);
+	switch (val.att) {
+	case Parameter::Attribute::IN:
+		stm << "in";
+		break;
+	case Parameter::Attribute::OUT:
+		stm << "out";
+		break;
+	case Parameter::Attribute::INOUT:
+		stm << "inout";
+		break;
 	}
+	return stm << " (" << val.name << ')';
+}
+
+Code& operator << (Code& stm, const Servant::CatchBlock&)
+{
+	return stm << unindent
+		<< "} catch (Exception& e) {\n"
+		<< indent
+		<< "set_exception (_env, e);\n"
+		<< unindent
+		<< "} catch (...) {\n"
+		<< indent
+		<< "set_unknown_exception (_env);\n"
+		<< unindent
+		<< "}\n";
 }

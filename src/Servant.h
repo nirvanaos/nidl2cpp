@@ -43,6 +43,29 @@ public:
 		h_ << "#include " << client.filename () << std::endl << std::endl;
 	}
 
+	struct ABI2Servant
+	{
+		ABI2Servant (const AST::Type& t, const AST::Identifier& n,
+			AST::Parameter::Attribute a = AST::Parameter::Attribute::IN) :
+			type (t),
+			name (n),
+			att (a)
+		{}
+
+		ABI2Servant (const AST::Parameter& p) :
+			type (p),
+			name (p.name ()),
+			att (p.attribute ())
+		{}
+
+		const AST::Type& type;
+		const AST::Identifier& name;
+		const AST::Parameter::Attribute att;
+	};
+
+	struct CatchBlock
+	{};
+
 protected:
 	virtual void end (const AST::Root&);
 	virtual void leaf (const AST::Include& item);
@@ -64,31 +87,18 @@ private:
 		epv_.clear ();
 	}
 	
-	void catch_block ();
 	void implementation_suffix (const AST::InterfaceKind ik);
 	void implementation_parameters (const AST::Interface& primary, const AST::Interfaces& bases);
 	void attribute (const AST::Member& m);
-	void generate_poller (const AST::Interface& itf);
-
-	struct AMI_Param
-	{
-		AST::Parameter::Attribute att;
-		const AST::Type type;
-		const AST::Identifier name;
-
-		AMI_Param (AST::Parameter::Attribute a, const AST::Type& t, const AST::Identifier& n) :
-			att (a), type (t), name (n)
-		{}
-
-		AMI_Param (AST::Parameter::Attribute a, const AST::Type& t, const char* n) :
-			att (a), type (t), name (n)
-		{}
-	};
+	std::string excep_handler (const AST::Interface& ami, const std::string& op, const AST::Raises& raises);
 
 private:
 	Header h_;
 	std::vector <std::string> epv_;
 	bool attributes_by_ref_;
 };
+
+Code& operator << (Code& stm, const Servant::ABI2Servant& val);
+Code& operator << (Code& stm, const Servant::CatchBlock&);
 
 #endif

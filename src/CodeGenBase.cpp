@@ -849,10 +849,22 @@ void CodeGenBase::fill_epv (Code& stm, const std::vector <std::string>& epv, boo
 		<< "\n};\n";
 }
 
-CodeGenBase::AMI_Bases CodeGenBase::AMI_Name::bases () const
+CodeGenBase::AMI_Bases CodeGenBase::AMI_Name::all_bases () const
 {
 	AMI_Bases ret;
 	Interfaces base_interfaces = itf.get_all_bases ();
+	ret.reserve (base_interfaces.size ());
+	for (auto b : base_interfaces) {
+		if (async_supported (*b))
+			ret.emplace_back (*b, suf);
+	}
+	return ret;
+}
+
+CodeGenBase::AMI_Bases CodeGenBase::AMI_Name::direct_bases () const
+{
+	AMI_Bases ret;
+	Interfaces base_interfaces = itf.bases ();
 	ret.reserve (base_interfaces.size ());
 	for (auto b : base_interfaces) {
 		if (async_supported (*b))

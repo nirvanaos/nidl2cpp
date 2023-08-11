@@ -937,7 +937,7 @@ void Servant::generate_poller (const Interface& itf)
 		"S::template _wide_val <Pollable, " << ami << ">,\n"
 		"S::template _wide_val <::Messaging::Poller, " << ami << ">";
 
-	const AMI_Bases bases = ami.bases ();
+	const AMI_Bases bases = ami.all_bases ();
 
 	for (const auto& b : bases) {
 		h_ << ",\n"

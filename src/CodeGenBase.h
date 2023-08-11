@@ -27,10 +27,11 @@
 #define NIDL2CPP_CODEGENBASE_H_
 #pragma once
 
-#include <unordered_set>
+#include "Compiler.h"
 #include "Code.h"
 #include "Options.h"
 #include <BE/MessageOut.h>
+#include <unordered_set>
 
 #define FACTORY_SUFFIX "_factory"
 #define EXCEPTION_SUFFIX "::_Data"
@@ -134,7 +135,8 @@ public:
 
 		AMI_Name (const AST::Interface& i, const char* suffix);
 
-		AMI_Bases bases () const;
+		AMI_Bases all_bases () const;
+		AMI_Bases direct_bases () const;
 	};
 
 	static void ami_skeleton_begin (Code& stm, const AMI_Name& ami);
@@ -142,8 +144,9 @@ public:
 	static void fill_epv (Code& stm, const std::vector <std::string>& epv, bool val_with_concrete_itf = false);
 
 protected:
-	CodeGenBase (const Options& options) :
-		options_ (options)
+	CodeGenBase (const Compiler& compiler) :
+		BE::MessageOut (compiler.err_out ()),
+		options_ (compiler)
 	{}
 
 	virtual void leaf (const AST::Include& item) {}

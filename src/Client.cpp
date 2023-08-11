@@ -2244,7 +2244,7 @@ void Client::generate_poller (const Interface& itf)
 		"NIRVANA_BASE_ENTRY (Pollable, CORBA_Pollable)\n"
 		"NIRVANA_BASE_ENTRY (::Messaging::Poller, Messaging_Poller)\n";
 
-	AMI_Bases bases = ami.bases ();
+	AMI_Bases bases = ami.all_bases ();
 	async_bridge_bases (bases);
 
 	for (auto item : itf) {
@@ -2400,7 +2400,7 @@ void Client::generate_handler (const Interface& itf)
 	h_ << "NIRVANA_BASE_ENTRY (Object, CORBA_Object)\n"
 		"NIRVANA_BASE_ENTRY (::Messaging::ReplyHandler, Messaging_ReplyHandler)\n";
 
-	AMI_Bases bases = ami.bases ();
+	AMI_Bases bases = ami.all_bases ();
 	async_bridge_bases (bases);
 
 	for (auto item : itf) {
@@ -2549,6 +2549,78 @@ void Client::generate_handler (const Interface& itf)
 		<< "}";
 
 	fill_epv (h_, epv, false);
+
+	// AMI handler servant
+	if (!options ().no_servant) {
+
+		// Standard implementation
+		h_.empty_line ();
+		h_ << "template <class S>\n"
+			"class Servant <S, " << ami << "> : public Implementation <S, " << ami;
+		for (const auto& b : bases) {
+			h_ << ",\n" << b;
+		}
+		h_ << ">\n"
+			"{};\n";
+
+		// Static implementation
+		h_.empty_line ();
+		h_ << "template <class S>\n"
+			"class ServantStatic <S, " << ami << "> : public ImplementationStatic <S, ";
+		for (const auto& b : bases) {
+			h_ << ",\n" << b;
+		}
+		h_ << "{};\n";
+
+		// POA implementation
+		h_ << empty_line
+			<< "template <>\n"
+			"class NIRVANA_NOVTABLE ServantPOA <" << ami << "> :\n"
+			<< indent;
+
+		if (bases.empty ()) {
+			h_ << "public virtual ServantPOA < ::Messaging::ReplyHandler>,\n";
+		} else {
+			AMI_Bases direct_bases = ami.direct_bases ();
+			for (const auto& b : direct_bases) {
+				h_ << "public virtual ServantPOA <" << b << ">,\n";
+			}
+		}
+		h_ << "public InterfaceImpl <ServantPOA <" << ami << ">, " << ami << ">\n";
+		h_ << unindent
+			<< "{\n"
+			"public:\n"
+			<< indent
+			<< "typedef " << ami << " PrimaryInterface;\n\n"
+			"virtual Interface* _query_interface (const String& id) override\n"
+			"{\n"
+			<< indent
+			<< "return FindInterface <" << ami;
+		for (auto b : bases) {
+			h_ << ", " << b;
+		}
+		h_ << ">::find (*this, id);\n"
+			<< unindent
+			<< "}\n\n"
+			<< "Type <" << ami << ">::VRet _this ()\n"
+			"{\n"
+			<< indent
+			<< "return this->_get_proxy ().template downcast <" << ami
+			<< "> ();\n"
+			<< unindent
+			<< "}\n";
+
+		// Operations
+		h_
+			<< unindent
+			<< "\nprotected:\n"
+			<< indent
+			<< "ServantPOA ()\n"
+			"{}\n";
+
+		h_ << unindent
+			<< "};\n";
+	}
 }
 
 std::string Client::excep_handler (const AMI_Name& ami, const std::string& op, const AST::Raises& raises)

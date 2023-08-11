@@ -895,7 +895,7 @@ void Proxy::generate_poller (const Interface& itf)
 		"template <>\n"
 		"class Poller <" << ami << "> : public PollerBase <" << ami;
 	
-	AMI_Bases bases = ami.bases ();
+	AMI_Bases bases = ami.all_bases ();
 	for (const auto& b : bases) {
 		cpp_ << ", " << b;
 	}

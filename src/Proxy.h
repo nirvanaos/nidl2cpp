@@ -34,14 +34,14 @@
 class Proxy : public CodeGenBase
 {
 public:
-	Proxy (const Options& options, const AST::Root& root,
+	Proxy (const Compiler& compiler, const AST::Root& root,
 		const std::filesystem::path& file, const std::filesystem::path& servant) :
-		CodeGenBase (options),
+		CodeGenBase (compiler),
 		cpp_ (file, root),
 		custom_ (false)
 	{
-		if (!options.inc_cpp.empty ())
-			cpp_ << "#include \"" << options.inc_cpp << "\"\n";
+		if (!compiler.inc_cpp.empty ())
+			cpp_ << "#include \"" << compiler.inc_cpp << "\"\n";
 
 		cpp_ << "#include <CORBA/Proxy/Proxy.h>\n"
 			"#include ";

@@ -34,6 +34,12 @@ class Compiler :
 	public IDL_FrontEnd,
 	public Options
 {
+public:
+	std::ostream& err_out () const noexcept
+	{
+		return IDL_FrontEnd::err_out ();
+	}
+
 private:
 	// Override print_usage_info for additional usage information.
 	virtual void print_usage_info (const char* exe_name);

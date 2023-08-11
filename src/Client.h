@@ -34,15 +34,15 @@
 class Client : public CodeGenBase
 {
 public:
-	Client (const Options& options, const AST::Root& root,
+	Client (const Compiler& compiler, const AST::Root& root,
 		const std::filesystem::path& file_h, const std::filesystem::path& file_cpp) :
-		CodeGenBase (options),
+		CodeGenBase (compiler),
 		h_ (file_h, root),
 		cpp_ (file_cpp, root),
 		export_count_ (0)
 	{
-		if (!options.inc_cpp.empty ())
-			cpp_ << "#include \"" << options.inc_cpp << "\"\n";
+		if (!compiler.inc_cpp.empty ())
+			cpp_ << "#include \"" << compiler.inc_cpp << "\"\n";
 
 		cpp_ << "#include <CORBA/CORBA.h>\n"
 			"#include <Nirvana/OLF.h>\n"

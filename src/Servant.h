@@ -34,9 +34,9 @@
 class Servant : public CodeGenBase
 {
 public:
-	Servant (const Options& options, const AST::Root& root,
+	Servant (const Compiler& compiler, const AST::Root& root,
 		const std::filesystem::path& file, const std::filesystem::path& client) :
-		CodeGenBase (options),
+		CodeGenBase (compiler),
 		h_ (file, root),
 		attributes_by_ref_ (false)
 	{

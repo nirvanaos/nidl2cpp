@@ -423,6 +423,15 @@ bool CodeGenBase::is_native (const Members& members)
 	return false;
 }
 
+bool CodeGenBase::is_native (const Raises& raises)
+{
+	for (const auto& ex : raises) {
+		if (ex->kind () == Item::Kind::NATIVE)
+			return true;
+	}
+	return false;
+}
+
 const AST::Enum* CodeGenBase::is_enum (const Type& type)
 {
 	const Type& t = type.dereference_type ();
@@ -729,57 +738,22 @@ bool CodeGenBase::is_custom (const Interface& itf) noexcept
 
 bool CodeGenBase::async_supported (const Interface& itf) noexcept
 {
-	static const char* const system_modules [] = {
-		"CORBA",
-		"PortableServer",
-		"Messaging"
-	};
+	if (itf.interface_kind () == InterfaceKind::UNCONSTRAINED) {
+		//if (is_stateless (itf) || is_custom (itf))
+		//	return false;
+		if (itf.scoped_name () == ScopedName (Location (), true, { "Messaging", "ReplyHandler" }))
+			return false;
 
-	switch (itf.interface_kind ()) {
-	case InterfaceKind::UNCONSTRAINED:
-		return !is_stateless (itf) && !is_custom (itf);
-
-	case InterfaceKind::LOCAL: {
-		if (!is_stateless (itf) && !is_custom (itf)) {
-			auto parent = itf.parent ();
-			if (parent && !parent->parent ()) {
-				for (auto p = system_modules; p != std::end (system_modules); ++p) {
-					if (parent->name () == *p)
-						return false; // CORBA local interfaces are not considered as asynchronous
-				}
+		// Do not generate AMI for empty interfaces
+		for (auto item : itf) {
+			switch (item->kind ()) {
+			case Item::Kind::OPERATION:
+			case Item::Kind::ATTRIBUTE:
+				return true;
 			}
-			return true;
 		}
-	}
 	}
 	return false;
-}
-
-void CodeGenBase::fill_epv (Code& stm, const std::vector <std::string>& epv, bool val_with_concrete_itf)
-{
-	if (!epv.empty () || val_with_concrete_itf) {
-		stm << ",\n"
-			"{ // EPV\n"
-			<< indent;
-
-		if (val_with_concrete_itf)
-			stm << SKELETON_FUNC_PREFIX "this";
-
-		auto n = epv.begin ();
-		if (n != epv.end ()) {
-			if (!val_with_concrete_itf) {
-				stm << "S::" << *(n++);
-			}
-			for (; n != epv.end (); ++n) {
-				stm << ",\nS::" << *n;
-			}
-		}
-		stm << unindent
-			<< "\n}";
-	}
-
-	stm << unindent
-		<< "\n};\n";
 }
 
 Code& operator << (Code& stm, const QName& qn)

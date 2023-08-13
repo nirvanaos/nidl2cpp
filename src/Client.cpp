@@ -451,12 +451,15 @@ void Client::end_interface (const IV_Base& container)
 			h_ << "Interface* (*_this) (Bridge <" << QName (vt) << ">*, Interface*);\n";
 	}
 
-	for (auto it = container.begin (); it != container.end (); ++it) {
-		const Item& item = **it;
-		switch (item.kind ()) {
+	for (auto item : container) {
+		switch (item->kind ()) {
 
 			case Item::Kind::OPERATION: {
-				const Operation& op = static_cast <const Operation&> (item);
+				const Operation& op = static_cast <const Operation&> (*item);
+
+				if (is_native (op.raises ()))
+					break;
+
 				h_ << ABI_ret (op) << " (*" << op.name () << ") (Bridge <"
 					<< QName (container) << ">*";
 
@@ -469,21 +472,27 @@ void Client::end_interface (const IV_Base& container)
 			} break;
 
 			case Item::Kind::STATE_MEMBER:
-				if (!static_cast <const StateMember&> (item).is_public ())
+				if (!static_cast <const StateMember&> (*item).is_public ())
 					break;
-
+				[[fallthrough]];
 			case Item::Kind::ATTRIBUTE: {
-				const Member& m = static_cast <const Member&> (item);
-				h_ << ABI_ret (m, att_byref)
-					<< " (*_get_" << m.name () << ") (Bridge <" << QName (container)
-					<< ">*, Interface*);\n";
+				const Member& m = static_cast <const Member&> (*item);
+				const Attribute* att = nullptr;
+				if (item->kind () == Item::Kind::ATTRIBUTE)
+					att = &static_cast <const Attribute&> (m);
 
-				if (!(m.kind () == Item::Kind::ATTRIBUTE && static_cast <const Attribute&> (m).readonly ())) {
+				if (!att || !is_native (att->getraises ())) {
+					h_ << ABI_ret (m, att_byref)
+						<< " (*_get_" << m.name () << ") (Bridge <" << QName (container)
+						<< ">*, Interface*);\n";
+				}
+
+				if (!att || !(att->readonly () || is_native (att->setraises ()))) {
 					h_ << "void (*_set_" << m.name () << ") (Bridge <" << QName (container)
 						<< ">*, " << ABI_param (m) << ", Interface*);\n";
 				}
 
-				if (m.kind () == Item::Kind::STATE_MEMBER && is_var_len (m)) {
+				if (!att && is_var_len (m)) {
 					h_ << "void (*_move_" << m.name () << ") (Bridge <" << QName (container)
 						<< ">*, " << ABI_param (m, Parameter::Attribute::INOUT) << ", Interface*);\n";
 				}
@@ -491,9 +500,9 @@ void Client::end_interface (const IV_Base& container)
 		}
 	}
 
+	// Client interface
 	h_ << "NIRVANA_BRIDGE_END ()\n"
 		"\n"
-		// Client interface
 		"template <class T>\n"
 		"class Client <T, " << QName (container) << "> :\n"
 		<< indent
@@ -508,12 +517,11 @@ void Client::end_interface (const IV_Base& container)
 	if (concrete_itf && concrete_itf->interface_kind () != InterfaceKind::PSEUDO)
 		h_ << "Type <" << QName (*concrete_itf) << ">::VRet _this ();\n";
 
-	for (auto it = container.begin (); it != container.end (); ++it) {
-		const Item& item = **it;
-		switch (item.kind ()) {
+	for (auto item : container) {
+		switch (item->kind ()) {
 
 			case Item::Kind::OPERATION: {
-				const Operation& op = static_cast <const Operation&> (item);
+				const Operation& op = static_cast <const Operation&> (*item);
 
 				h_ << VRet (op) << ' ' << Signature (op) << ";\n";
 
@@ -522,11 +530,11 @@ void Client::end_interface (const IV_Base& container)
 			} break;
 
 			case Item::Kind::STATE_MEMBER:
-				if (!static_cast <const StateMember&> (item).is_public ())
+				if (!static_cast <const StateMember&> (*item).is_public ())
 					break;
-
+				[[fallthrough]];
 			case Item::Kind::ATTRIBUTE: {
-				const Member& m = static_cast <const Member&> (item);
+				const Member& m = static_cast <const Member&> (*item);
 
 				if (!att_byref)
 					h_ << VRet (m);
@@ -562,12 +570,14 @@ void Client::end_interface (const IV_Base& container)
 
 	// Client operations
 
-	for (auto it = container.begin (); it != container.end (); ++it) {
-		const Item& item = **it;
-		switch (item.kind ()) {
+	for (auto item : container) {
+		switch (item->kind ()) {
 
 			case Item::Kind::OPERATION: {
-				const Operation& op = static_cast <const Operation&> (item);
+				const Operation& op = static_cast <const Operation&> (*item);
+
+				if (is_native (op.raises ()))
+					break;
 
 				h_ << "\ntemplate <class T>\n"
 					<< VRet (op) << " Client <T, " << QName (container) << ">::" << Signature (op) << "\n"
@@ -601,41 +611,42 @@ void Client::end_interface (const IV_Base& container)
 			} break;
 
 			case Item::Kind::STATE_MEMBER:
-				if (!static_cast <const StateMember&> (item).is_public ())
+				if (!static_cast <const StateMember&> (*item).is_public ())
 					break;
-
+				[[fallthrough]];
 			case Item::Kind::ATTRIBUTE: {
-				const Member& m = static_cast <const Member&> (item);
-
-				h_ << "\ntemplate <class T>\n";
-				if (!att_byref)
-					h_ << VRet (m);
-				else
-					h_ << ConstRef (m);
-
-				h_ << " Client <T, " << QName (container) << ">::" << m.name () << " ()\n"
-					"{\n";
-
-				h_.indent ();
-
+				const Member& m = static_cast <const Member&> (*item);
 				const Attribute* att = nullptr;
 				if (m.kind () == Item::Kind::ATTRIBUTE)
 					att = &static_cast <const Attribute&> (m);
 
-				environment (att ? att->getraises () : Raises ());
-				h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n"
-					<< TypePrefix (m) << 'C';
+				if (!att || !is_native (att->getraises ())) {
+					h_ << "\ntemplate <class T>\n";
+					if (!att_byref)
+						h_ << VRet (m);
+					else
+						h_ << ConstRef (m);
 
-				if (att_byref)
-					h_ << "_VT";
+					h_ << " Client <T, " << QName (container) << ">::" << m.name () << " ()\n"
+						"{\n";
 
-				h_ << "_ret _ret ((_b._epv ().epv._get_" << m.name () << ") (&_b, &_env));\n"
-					"_env.check ();\n"
-					"return _ret;\n"
-					<< unindent
-					<< "}\n";
+					h_.indent ();
 
-				if (!(att && att->readonly ())) {
+					environment (att ? att->getraises () : Raises ());
+					h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n"
+						<< TypePrefix (m) << 'C';
+
+					if (att_byref)
+						h_ << "_VT";
+
+					h_ << "_ret _ret ((_b._epv ().epv._get_" << m.name () << ") (&_b, &_env));\n"
+						"_env.check ();\n"
+						"return _ret;\n"
+						<< unindent
+						<< "}\n";
+				}
+
+				if (!(att && (att->readonly () || is_native (att->setraises ())))) {
 					h_ << "\ntemplate <class T>\n"
 						"void Client <T, " << QName (container) << ">::" << m.name ()
 						<< " (" << Param (m) << " val)\n"
@@ -649,7 +660,7 @@ void Client::end_interface (const IV_Base& container)
 					<< "}\n";
 				}
 
-				if (m.kind () == Item::Kind::STATE_MEMBER && is_var_len (m)) {
+				if (!att && is_var_len (m)) {
 					h_ << "\ntemplate <class T>\n"
 						"void Client <T, " << QName (container) << ">::" << m.name ()
 						<< " (" << Var (m) << "&& val)\n"

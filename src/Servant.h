@@ -81,11 +81,7 @@ private:
 	void skeleton_begin (const AST::IV_Base& item, const char* suffix = "");
 	void skeleton_end (const AST::IV_Base& item, const char* suffix = "");
 	
-	void epv (bool val_with_concrete_itf = false)
-	{
-		fill_epv (h_, epv_, val_with_concrete_itf);
-		epv_.clear ();
-	}
+	void epv (bool val_with_concrete_itf = false);
 	
 	void implementation_suffix (const AST::InterfaceKind ik);
 	void implementation_parameters (const AST::Interface& primary, const AST::Interfaces& bases);

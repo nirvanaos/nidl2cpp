@@ -28,7 +28,9 @@
 #pragma once
 
 #include <IDL_FrontEnd.h>
+#include <AST/Interface.h>
 #include "Options.h"
+#include <unordered_map>
 
 class Compiler :
 	public IDL_FrontEnd,
@@ -38,6 +40,48 @@ public:
 	std::ostream& err_out () const noexcept
 	{
 		return IDL_FrontEnd::err_out ();
+	}
+
+	int main (int argc, char* argv [])
+	{
+		char fi [] = "-FI";
+		char ami [] = "CORBA/AMI.idl";
+
+		if (argc > 1) {
+			const char* arg1 = argv [1];
+			size_t len = strlen (arg1);
+			if (len >= 8) {
+				const char* end = arg1 + len;
+				if (std::equal (end - 7, end, "AMI.idl")) {
+					const char slash = *(end - 8);
+					if ('/' == slash || '\\' == slash)
+						return IDL_FrontEnd::main (argc, argv);
+				}
+			}
+		}
+
+		std::vector <char*> args;
+		args.resize (argc + 2);
+		auto arg = std::copy (argv, argv + argc, args.begin ());
+		*(arg++) = fi;
+		*(arg++) = ami;
+
+		return IDL_FrontEnd::main ((int)args.size (), args.data ());
+	}
+
+	struct AMI_Objects
+	{
+		const AST::ValueType* poller;
+		const AST::Interface* handler;
+	};
+
+	typedef std::unordered_map <const AST::Interface*, AMI_Objects> AMI_Map;
+
+	typedef std::vector <const AMI_Map::value_type*> AMI_Bases;
+
+	const AMI_Map& ami_map () const noexcept
+	{
+		return ami_map_;
 	}
 
 private:
@@ -52,7 +96,19 @@ private:
 	// Override generate_code to build output from the AST.
 	virtual void generate_code (const AST::Root& tree);
 
+	virtual void file_begin (const std::filesystem::path& file, AST::Builder& builder) override;
+	virtual void interface_end (const AST::Interface& itf, AST::Builder& builder) override;
+
+	AST::Identifier make_ami_id (const AST::Interface& itf, const char* suffix);
+
+	static bool async_supported (const AST::Interface& itf);
+
+	static AST::ScopedNames poller_raises (const AST::Location& loc, const AST::Raises& op_raises);
+
 	std::filesystem::path out_file (const AST::Root& tree, const std::filesystem::path& dir, const std::string& suffix, const std::filesystem::path& ext) const;
+
+private:
+	AMI_Map ami_map_;
 };
 
 #endif

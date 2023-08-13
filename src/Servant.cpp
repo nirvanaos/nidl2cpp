@@ -685,6 +685,34 @@ void Servant::end (const ValueType& vt)
 
 }
 
+void Servant::epv (bool val_with_concrete_itf)
+{
+	if (!epv_.empty () || val_with_concrete_itf) {
+		h_ << ",\n"
+			"{ // EPV\n"
+			<< indent;
+
+		if (val_with_concrete_itf)
+			h_ << SKELETON_FUNC_PREFIX "this";
+
+		auto n = epv_.begin ();
+		if (n != epv_.end ()) {
+			if (!val_with_concrete_itf) {
+				h_ << "S::" << *(n++);
+			}
+			for (; n != epv_.end (); ++n) {
+				h_ << ",\nS::" << *n;
+			}
+		}
+		h_ << unindent
+			<< "\n}";
+	}
+
+	h_ << unindent
+		<< "\n};\n";
+	epv_.clear ();
+}
+
 void Servant::implementation_suffix (const InterfaceKind ik)
 {
 	switch (ik.interface_kind ()) {
@@ -708,6 +736,9 @@ void Servant::implementation_parameters (const Interface& primary, const Interfa
 
 void Servant::leaf (const Operation& op)
 {
+	if (is_native (op.raises ()))
+		return;
+
 	const ItemScope& itf = *op.parent ();
 
 	h_ << "static " << ABI_ret (op);
@@ -764,32 +795,38 @@ void Servant::leaf (const StateMember& m)
 
 void Servant::attribute (const Member& m)
 {
+	const Attribute* att = nullptr;
+	if (m.kind () == Item::Kind::ATTRIBUTE)
+		att = &static_cast <const Attribute&> (m);
+
 	const ItemScope& itf = *m.parent ();
 
-	h_ << "static " << ABI_ret (m, attributes_by_ref_);
-	{
-		std::string name = SKELETON_GETTER_PREFIX;
-		name += m.name ();
-		h_ << ' ' << name << " (Bridge <" << QName (itf) << ">* _b, Interface* _env) noexcept\n"
-			"{\n";
-		epv_.push_back (std::move (name));
+	if (!att || !is_native (att->getraises ())) {
+		h_ << "static " << ABI_ret (m, attributes_by_ref_);
+		{
+			std::string name = SKELETON_GETTER_PREFIX;
+			name += m.name ();
+			h_ << ' ' << name << " (Bridge <" << QName (itf) << ">* _b, Interface* _env) noexcept\n"
+				"{\n";
+			epv_.push_back (std::move (name));
+		}
+		h_ << indent
+			<< "try {\n"
+			<< indent
+			<< "return " << TypePrefix (m);
+		if (attributes_by_ref_)
+			h_ << "VT_";
+		h_ << "ret (S::_implementation (_b)." << m.name () << " ());\n"
+			<< CatchBlock ()
+			<< "return " << TypePrefix (m);
+		if (attributes_by_ref_)
+			h_ << "VT_";
+		h_ << "ret ();\n"
+			<< unindent
+			<< "}\n";
 	}
-	h_ << indent
-		<< "try {\n"
-		<< indent
-		<< "return " << TypePrefix (m);
-	if (attributes_by_ref_)
-		h_ << "VT_";
-	h_ << "ret (S::_implementation (_b)." << m.name () << " ());\n"
-		<< CatchBlock ()
-		<< "return " << TypePrefix (m);
-	if (attributes_by_ref_)
-		h_ << "VT_";
-	h_ << "ret ();\n"
-		<< unindent
-		<< "}\n";
 
-	if (!(m.kind () == Item::Kind::ATTRIBUTE && static_cast <const Attribute&> (m).readonly ())) {
+	if (!att || !(att->readonly () || is_native (att->setraises ()))) {
 		{
 			std::string name = SKELETON_SETTER_PREFIX;
 			name += m.name ();
@@ -807,7 +844,7 @@ void Servant::attribute (const Member& m)
 			<< "}\n";
 	}
 
-	if (m.kind () == Item::Kind::STATE_MEMBER && is_var_len (m)) {
+	if (!att && is_var_len (m)) {
 		{
 			std::string name = SKELETON_MOVE_PREFIX;
 			name += m.name ();

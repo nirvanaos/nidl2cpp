@@ -28,6 +28,7 @@
 #include "Client.h"
 #include "Servant.h"
 #include "Proxy.h"
+#include <AST/Builder.h>
 #include <iostream>
 
 using std::filesystem::path;
@@ -145,4 +146,186 @@ void Compiler::generate_code (const Root& tree)
 		Proxy proxy (*this, tree, out_file (tree, out_cpp, proxy_suffix, "cpp"), servant_h);
 		tree.visit (proxy);
 	}
+}
+
+void Compiler::file_begin (const std::filesystem::path& file, Builder& builder)
+{
+	ami_map_.clear ();
+}
+
+void Compiler::interface_end (const Interface& itf, Builder& builder)
+{
+	if (async_supported (itf)) {
+
+		Location loc = builder.location ();
+		SimpleDeclarator ami_return_val (AMI_RETURN_VAL, loc);
+
+		AMI_Objects ami_objects;
+
+		AMI_Bases async_bases;
+		for (const auto b : itf.bases ()) {
+			auto f = ami_map_.find (b);
+			if (f != ami_map_.end ())
+				async_bases.push_back (&*f);
+		}
+
+		{ // Make Poller
+			SimpleDeclarator ami_timeout (AMI_TIMEOUT, loc);
+
+			builder.valuetype_begin (SimpleDeclarator (make_ami_id (itf, AMI_POLLER), loc), ValueType::Modifier::ABSTRACT);
+
+			ScopedNames bases;
+			for (const auto b : async_bases) {
+				bases.push_front (b->second.poller->scoped_name ());
+			}
+			if (bases.empty ()) {
+				ScopedName base (loc, true, { "Messaging", "Poller" });
+				bases.push_front (std::move (base));
+			}
+			builder.valuetype_bases (false, bases);
+
+			for (auto item : itf) {
+				switch (item->kind ()) {
+				case Item::Kind::OPERATION: {
+					const Operation& op = static_cast <const Operation&> (*item);
+					builder.operation_begin (false, Type (), SimpleDeclarator (op.name (), loc));
+
+					builder.parameter (Parameter::Attribute::IN, Type (BasicType::ULONG), ami_timeout);
+					if (op.tkind () != Type::Kind::VOID)
+						builder.parameter (Parameter::Attribute::OUT, Type (op), ami_return_val);
+
+					for (auto par : op) {
+						if (par->attribute () != Parameter::Attribute::IN)
+							builder.parameter (Parameter::Attribute::OUT, Type (*par), SimpleDeclarator (par->name (), loc));
+					}
+
+					builder.raises (poller_raises (loc, op.raises ()));
+					builder.operation_end ();
+				} break;
+
+				case Item::Kind::ATTRIBUTE: {
+					const Attribute& att = static_cast <const Attribute&> (*item);
+
+					builder.operation_begin (false, Type (), SimpleDeclarator ("get_" + att.name (), loc));
+					builder.parameter (Parameter::Attribute::IN, Type (BasicType::ULONG), ami_timeout);
+					builder.parameter (Parameter::Attribute::OUT, Type (att), ami_return_val);
+					builder.raises (poller_raises (loc, att.getraises ()));
+					builder.operation_end ();
+
+					if (!att.readonly ()) {
+						builder.operation_begin (false, Type (), SimpleDeclarator ("set_" + att.name (), loc));
+						builder.parameter (Parameter::Attribute::IN, Type (BasicType::ULONG), ami_timeout);
+						builder.raises (poller_raises (loc, att.setraises ()));
+						builder.operation_end ();
+					}
+				} break;
+				}
+			}
+
+			ami_objects.poller = static_cast <const ValueType*> (builder.cur_parent ());
+			builder.valuetype_end ();
+		}
+
+		{ // Make Handler
+
+			const Type exception_holder = builder.lookup_type (ScopedName (loc, true, { "Messaging", "ExceptionHolder" }));
+			SimpleDeclarator excep_holder ("excep_holder", loc);
+
+			builder.interface_begin (SimpleDeclarator (make_ami_id (itf, AMI_POLLER), loc), InterfaceKind::UNCONSTRAINED);
+
+			ScopedNames bases;
+			for (const auto b : async_bases) {
+				bases.push_front (b->second.handler->scoped_name ());
+			}
+			if (bases.empty ()) {
+				ScopedName base (loc, true, { "Messaging", "ReplyHandler" });
+				bases.push_front (std::move (base));
+			}
+			builder.interface_bases (bases);
+
+			for (auto item : itf) {
+				switch (item->kind ()) {
+				case Item::Kind::OPERATION: {
+					const Operation& op = static_cast <const Operation&> (*item);
+
+					builder.operation_begin (false, Type (), SimpleDeclarator (op.name (), loc));
+
+					if (op.tkind () != Type::Kind::VOID)
+						builder.parameter (Parameter::Attribute::IN, Type (op), ami_return_val);
+
+					for (auto par : op) {
+						if (par->attribute () != Parameter::Attribute::IN)
+							builder.parameter (Parameter::Attribute::IN, Type (*par), SimpleDeclarator (par->name (), loc));
+					}
+
+					builder.operation_end ();
+
+					builder.operation_begin (false, Type (), SimpleDeclarator (op.name () + AMI_EXCEP, loc));
+					builder.parameter (Parameter::Attribute::IN, Type (exception_holder), excep_holder);
+					builder.operation_end ();
+
+				} break;
+
+				case Item::Kind::ATTRIBUTE: {
+					const Attribute& att = static_cast <const Attribute&> (*item);
+
+					builder.operation_begin (false, Type (), SimpleDeclarator ("get_" + att.name (), loc));
+					builder.parameter (Parameter::Attribute::IN, Type (att), ami_return_val);
+					builder.operation_end ();
+
+					builder.operation_begin (false, Type (), SimpleDeclarator ("get_" + att.name () + AMI_EXCEP, loc));
+					builder.parameter (Parameter::Attribute::IN, Type (exception_holder), excep_holder);
+					builder.operation_end ();
+
+					if (!att.readonly ()) {
+						builder.operation_begin (false, Type (), SimpleDeclarator ("set_" + att.name (), loc));
+						builder.operation_end ();
+
+						builder.operation_begin (false, Type (), SimpleDeclarator ("set_" + att.name () + AMI_EXCEP, loc));
+						builder.parameter (Parameter::Attribute::IN, Type (exception_holder), excep_holder);
+						builder.operation_end ();
+					}
+				} break;
+				}
+			}
+
+			ami_objects.handler = static_cast <const Interface*> (builder.cur_parent ());
+			builder.interface_end ();
+		}
+
+		ami_map_.emplace (&itf, ami_objects);
+	}
+}
+
+bool Compiler::async_supported (const Interface& itf)
+{
+	return CodeGenBase::async_supported (itf);
+}
+
+Identifier Compiler::make_ami_id (const Interface& itf, const char* suffix)
+{
+	std::string id = "AMI_" + itf.name () + suffix;
+	const Symbols* scope = itf.parent_scope ();
+	assert (scope);
+	while (scope && scope->find (static_cast <const Identifier&> (id))) {
+		id.insert (0, "AMI_");
+	}
+	return id;
+}
+
+ScopedNames Compiler::poller_raises (const AST::Location& loc, const AST::Raises& op_raises)
+{
+	bool wrong_transaction_found = false;
+	ScopedName wrong_transaction (loc, true, { "CORBA", "WrongTransaction" });
+	ScopedNames exceptions;
+	for (auto ex : op_raises) {
+		ScopedName sn = ex->scoped_name ();
+		if (sn == wrong_transaction)
+			wrong_transaction_found = true;
+		exceptions.push_front (std::move (sn));
+	}
+	if (!wrong_transaction_found)
+		exceptions.push_front (std::move (wrong_transaction));
+
+	return exceptions;
 }

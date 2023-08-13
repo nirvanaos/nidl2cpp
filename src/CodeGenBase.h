@@ -88,6 +88,7 @@ public:
 	static bool is_servant (const AST::Type& type);
 	static bool is_native (const AST::Type& type);
 	static bool is_native (const Members& members);
+	static bool is_native (const AST::Raises& raises);
 	static bool is_boolean (const AST::Type& type);
 
 	static bool is_sequence (const AST::Type& type)
@@ -100,7 +101,7 @@ public:
 	static bool is_bounded (const AST::Type& type);
 	void init_union (Code& stm, const AST::UnionElement& init_el, const char* prefix = "");
 
-	static void fill_epv (Code& stm, const std::vector <std::string>& epv, bool val_with_concrete_itf = false);
+	static bool async_supported (const AST::Interface& itf) noexcept;
 
 protected:
 	CodeGenBase (const Compiler& compiler) :
@@ -149,8 +150,6 @@ protected:
 	static bool is_custom (const AST::Operation& op) noexcept;
 	static bool is_custom (const AST::Interface& itf) noexcept;
 
-	static bool async_supported (const AST::Interface& itf) noexcept;
-	
 private:
 	static bool pred (const char* l, const char* r)
 	{

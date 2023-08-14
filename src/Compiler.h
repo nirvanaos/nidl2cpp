@@ -86,15 +86,15 @@ public:
 
 private:
 	// Override print_usage_info for additional usage information.
-	virtual void print_usage_info (const char* exe_name);
+	virtual void print_usage_info (const char* exe_name) override;
 
 	// Override parse_command_line to parse own command line switches.
-	virtual bool parse_command_line (CmdLine& args);
+	virtual bool parse_command_line (CmdLine& args) override;
 
 	static const char* option (const char* arg, const char* opt);
 
 	// Override generate_code to build output from the AST.
-	virtual void generate_code (const AST::Root& tree);
+	virtual void generate_code (const AST::Root& tree) override;
 
 	virtual void file_begin (const std::filesystem::path& file, AST::Builder& builder) override;
 	virtual void interface_end (const AST::Interface& itf, AST::Builder& builder) override;
@@ -105,7 +105,8 @@ private:
 
 	static AST::ScopedNames poller_raises (const AST::Location& loc, const AST::Raises& op_raises);
 
-	std::filesystem::path out_file (const AST::Root& tree, const std::filesystem::path& dir, const std::string& suffix, const std::filesystem::path& ext) const;
+	std::filesystem::path out_file (const AST::Root& tree, const std::filesystem::path& dir,
+		const std::string& suffix, const std::filesystem::path& ext) const;
 
 private:
 	AMI_Map ami_map_;

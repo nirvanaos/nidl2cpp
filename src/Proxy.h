@@ -93,8 +93,8 @@ private:
 
 	Code& exp (const AST::NamedItem& item);
 
-	void generate_proxy (const AST::Interface& itf);
-	void generate_poller (const AST::Interface& itf);
+	void generate_proxy (const AST::Interface& itf, const AST::ValueType* poller);
+	void generate_poller (const AST::Interface& itf, const AST::ValueType& poller);
 
 private:
 	Code cpp_;

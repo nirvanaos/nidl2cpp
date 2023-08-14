@@ -222,12 +222,25 @@ void Proxy::end (const Interface& itf)
 	if (itf.interface_kind () == InterfaceKind::PSEUDO)
 		return;
 
-	generate_proxy (itf);
+	const ValueType* poller = nullptr;
+	{
+		auto f = compiler ().ami_map ().find (&itf);
+		if (f != compiler ().ami_map ().end ())
+			poller = f->second.poller;
+	}
+	generate_proxy (itf, poller);
+	if (poller)
+		generate_poller (itf, *poller);
 
 	cpp_.namespace_close ();
 	cpp_ << "NIRVANA_EXPORT (" << export_name (itf) << ", CORBA::Internal::RepIdOf <" << QName (itf)
 		<< ">::id, CORBA::Internal::PseudoBase, CORBA::Internal::ProxyFactoryImpl"
-		<< " <" << QName (itf) << ">)\n";
+		<< " <" << QName (itf);
+
+	if (poller)
+		cpp_ << ", " << QName (*poller);
+
+	cpp_ << ">)\n";
 }
 
 void Proxy::md_operation (const Interface& itf, const OpMetadata& op, bool no_rq)
@@ -536,7 +549,7 @@ void Proxy::leaf (const Union& item)
 	exp (item) << "TypeCodeUnion <" << QName (item) << ">)\n";
 }
 
-void Proxy::generate_proxy (const Interface& itf)
+void Proxy::generate_proxy (const Interface& itf, const AST::ValueType* poller)
 {
 	cpp_.namespace_open ("CORBA/Internal");
 	cpp_.empty_line ();
@@ -868,42 +881,39 @@ void Proxy::generate_proxy (const Interface& itf)
 	else
 		cpp_ << "{Proxy <" << QName (itf) << ">::__operations, countof (Proxy <" << QName (itf) << ">::__operations)},\n";
 	cpp_ << (local_stateless ? "InterfaceMetadata::FLAG_LOCAL_STATELESS" : "0");
+	if (poller)
+		cpp_ << ",\n\"" << poller->repository_id () << '\"';
 	cpp_ << "\n" << unindent << "};\n";
 }
-/*
-void Proxy::generate_poller (const Interface& itf)
+
+void Proxy::generate_poller (const Interface& itf, const ValueType& poller)
 {
-	AMI_Name ami (itf, AMI_POLLER);
-
 	cpp_.namespace_open ("CORBA/Internal");
-
-	cpp_ << empty_line
-		<< "template <>\n"
-		"const Char TypeCodeName <" << ami << ">::name_ [] = \"" << ami.name << "\";\n";
-
-	cpp_ << empty_line <<
-		"template <>\n"
-		"class TypeCodeValue <" << ami << "> : public TypeCodeValueAbstract <"
-		<< ami << ">\n"
-		"{};\n";
-
-	cpp_.empty_line ();
 
 	cpp_ << "\n"
 		"template <>\n"
-		"class Poller <" << ami << "> : public PollerBase <" << ami;
+		"class Poller <" << QName (poller) << "> : public PollerBase <" << QName (poller);
+
+	std::vector <const ValueType*> base_pollers;
+	{
+		Interfaces bases = itf.get_all_bases ();
+		for (const auto& b : bases) {
+			auto f = compiler ().ami_map ().find (b);
+			if (f != compiler ().ami_map ().end ())
+				base_pollers.push_back (f->second.poller);
+		}
+	}
 	
-	AMI_Bases bases = ami.all_bases ();
-	for (const auto& b : bases) {
-		cpp_ << ", " << b;
+	for (const auto& b : base_pollers) {
+		cpp_ << ", " << QName (*b);
 	}
 	
 	cpp_ << ">\n"
 		"{\n"
 		<< indent
-		<< "typedef PollerBase <" << ami;
-	for (const auto& b : bases) {
-		cpp_ << ", " << b;
+		<< "typedef PollerBase <" << QName (poller);
+	for (const auto& b : base_pollers) {
+		cpp_ << ", " << QName (*b);
 	}
 
 	cpp_ << "> Base;\n\n"
@@ -974,19 +984,5 @@ void Proxy::generate_poller (const Interface& itf)
 	cpp_ << unindent << "};\n";
 
 	cpp_.namespace_close ();
-
-	std::string export_name = "_exp";
-	ScopedName sn = itf.scoped_name ();
-	for (auto it = sn.begin (), end = sn.end () - 1; it != end; ++it) {
-		export_name += '_';
-		export_name += *it;
-	}
-	export_name += '_';
-	export_name += ami.name;
-
-	cpp_ << "NIRVANA_EXPORT (" << export_name << ", CORBA::Internal::RepIdOf <"
-		<< ami << ">::id, CORBA"
-		"::TypeCode, CORBA::Internal::TypeCodeValue <"
-		<< ami << ">)\n";
 }
-*/
+

@@ -29,7 +29,7 @@
 
 #include "Compiler.h"
 #include "Code.h"
-#include "Options.h"
+#include "Compiler.h"
 #include <BE/MessageOut.h>
 #include <unordered_set>
 
@@ -55,9 +55,14 @@ public:
 	static bool is_keyword (const AST::Identifier& id);
 	inline static const char protected_prefix_ [] = "_cxx_";
 
-	const Options& options () const
+	const Options& options () const noexcept
 	{
-		return options_;
+		return compiler_;
+	}
+
+	const Compiler& compiler () const noexcept
+	{
+		return compiler_;
 	}
 
 	typedef AST::ContainerT <AST::Member> Members;
@@ -106,7 +111,7 @@ public:
 protected:
 	CodeGenBase (const Compiler& compiler) :
 		BE::MessageOut (compiler.err_out ()),
-		options_ (compiler)
+		compiler_ (compiler)
 	{}
 
 	virtual void leaf (const AST::Include& item) {}
@@ -167,7 +172,7 @@ private:
 private:
 	static const char* const protected_names_ [];
 
-	const Options& options_;
+	const Compiler& compiler_;
 };
 
 struct QName

@@ -515,9 +515,9 @@ void Servant::end (const ValueType& vt)
 			h_ << ",\n"
 			"public InterfaceImpl <S, AbstractBase>";
 
-		h_ << "\n"
+		h_ << "\n" << unindent <<
 			"{\n"
-			"public:\n";
+			"public:\n" << indent;
 
 		if (abstract_base)
 			h_ << "using InterfaceImpl <S, AbstractBase>::_get_abstract_base;\n";
@@ -759,20 +759,67 @@ void Servant::leaf (const Operation& op)
 		<< indent
 		<< "try {\n"
 		<< indent;
-	if (op.tkind () != Type::Kind::VOID)
-		h_ << "return " << TypePrefix (op) << "ret (";
-	h_ << "S::_implementation (_b)." << op.name () << " (";
-	if (!op.empty ()) {
-		auto par = op.begin ();
-		h_ << ABI2Servant (**par);
-		for (++par; par != op.end (); ++par) {
-			h_ << ", " << ABI2Servant (**par);
+
+	// Exception list for ExceptionHolder
+	const Raises* holder_raises = nullptr;
+	if (op.tkind () == Type::Kind::VOID) {
+		// Check for exception callback
+		if (itf.kind () == Item::Kind::INTERFACE
+			&& op.size () == 1
+			&& op.front ()->tkind () == Type::Kind::NAMED_TYPE
+			&& op.front ()->named_type ().qualified_name () == "::Messaging::ExceptionHolder"
+			&& op.name ().ends_with (AMI_EXCEP)
+			) {
+			// Probably a handler
+			auto f = compiler ().ami_handler_map ().find (&static_cast <const Interface&> (itf));
+			if (f != compiler ().ami_handler_map ().end ()) {
+				// Yes it is a handler
+				const Interface& main_itf = *f->second;
+				Identifier op_name = op.name ();
+				// Trim "_excep" suffix
+				op_name.resize (op_name.size () - 6);
+				const NamedItem* main_op = find_item (main_itf, op_name, Item::Kind::OPERATION);
+				if (main_op)
+					holder_raises = &static_cast <const Operation&> (*main_op).raises ();
+				else {
+					// Try attribute
+					bool getter = op_name.starts_with ("get_");
+					if (getter || op_name.starts_with ("set_")) {
+						op_name.erase (0, 4);
+						main_op = find_item (main_itf, op_name, Item::Kind::ATTRIBUTE);
+						if (main_op) {
+							const Attribute& att = static_cast <const Attribute&> (*main_op);
+							if (getter || !att.readonly ()) {
+								// OK, it is attribute
+								holder_raises = getter ? &att.getraises () : &att.setraises ();
+							}
+						}
+					}
+				}
+			}
 		}
+	} else
+		h_ << "return " << TypePrefix (op) << "ret (";
+
+	if (holder_raises && !holder_raises->empty ()) {
+		h_ << "::Messaging::ExceptionHolder::_ptr_type _eh = Type < ::Messaging::ExceptionHolder>::in ("
+			<< op.front ()->name () << ");\n"
+			"set_user_exceptions <" << *holder_raises << "> (_eh);\n"
+			"S::_implementation (_b)." << op.name () << " (_eh);\n";
+	} else {
+		h_ << "S::_implementation (_b)." << op.name () << " (";
+		if (!op.empty ()) {
+			auto par = op.begin ();
+			h_ << ABI2Servant (**par);
+			for (++par; par != op.end (); ++par) {
+				h_ << ", " << ABI2Servant (**par);
+			}
+		}
+		if (op.tkind () != Type::Kind::VOID)
+			h_ << ')';
+		h_ << ");\n";
 	}
-	if (op.tkind () != Type::Kind::VOID)
-		h_ << ')';
-	h_ << ");\n"
-		<< CatchBlock ();
+	h_	<< CatchBlock ();
 	if (op.tkind () != Type::Kind::VOID) {
 		// Return default value on exception
 		h_ << "return " << TypePrefix (op) << "ret ();\n";
@@ -780,6 +827,18 @@ void Servant::leaf (const Operation& op)
 
 	h_ << unindent
 		<< "}\n\n";
+}
+
+const NamedItem* Servant::find_item (const Interface& itf, const Identifier& name, Item::Kind kind)
+{
+	for (auto item : itf) {
+		if (item->kind () == kind) {
+			const NamedItem& ni = static_cast <const NamedItem&> (*item);
+			if (ni.name () == name)
+				return &ni;
+		}
+	}
+	return nullptr;
 }
 
 void Servant::leaf (const Attribute& att)
@@ -864,23 +923,6 @@ void Servant::attribute (const Member& m)
 	}
 
 	h_ << std::endl;
-}
-
-std::string Servant::excep_handler (const Interface& ami, const std::string& op, const Raises& raises)
-{
-	std::string name = SKELETON_FUNC_PREFIX + op + AMI_EXCEP;
-	h_ << "static void " << name
-		<< " (Bridge <" << QName (ami) << ">* _b, Any* exc, Interface* _env) noexcept\n"
-		"{\n" << indent
-		<< "try {\n" << indent
-		<< "S::_implementation (_b)." << op
-		<< AMI_EXCEP " (ExceptionHolder::make <" << raises
-		<< "> (std::move (*exc)));\n"
-		<< CatchBlock ()
-		<< unindent
-		<< "}\n\n";
-
-	return name;
 }
 
 Code& operator << (Code& stm, const Servant::ABI2Servant& val)

@@ -86,7 +86,8 @@ private:
 	void implementation_suffix (const AST::InterfaceKind ik);
 	void implementation_parameters (const AST::Interface& primary, const AST::Interfaces& bases);
 	void attribute (const AST::Member& m);
-	std::string excep_handler (const AST::Interface& ami, const std::string& op, const AST::Raises& raises);
+
+	static const AST::NamedItem* find_item (const AST::Interface& itf, const AST::Identifier& name, AST::Item::Kind kind);
 
 private:
 	Header h_;

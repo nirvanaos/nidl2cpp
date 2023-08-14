@@ -84,6 +84,14 @@ public:
 		return ami_map_;
 	}
 
+	// Handler interface -> interface.
+	typedef std::unordered_map <const AST::Interface*, const AST::Interface*> AMI_HandlerMap;
+
+	const AMI_HandlerMap& ami_handler_map () const noexcept
+	{
+		return ami_handler_map_;
+	}
+
 private:
 	// Override print_usage_info for additional usage information.
 	virtual void print_usage_info (const char* exe_name) override;
@@ -110,6 +118,7 @@ private:
 
 private:
 	AMI_Map ami_map_;
+	AMI_HandlerMap ami_handler_map_;
 };
 
 #endif

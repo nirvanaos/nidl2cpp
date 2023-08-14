@@ -741,7 +741,7 @@ bool CodeGenBase::async_supported (const Interface& itf) noexcept
 	if (itf.interface_kind () == InterfaceKind::UNCONSTRAINED) {
 		//if (is_stateless (itf) || is_custom (itf))
 		//	return false;
-		if (itf.scoped_name () == ScopedName (Location (), true, { "Messaging", "ReplyHandler" }))
+		if (itf.qualified_name () == "::Messaging::ReplyHandler")
 			return false;
 
 		// Do not generate AMI for empty interfaces

@@ -151,6 +151,7 @@ void Compiler::generate_code (const Root& tree)
 void Compiler::file_begin (const std::filesystem::path& file, Builder& builder)
 {
 	ami_map_.clear ();
+	ami_handler_map_.clear ();
 }
 
 void Compiler::interface_end (const Interface& itf, Builder& builder)
@@ -231,7 +232,7 @@ void Compiler::interface_end (const Interface& itf, Builder& builder)
 			const Type exception_holder = builder.lookup_type (ScopedName (loc, true, { "Messaging", "ExceptionHolder" }));
 			SimpleDeclarator excep_holder ("excep_holder", loc);
 
-			builder.interface_begin (SimpleDeclarator (make_ami_id (itf, AMI_POLLER), loc), InterfaceKind::UNCONSTRAINED);
+			builder.interface_begin (SimpleDeclarator (make_ami_id (itf, AMI_HANDLER), loc), InterfaceKind::UNCONSTRAINED);
 
 			ScopedNames bases;
 			for (const auto b : async_bases) {
@@ -294,6 +295,7 @@ void Compiler::interface_end (const Interface& itf, Builder& builder)
 		}
 
 		ami_map_.emplace (&itf, ami_objects);
+		ami_handler_map_.emplace (ami_objects.handler, &itf);
 	}
 }
 

@@ -145,11 +145,11 @@ void Proxy::implement (const Operation& op, bool no_rq)
 		<< "}\n"; // Input params are out of scope here
 
 	// Marshal output
+	if (op.tkind () != Type::Kind::VOID)
+		cpp_ << TypePrefix (op) << "marshal_out (_ret, _call);\n";
 	for (auto p : params_out) {
 		cpp_ << TypePrefix (*p) << "marshal_out (" << p->name () << ", _call);\n";
 	}
-	if (op.tkind () != Type::Kind::VOID)
-		cpp_ << TypePrefix (op) << "marshal_out (_ret, _call);\n";
 
 	cpp_ << unindent
 		<< "}\n\n";
@@ -666,12 +666,12 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 
 						// Unmarshal output
 
-						for (auto p : op_md.params_out) {
-							cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";
-						}
 						if (op.tkind () != Type::Kind::VOID) {
 							cpp_ << Var (op) << " _ret;\n"
 								<< TypePrefix (op) << "unmarshal (_call, _ret);\n";
+						}
+						for (auto p : op_md.params_out) {
+							cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";
 						}
 						cpp_ << "_call->unmarshal_end ();\n";
 

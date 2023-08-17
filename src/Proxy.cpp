@@ -561,17 +561,23 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 
 	const char* proxy_base = stateless ? "ProxyBaseStateless" : "ProxyBase";
 
-	cpp_ << "\n"
-		"template <>\n"
-		"class Proxy <" << QName (itf) << "> : public " << proxy_base << " <" << QName (itf);
+	if (ami)
+		cpp_ << "NIRVANA_IMPLEMENT_AMI (Proxy <" << QName (itf) << ">, " << QName (itf) << ");\n\n";
+
+	cpp_ << "template <>\n"
+		"class Proxy <" << QName (itf) << "> : public " << proxy_base << " <" << QName (itf)
+		<< indent;
 
 	Interfaces bases = itf.get_all_bases ();
 	for (auto p : bases) {
-		cpp_ << ", " << QName (*p);
+		cpp_ << ",\n" << QName (*p);
 	}
 
-	cpp_ << '>'
-		<< indent;
+	cpp_ << '>';
+
+	if (ami)
+		cpp_ << ",\n"
+		"public AMI_Skeleton <Proxy <" << QName (itf) << ">, " << QName (itf) << '>';
 
 	cpp_ << unindent
 		<< "\n{\n"
@@ -692,7 +698,7 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 
 					// sendc_
 
-					cpp_ << "void " AMI_SENDC << std::string (op.name ()) << " ("
+					cpp_ << "void " AMI_SENDC << static_cast <const std::string&> (op.name ()) << " ("
 						<< ServantParam (Type (ami->handler)) << " " AMI_HANDLER;
 
 					for (auto param : op_md.params_in) {
@@ -716,7 +722,7 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 
 					// sendp_
 
-					cpp_ << POLLER_TYPE_PREFIX "VRet " AMI_SENDP << std::string (op.name ()) << " (";
+					cpp_ << POLLER_TYPE_PREFIX "VRet " AMI_SENDP << static_cast <const std::string&> (op.name ()) << " (";
 
 					auto param = op_md.params_in.begin ();
 					if (param != op_md.params_in.end ()) {
@@ -803,7 +809,7 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 
 					// sendc_
 
-					cpp_ << "void " AMI_SENDC "get_" << std::string (att.name ()) << " ("
+					cpp_ << "void " AMI_SENDC "get_" << static_cast <const std::string&> (att.name ()) << " ("
 						<< ServantParam (Type (ami->handler)) << " " AMI_HANDLER ") const\n"
 						"{\n" << indent
 						// Create request and call
@@ -814,7 +820,8 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 
 					// sendp_
 
-					cpp_ << POLLER_TYPE_PREFIX "VRet " AMI_SENDP "get_" << std::string (att.name ()) << " () const\n"
+					cpp_ << POLLER_TYPE_PREFIX "VRet " AMI_SENDP "get_" << static_cast <const std::string&> (att.name ())
+						<< " () const\n"
 						"{\n" << indent
 						// Create poller and request
 						<< "CORBA::Pollable::_ref_type _poller = _target ()->create_poller (" << op_idx << ");\n"
@@ -878,7 +885,7 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 
 					// sendc_
 
-					cpp_ << "void " AMI_SENDC "set_" << std::string (att.name ()) << " ("
+					cpp_ << "void " AMI_SENDC "set_" << static_cast <const std::string&> (att.name ()) << " ("
 						<< ServantParam (Type (ami->handler)) << " " AMI_HANDLER ", "
 						<< ServantParam (att) << " val) const\n"
 						"{\n" << indent
@@ -891,7 +898,8 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 
 					// sendp_
 
-					cpp_ << POLLER_TYPE_PREFIX "VRet " AMI_SENDP "set_" << std::string (att.name ()) << " ("
+					cpp_ << POLLER_TYPE_PREFIX "VRet " AMI_SENDP "set_"
+						<< static_cast <const std::string&> (att.name ()) << " ("
 						<< ServantParam (att) << " val) const\n"
 						"{\n" << indent
 						// Create poller and request, marshal val and call

@@ -89,6 +89,8 @@ private:
 
 	static const AST::NamedItem* find_item (const AST::Interface& itf, const AST::Identifier& name, AST::Item::Kind kind);
 
+	void skeleton_ami (const AST::Interface& itf);
+
 private:
 	Header h_;
 	std::vector <std::string> epv_;

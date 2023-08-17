@@ -463,8 +463,8 @@ void Client::end_interface (const IV_Base& container)
 				h_ << ABI_ret (op) << " (*" << op.name () << ") (Bridge <"
 					<< QName (container) << ">*";
 
-				for (auto it = op.begin (); it != op.end (); ++it) {
-					h_ << ", " << ABI_param (**it);
+				for (auto param : op) {
+					h_ << ", " << ABI_param (*param);
 				}
 
 				h_ << ", Interface*);\n";
@@ -798,6 +798,7 @@ void Client::begin (const Interface& itf)
 void Client::end (const Interface& itf)
 {
 	end_interface (itf);
+	generate_ami (itf);
 }
 
 void Client::begin (const ValueType& itf)
@@ -2145,4 +2146,56 @@ void Client::marshal_union (const Union& u, bool out)
 	}
 	cpp_ << "}\n"
 		<< unindent << "}\n";
+}
+
+void Client::generate_ami (const Interface& itf)
+{
+	auto ami_it = compiler ().ami_map ().find (&itf);
+	if (ami_it == compiler ().ami_map ().end ())
+		return;
+
+	const Compiler::AMI_Objects& ami (ami_it->second);
+
+	h_.namespace_open ("CORBA/Internal");
+
+	h_ << "NIRVANA_AMI_BEGIN (" << QName (itf) << ")\n";
+
+	for (auto item : itf) {
+		switch (item->kind ()) {
+
+		case Item::Kind::OPERATION: {
+			const Operation& op = static_cast <const Operation&> (*item);
+
+			if (is_native (op.raises ()))
+				break;
+
+			h_ << "void (*" AMI_SENDC << op.name () << ") (Bridge <"
+				<< QName (itf) << ">*, Interface*" << AMI_ParametersABI (op) << ";\n"
+				"Interface* (*" AMI_SENDP << op.name () << ") (Bridge <"
+				<< QName (itf) << ">*" << AMI_ParametersABI (op) << ";\n";
+
+		} break;
+
+		case Item::Kind::ATTRIBUTE: {
+			const Attribute& att = static_cast <const Attribute&> (*item);
+
+			if (!is_native (att.getraises ())) {
+				h_ << "void (*" AMI_SENDC "_get_" << att.name () << ") (Bridge <" << QName (itf)
+					<< ">*, Interface*, Interface*);\n"
+					"Interface* (*" AMI_SENDP "_get_" << att.name () << ") (Bridge <" << QName (itf)
+					<< ">*, Interface*);\n";
+			}
+
+			if (!att.readonly () && !is_native (att.setraises ())) {
+				h_ << "void (*" AMI_SENDC "_set_" << att.name () << ") (Bridge <" << QName (itf)
+					<< ">*, Interface*, " << ABI_param (att, Parameter::Attribute::IN) << ", Interface*);\n"
+					"Interface* (*" AMI_SENDP "_set_" << att.name () << ") (Bridge <" << QName (itf)
+					<< ">*, " << ABI_param (att, Parameter::Attribute::IN) << ", Interface*);\n";
+			}
+
+		} break;
+		}
+	}
+
+	h_ << "NIRVANA_AMI_END ()\n";
 }

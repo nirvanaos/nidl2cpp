@@ -173,7 +173,7 @@ void Compiler::interface_end (const Interface& itf, Builder& builder)
 		{ // Make Poller
 			SimpleDeclarator ami_timeout (AMI_TIMEOUT, loc);
 
-			builder.valuetype_begin (SimpleDeclarator (make_ami_id (itf, AMI_POLLER), loc), ValueType::Modifier::ABSTRACT);
+			builder.valuetype_begin (SimpleDeclarator (make_ami_id (itf, AMI_POLLER_SUFFIX), loc), ValueType::Modifier::ABSTRACT);
 
 			ScopedNames bases;
 			for (const auto b : async_bases) {
@@ -232,7 +232,7 @@ void Compiler::interface_end (const Interface& itf, Builder& builder)
 			const Type exception_holder = builder.lookup_type (ScopedName (loc, true, { "Messaging", "ExceptionHolder" }));
 			SimpleDeclarator excep_holder ("excep_holder", loc);
 
-			builder.interface_begin (SimpleDeclarator (make_ami_id (itf, AMI_HANDLER), loc), InterfaceKind::UNCONSTRAINED);
+			builder.interface_begin (SimpleDeclarator (make_ami_id (itf, AMI_HANDLER_SUFFIX), loc), InterfaceKind::UNCONSTRAINED);
 
 			ScopedNames bases;
 			for (const auto b : async_bases) {

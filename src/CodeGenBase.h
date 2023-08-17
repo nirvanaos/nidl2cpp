@@ -43,9 +43,12 @@
 
 #define AMI_TIMEOUT "ami_timeout"
 #define AMI_RETURN_VAL "ami_return_val"
-#define AMI_POLLER "Poller"
-#define AMI_HANDLER "Handler"
+#define AMI_HANDLER "ami_handler"
+#define AMI_POLLER_SUFFIX "Poller"
+#define AMI_HANDLER_SUFFIX "Handler"
 #define AMI_EXCEP "_excep"
+#define AMI_SENDC "sendc_"
+#define AMI_SENDP "sendp_"
 
 class CodeGenBase :
 	public AST::CodeGen,
@@ -407,5 +410,16 @@ struct MemberInit
 };
 
 Code& operator << (Code& stm, const MemberInit& val);
+
+struct AMI_ParametersABI
+{
+	AMI_ParametersABI (const AST::Operation& operation) :
+		op (operation)
+	{}
+
+	const AST::Operation& op;
+};
+
+Code& operator << (Code& stm, const AMI_ParametersABI& op);
 
 #endif

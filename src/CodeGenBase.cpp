@@ -977,3 +977,13 @@ Code& operator << (Code& stm, const MemberInit& m)
 	return stm << m.prefix << m.member.name () << " (std::move ("
 		<< m.member.name () << "))";
 }
+
+Code& operator << (Code& stm, const AMI_ParametersABI& op)
+{
+	for (auto param : op.op) {
+		if (param->attribute () != Parameter::Attribute::OUT)
+			stm << ", " << ABI_param (*param, Parameter::Attribute::IN) << ' ' << param->name ();
+	}
+
+	return stm << ", Interface* _env)";
+}

@@ -29,6 +29,8 @@
 using std::filesystem::path;
 using namespace AST;
 
+#define POLLER_TYPE_PREFIX "Type <CORBA::ValueBase>::"
+
 void Servant::end (const Root&)
 {
 	h_.close ();
@@ -76,8 +78,7 @@ void Servant::skeleton_begin (const IV_Base& item, const char* suffix)
 	h_ << empty_line
 
 		<< "template <class S>\n"
-		"class Skeleton <S, " << QName (item) << suffix << "> : public Decls <"
-		<< QName (item) << ">\n"
+		"class Skeleton <S, " << QName (item) << suffix << "> : public Decls <" << QName (item) << ">\n"
 		"{\n"
 		"public:\n"
 		<< indent
@@ -92,8 +93,8 @@ void Servant::skeleton_end (const IV_Base& item, const char* suffix)
 	h_ << unindent
 		<< "};\n"
 		"\ntemplate <class S>\n"
-		"const Bridge <" << QName (item) << suffix << ">::EPV Skeleton <S, "
-		<< QName (item) << suffix << ">::epv_ = {\n"
+		"const Bridge <" << QName (item) << suffix << ">::EPV Skeleton <S, " << QName (item) << suffix
+		<< ">::epv_ = {\n"
 		<< indent
 		<< "{ // header\n"
 		<< indent
@@ -140,6 +141,9 @@ void Servant::end (const Interface& itf)
 
 	// EPV
 	epv ();
+
+	// AMI skeleton
+	skeleton_ami (itf);
 
 	// Servant implementations
 	if (!options ().no_servant) {
@@ -923,6 +927,166 @@ void Servant::attribute (const Member& m)
 	}
 
 	h_ << std::endl;
+}
+
+void Servant::skeleton_ami (const AST::Interface& itf)
+{
+	auto ami_it = compiler ().ami_map ().find (&itf);
+	if (ami_it == compiler ().ami_map ().end ())
+		return;
+
+	const Type handler_type (ami_it->second.handler);
+
+	h_.namespace_open ("CORBA/Internal");
+	h_ << empty_line
+
+		<< "template <class S>\n"
+		"class SkeletonAMI <S, " << QName (itf) << "> : public Decls <" << QName (itf) << ">\n"
+		"{\n"
+		"public:\n"
+		<< indent
+		<< "static const AMI_EPV <" << QName (itf) << "> epv_;\n\n"
+		<< unindent
+		<< "protected:\n"
+		<< indent;
+
+	for (auto item : itf) {
+		switch (item->kind ()) {
+
+		case Item::Kind::OPERATION: {
+			const Operation& op = static_cast <const Operation&> (*item);
+
+			if (is_native (op.raises ()))
+				break;
+
+			std::string name = SKELETON_FUNC_PREFIX AMI_SENDC + op.name ();
+
+			h_ << "static void " << name << " (Bridge <"
+				<< QName (itf) << ">* _b, Interface* " AMI_HANDLER << AMI_ParametersABI (op) << "noexcept \n"
+				"{\n" << indent
+				<< "try {\n" << indent
+				<< "S::_implementation (_b)." AMI_SENDC << std::string (op.name ()) << " ("
+				<< ABI2Servant (handler_type, AMI_HANDLER);
+
+			for (auto param : op) {
+				if (param->attribute () == Parameter::Attribute::IN)
+					h_ << "," << ABI2Servant (*param);
+			}
+
+			h_ << ");\n"
+				<< CatchBlock ()
+				<< unindent << "}\n";
+			epv_.push_back (std::move (name));
+
+			name = SKELETON_FUNC_PREFIX AMI_SENDP + op.name ();
+
+			h_ << "static Interface* " << name << " (Bridge <"
+				<< QName (itf) << ">* _b" << AMI_ParametersABI (op) << "noexcept \n"
+				"{\n" << indent
+				<< "try {\n" << indent
+				<< "return " POLLER_TYPE_PREFIX
+				<< "ret (S::_implementation (_b)." AMI_SENDP << std::string (op.name ()) << " (";
+
+			auto it = op.begin ();
+			while (it != op.end () && (*it)->attribute () != Parameter::Attribute::IN)
+				++it;
+			if (it != op.end ()) {
+				h_ << ABI2Servant (**it);
+				for (++it; it != op.end (); ++it) {
+					if ((*it)->attribute () == Parameter::Attribute::IN)
+						h_ << ", " << ABI2Servant (**it);
+				}
+			}
+
+			h_ << "));\n"
+				<< CatchBlock ()
+				<< "return " POLLER_TYPE_PREFIX "ret ();\n"
+				<< unindent << "}\n\n";
+			epv_.push_back (std::move (name));
+
+		} break;
+
+		case Item::Kind::ATTRIBUTE: {
+			const Attribute& att = static_cast <const Attribute&> (*item);
+
+			if (!is_native (att.getraises ())) {
+
+				std::string name = SKELETON_FUNC_PREFIX AMI_SENDC "_get_" + att.name ();
+
+				h_ << "static void " << name << " (Bridge <" << QName (itf) << ">* _b, "
+					"Interface* " AMI_HANDLER ", Interface* _env) noexcept\n"
+					"{\n" << indent
+					<< "try {\n" << indent
+					<< "S::_implementation (_b)." AMI_SENDC "_get_" << std::string (att.name ()) << " ("
+					<< ABI2Servant (handler_type, AMI_HANDLER) << ");\n"
+					<< CatchBlock ()
+					<< unindent << "}\n";
+				epv_.push_back (std::move (name));
+
+				name = SKELETON_FUNC_PREFIX AMI_SENDP "_get_" + att.name ();
+
+				h_ << "static Interface* " << name << " (Bridge <" << QName (itf) << ">* _b, Interface* _env) noexcept\n"
+					"{\n" << indent
+					<< "try {\n" << indent
+					<< "return " POLLER_TYPE_PREFIX
+					<< "ret (S::_implementation (_b)." AMI_SENDP "_get_" << std::string (att.name ()) << " ());\n"
+					<< CatchBlock ()
+					<< "return " POLLER_TYPE_PREFIX "ret ();\n"
+					<< unindent << "}\n";
+				epv_.push_back (std::move (name));
+			}
+
+			if (!att.readonly () && !is_native (att.setraises ())) {
+
+				std::string name = SKELETON_FUNC_PREFIX AMI_SENDC "_set_" + att.name ();
+
+				h_ << "static void " << name << " (Bridge <" << QName (itf) << ">* _b, "
+					"Interface* " AMI_HANDLER ", "
+					<< ABI_param (att, Parameter::Attribute::IN) << " val, Interface* _env) noexcept\n"
+					"{\n" << indent
+					<< "try {\n" << indent
+					<< "S::_implementation (_b)." AMI_SENDC "_set_" << std::string (att.name ()) << " ("
+					<< ABI2Servant (handler_type, AMI_HANDLER) << ", " << ABI2Servant (att, "val") << ");\n"
+					<< CatchBlock ()
+					<< unindent << "}\n";
+				epv_.push_back (std::move (name));
+
+				name = SKELETON_FUNC_PREFIX AMI_SENDP "_set_" + att.name ();
+
+				h_ << "static Interface* " << name << " (Bridge <" << QName (itf) << ">* _b, "
+					<< ABI_param (att, Parameter::Attribute::IN) << " val, Interface* _env) noexcept\n"
+					"{\n" << indent
+					<< "try {\n" << indent
+					<< "return " POLLER_TYPE_PREFIX
+					<< "ret (S::_implementation (_b)." AMI_SENDP "_set_" << std::string (att.name ()) << " ("
+					<< ABI2Servant (att, "val") << "));\n"
+					<< CatchBlock ()
+					<< "return "  POLLER_TYPE_PREFIX "ret ();\n"
+					<< unindent << "}\n";
+				epv_.push_back (std::move (name));
+			}
+			h_ << std::endl;
+		} break;
+		}
+	}
+
+	h_ << unindent
+		<< "};\n"
+		"\ntemplate <class S>\n"
+		"const AMI_EPV <" << QName (itf) << "> SkeletonAMI <S, " << QName (itf) << ">::epv_ = {\n"
+		<< indent;
+
+	auto n = epv_.begin ();
+	if (n != epv_.end ()) {
+		h_ << "S::" << *(n++);
+		for (; n != epv_.end (); ++n) {
+			h_ << ",\nS::" << *n;
+		}
+	}
+	epv_.clear ();
+
+	h_ << unindent
+		<< "\n};\n";
 }
 
 Code& operator << (Code& stm, const Servant::ABI2Servant& val)

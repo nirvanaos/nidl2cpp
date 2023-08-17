@@ -29,8 +29,6 @@
 using std::filesystem::path;
 using namespace AST;
 
-#define POLLER_TYPE_PREFIX "Type <CORBA::ValueBase>::"
-
 void Servant::end (const Root&)
 {
 	h_.close ();

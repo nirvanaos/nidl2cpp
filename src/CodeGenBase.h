@@ -49,6 +49,7 @@
 #define AMI_EXCEP "_excep"
 #define AMI_SENDC "sendc_"
 #define AMI_SENDP "sendp_"
+#define POLLER_TYPE_PREFIX "Type <CORBA::ValueBase>::"
 
 class CodeGenBase :
 	public AST::CodeGen,
@@ -298,6 +299,12 @@ struct ServantParam
 		type (t),
 		att (AST::Parameter::Attribute::IN),
 		virt (v)
+	{}
+
+	ServantParam (const AST::Type& t) :
+		type (t),
+		att (AST::Parameter::Attribute::IN),
+		virt (false)
 	{}
 
 	const AST::Type& type;

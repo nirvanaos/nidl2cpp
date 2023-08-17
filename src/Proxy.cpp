@@ -586,7 +586,8 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 		<< indent
 
 		// Constructor
-		<< "Proxy (Object::_ptr_type obj, AbstractBase::_ptr_type ab, IOReference::_ptr_type proxy_manager, uint16_t interface_idx, Interface*& servant) :\n"
+		<< "Proxy (Object::_ptr_type obj, AbstractBase::_ptr_type ab, IOReference::_ptr_type proxy_manager, "
+		"uint16_t interface_idx, Interface*& servant) :\n"
 		<< indent
 		<< "Base (obj, ab, proxy_manager, interface_idx, servant)\n"
 		<< unindent
@@ -603,6 +604,7 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 
 			implement (op, local_stateless);
 
+			unsigned op_idx = (unsigned)metadata.size ();
 			metadata.emplace_back ();
 			OpMetadata& op_md = metadata.back ();
 			op_md.name = op.name ();
@@ -618,7 +620,7 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 			if (is_custom (op)) {
 				cpp_ << ";\n"
 					"static const UShort " PREFIX_OP_IDX << static_cast <const std::string&> (op.name ())
-					<< " = " << (metadata.size () - 1) << ";\n";
+					<< " = " << op_idx << ";\n";
 			} else {
 
 				cpp_ << "\n{\n" << indent;
@@ -647,8 +649,8 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 
 				if (!local_stateless) {
 					// Create request
-					cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
-						<< (metadata.size () - 1) << "), " << (op.oneway () ? "0" : "3") << ", nullptr);\n";
+					cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx (" << op_idx
+						<< "), " << (op.oneway () ? "0" : "3") << ", nullptr);\n";
 
 					// Marshal input
 					for (auto p : op_md.params_in) {
@@ -684,6 +686,62 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 				}
 
 				cpp_ << unindent << "}\n\n";
+
+				// Generate AMI calls
+				if (ami) {
+
+					// sendc_
+
+					cpp_ << "void " AMI_SENDC << std::string (op.name ()) << " ("
+						<< ServantParam (Type (ami->handler)) << " " AMI_HANDLER;
+
+					for (auto param : op_md.params_in) {
+						cpp_ << ", " << ServantParam (*param) << ' ' << param->name ();
+					}
+
+					cpp_ << ") const\n"
+						"{\n" << indent
+						// Create request
+						<< "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx (" << op_idx
+						<< "), 3, ::Messaging::ReplyHandler::_ptr_type (" AMI_HANDLER "));\n";
+
+					// Marshal input
+					for (auto p : op_md.params_in) {
+						cpp_ << TypePrefix (*p) << "marshal_in (" << p->name () << ", _call);\n";
+					}
+
+					// Call
+					cpp_ << "_call->invoke ();\n"
+						<< unindent << "}\n";
+
+					// sendp_
+
+					cpp_ << POLLER_TYPE_PREFIX "VRet " AMI_SENDP << std::string (op.name ()) << " (";
+
+					auto param = op_md.params_in.begin ();
+					if (param != op_md.params_in.end ()) {
+						cpp_ << ServantParam (**param) << ' ' << (*param)->name ();
+						for (++param; param != op_md.params_in.end (); ++param) {
+							cpp_ << ", " << ServantParam (**param) << ' ' << (*param)->name ();
+						}
+					}
+					cpp_ << ") const\n"
+						"{\n" << indent
+						// Create poller and request
+						<< "CORBA::Pollable::_ref_type _poller = _target ()->create_poller (" << op_idx << ");\n"
+							"IORequest::_ref_type _call = _target ()->create_request (_make_op_idx (" << op_idx
+						<< "), 3, CORBA::Pollable::_ptr_type (_poller));\n";
+
+					// Marshal input
+					for (auto p : op_md.params_in) {
+						cpp_ << TypePrefix (*p) << "marshal_in (" << p->name () << ", _call);\n";
+					}
+
+					// Call
+					cpp_ << "_call->invoke ();\n"
+						"return _poller;\n"
+						<< unindent << "}\n";
+				}
 			}
 		} break;
 
@@ -692,6 +750,7 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 
 			implement (att, local_stateless);
 
+			unsigned op_idx = (unsigned)metadata.size ();
 			metadata.emplace_back ();
 			{
 				OpMetadata& op_md = metadata.back ();
@@ -708,7 +767,7 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 			if (custom) {
 				cpp_ << ";\n"
 					"static const UShort " PREFIX_OP_IDX "_get_" << static_cast <const std::string&> (att.name ())
-					<< " = " << (metadata.size () - 1) << ";\n";
+					<< " = " << op_idx << ";\n";
 			} else {
 
 				cpp_ << "\n{\n" << indent;
@@ -725,7 +784,7 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 
 				if (!local_stateless) {
 					cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
-						<< (metadata.size () - 1) << "), 3, nullptr);\n"
+						<< op_idx << "), 3, nullptr);\n"
 						"_call->invoke ();\n"
 						"check_request (_call);\n"
 
@@ -738,10 +797,38 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 				}
 
 				cpp_ << unindent << "}\n\n";
+
+				// Generate AMI calls
+				if (ami) {
+
+					// sendc_
+
+					cpp_ << "void " AMI_SENDC "get_" << std::string (att.name ()) << " ("
+						<< ServantParam (Type (ami->handler)) << " " AMI_HANDLER ") const\n"
+						"{\n" << indent
+						// Create request and call
+						<< "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx (" << op_idx
+						<< "), 3, ::Messaging::ReplyHandler::_ptr_type (" AMI_HANDLER "));\n"
+						"_call->invoke ();\n"
+						<< unindent << "}\n";
+
+					// sendp_
+
+					cpp_ << POLLER_TYPE_PREFIX "VRet " AMI_SENDP "get_" << std::string (att.name ()) << " () const\n"
+						"{\n" << indent
+						// Create poller and request
+						<< "CORBA::Pollable::_ref_type _poller = _target ()->create_poller (" << op_idx << ");\n"
+						"IORequest::_ref_type _call = _target ()->create_request (_make_op_idx (" << op_idx
+						<< "), 3, CORBA::Pollable::_ptr_type (_poller));\n"
+						"_call->invoke ();\n"
+						"return _poller;\n"
+						<< unindent << "}\n";
+				}
 			}
 
 			if (!att.readonly ()) {
 
+				op_idx = (unsigned)metadata.size ();
 				metadata.emplace_back ();
 				{
 					OpMetadata& op_md = metadata.back ();
@@ -757,7 +844,7 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 				if (custom) {
 					cpp_ << ";\n"
 						"static const UShort " PREFIX_OP_IDX "_set_" << static_cast <const std::string&> (att.name ())
-						<< " = " << (metadata.size () - 1) << ";\n";
+						<< " = " << op_idx << ";\n";
 				} else {
 
 					cpp_ << "\n{\n" << indent;
@@ -774,7 +861,7 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 
 					if (!local_stateless) {
 						cpp_ << "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx ("
-							<< (metadata.size () - 1) << "), 3, nullptr);\n"
+							<< op_idx << "), 3, nullptr);\n"
 							<< TypePrefix (att) << "marshal_in (val, _call);\n"
 							"_call->invoke ();\n"
 							"check_request (_call);\n";
@@ -784,6 +871,37 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 					}
 
 					cpp_ << unindent << "}\n\n";
+				}
+
+				// Generate AMI calls
+				if (ami) {
+
+					// sendc_
+
+					cpp_ << "void " AMI_SENDC "set_" << std::string (att.name ()) << " ("
+						<< ServantParam (Type (ami->handler)) << " " AMI_HANDLER ", "
+						<< ServantParam (att) << " val) const\n"
+						"{\n" << indent
+						// Create request, marshal val and call
+						<< "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx (" << op_idx
+						<< "), 3, ::Messaging::ReplyHandler::_ptr_type (" AMI_HANDLER "));\n"
+						<< TypePrefix (att) << "marshal_in (val, _call);\n"
+						"_call->invoke ();\n"
+						<< unindent << "}\n";
+
+					// sendp_
+
+					cpp_ << POLLER_TYPE_PREFIX "VRet " AMI_SENDP "set_" << std::string (att.name ()) << " ("
+						<< ServantParam (att) << " val) const\n"
+						"{\n" << indent
+						// Create poller and request, marshal val and call
+						<< "CORBA::Pollable::_ref_type _poller = _target ()->create_poller (" << op_idx << ");\n"
+						"IORequest::_ref_type _call = _target ()->create_request (_make_op_idx (" << op_idx
+						<< "), 3, CORBA::Pollable::_ptr_type (_poller));\n"
+						<< TypePrefix (att) << "marshal_in (val, _call);\n"
+						"_call->invoke ();\n"
+						"return _poller;\n"
+						<< unindent << "}\n";
 				}
 			}
 		} break;

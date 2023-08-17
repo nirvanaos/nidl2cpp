@@ -137,6 +137,10 @@ void Servant::end (const Interface& itf)
 			<< "}";
 	}
 
+	if (compiler ().ami_map ().find (&itf) != compiler ().ami_map ().end ())
+		h_ << ",\n"
+			"{ nullptr }";
+
 	// EPV
 	epv ();
 

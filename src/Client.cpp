@@ -410,9 +410,12 @@ void Client::end_interface (const IV_Base& container)
 
 		const Interface& itf = static_cast <const Interface&> (container);
 
+		bool async = false;
+
 		switch (itf.interface_kind ()) {
 			case InterfaceKind::UNCONSTRAINED:
 			case InterfaceKind::LOCAL:
+				async = compiler ().ami_map ().find (&itf) != compiler ().ami_map ().end ();
 				h_ << "NIRVANA_BASE_ENTRY (Object, CORBA_Object)\n";
 				break;
 			case InterfaceKind::ABSTRACT:
@@ -429,8 +432,12 @@ void Client::end_interface (const IV_Base& container)
 		bases.assign (itf_bases.begin (), itf_bases.end ());
 		bridge_bases (bases);
 
-		if (itf.interface_kind () != InterfaceKind::PSEUDO || !bases.empty ())
-			h_ << "NIRVANA_BRIDGE_EPV\n";
+		if (itf.interface_kind () != InterfaceKind::PSEUDO || !bases.empty ()) {
+			if (async)
+				h_ << "NIRVANA_BRIDGE_AMI_EPV(" << QName (itf) << ")\n";
+			else
+				h_ << "NIRVANA_BRIDGE_EPV\n";
+		}
 	} else {
 		const ValueType& vt = static_cast <const ValueType&> (container);
 		att_byref = true;

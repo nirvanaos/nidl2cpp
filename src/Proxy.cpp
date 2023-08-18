@@ -734,9 +734,9 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 					cpp_ << ") const\n"
 						"{\n" << indent
 						// Create poller and request
-						<< "CORBA::Pollable::_ref_type _poller = _target ()->create_poller (" << op_idx << ");\n"
-							"IORequest::_ref_type _call = _target ()->create_request (_make_op_idx (" << op_idx
-						<< "), 3, CORBA::Pollable::_ptr_type (_poller));\n";
+						<< "OperationIndex _op = _make_op_idx (" << op_idx << ");\n"
+							"CORBA::Pollable::_ref_type _poller = _target ()->create_poller (_op);\n"
+							"IORequest::_ref_type _call = _target ()->create_request (_op, 3, CORBA::Pollable::_ptr_type (_poller));\n";
 
 					// Marshal input
 					for (auto p : op_md.params_in) {

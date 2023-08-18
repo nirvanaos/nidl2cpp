@@ -137,7 +137,7 @@ void Servant::end (const Interface& itf)
 			<< "}";
 	}
 
-	if (compiler ().ami_map ().find (&itf) != compiler ().ami_map ().end ())
+	if (compiler ().ami_interfaces ().find (&itf) != compiler ().ami_interfaces ().end ())
 		h_ << ",\n"
 			"{ NIRVANA_BRIDGE_AMI_INIT (S, " << QName (itf) << ") }";
 
@@ -777,8 +777,8 @@ void Servant::leaf (const Operation& op)
 			&& op.name ().ends_with (AMI_EXCEP)
 			) {
 			// Probably a handler
-			auto f = compiler ().ami_handler_map ().find (&static_cast <const Interface&> (itf));
-			if (f != compiler ().ami_handler_map ().end ()) {
+			auto f = compiler ().ami_handlers ().find (&static_cast <const Interface&> (itf));
+			if (f != compiler ().ami_handlers ().end ()) {
 				// Yes it is a handler
 				const Interface& main_itf = *f->second;
 				Identifier op_name = op.name ();
@@ -933,8 +933,8 @@ void Servant::attribute (const Member& m)
 
 void Servant::skeleton_ami (const AST::Interface& itf)
 {
-	auto ami_it = compiler ().ami_map ().find (&itf);
-	if (ami_it == compiler ().ami_map ().end ())
+	auto ami_it = compiler ().ami_interfaces ().find (&itf);
+	if (ami_it == compiler ().ami_interfaces ().end ())
 		return;
 
 	const Type handler_type (ami_it->second.handler);

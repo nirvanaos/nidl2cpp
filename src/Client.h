@@ -85,6 +85,26 @@ public:
 		const AST::Operation& op;
 	};
 
+	struct SendcSignature
+	{
+		SendcSignature (const AST::Operation& o, const AST::Interface& h) :
+			op (o),
+			handler (h)
+		{}
+
+		const AST::Operation& op;
+		const AST::Interface& handler;
+	};
+
+	struct SendpSignature
+	{
+		SendpSignature (const AST::Operation& o) :
+			op (o)
+		{}
+
+		const AST::Operation& op;
+	};
+
 	struct ConstType
 	{
 		ConstType (const AST::Constant& _c) :
@@ -180,6 +200,8 @@ private:
 
 	void generate_ami (const AST::Interface& itf);
 
+	void override_sendp (const AST::Interface& itf, const AST::ValueType& poller);
+
 private:
 	Header h_; // .h file
 	Code cpp_; // .cpp file.
@@ -191,5 +213,7 @@ Code& operator << (Code& stm, const Client::Param& t);
 Code& operator << (Code& stm, const Client::Signature& op);
 Code& operator << (Code& stm, const Client::ConstType& op);
 Code& operator << (Code& stm, const Client::PollerSignature& op);
+Code& operator << (Code& stm, const Client::SendcSignature& op);
+Code& operator << (Code& stm, const Client::SendpSignature& op);
 
 #endif

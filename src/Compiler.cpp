@@ -150,8 +150,9 @@ void Compiler::generate_code (const Root& tree)
 
 void Compiler::file_begin (const std::filesystem::path& file, Builder& builder)
 {
-	ami_map_.clear ();
-	ami_handler_map_.clear ();
+	ami_interfaces_.clear ();
+	ami_handlers_.clear ();
+	ami_pollers_.clear ();
 }
 
 void Compiler::interface_end (const Interface& itf, Builder& builder)
@@ -165,8 +166,8 @@ void Compiler::interface_end (const Interface& itf, Builder& builder)
 
 		AMI_Bases async_bases;
 		for (const auto b : itf.bases ()) {
-			auto f = ami_map_.find (b);
-			if (f != ami_map_.end ())
+			auto f = ami_interfaces_.find (b);
+			if (f != ami_interfaces_.end ())
 				async_bases.push_back (&*f);
 		}
 
@@ -294,8 +295,9 @@ void Compiler::interface_end (const Interface& itf, Builder& builder)
 			builder.interface_end ();
 		}
 
-		ami_map_.emplace (&itf, ami_objects);
-		ami_handler_map_.emplace (ami_objects.handler, &itf);
+		ami_interfaces_.emplace (&itf, ami_objects);
+		ami_handlers_.emplace (ami_objects.handler, &itf);
+		ami_pollers_.insert (ami_objects.poller);
 	}
 }
 

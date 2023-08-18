@@ -75,21 +75,29 @@ public:
 		const AST::Interface* handler;
 	};
 
-	typedef std::unordered_map <const AST::Interface*, AMI_Objects> AMI_Map;
+	typedef std::unordered_map <const AST::Interface*, AMI_Objects> AMI_Interfaces;
 
-	typedef std::vector <const AMI_Map::value_type*> AMI_Bases;
+	typedef std::vector <const AMI_Interfaces::value_type*> AMI_Bases;
 
-	const AMI_Map& ami_map () const noexcept
+	const AMI_Interfaces& ami_interfaces () const noexcept
 	{
-		return ami_map_;
+		return ami_interfaces_;
 	}
 
 	// Handler interface -> interface.
-	typedef std::unordered_map <const AST::Interface*, const AST::Interface*> AMI_HandlerMap;
+	typedef std::unordered_map <const AST::Interface*, const AST::Interface*> AMI_Handlers;
 
-	const AMI_HandlerMap& ami_handler_map () const noexcept
+	const AMI_Handlers& ami_handlers () const noexcept
 	{
-		return ami_handler_map_;
+		return ami_handlers_;
+	}
+
+	// Pollers
+	typedef std::unordered_set <const AST::ValueType*> AMI_Pollers;
+
+	const AMI_Pollers& ami_pollers () const noexcept
+	{
+		return ami_pollers_;
 	}
 
 private:
@@ -117,8 +125,9 @@ private:
 		const std::string& suffix, const std::filesystem::path& ext) const;
 
 private:
-	AMI_Map ami_map_;
-	AMI_HandlerMap ami_handler_map_;
+	AMI_Interfaces ami_interfaces_;
+	AMI_Handlers ami_handlers_;
+	AMI_Pollers ami_pollers_;
 };
 
 #endif

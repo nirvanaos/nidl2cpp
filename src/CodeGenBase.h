@@ -429,4 +429,15 @@ struct AMI_ParametersABI
 
 Code& operator << (Code& stm, const AMI_ParametersABI& op);
 
+struct AMI_Parameters
+{
+	AMI_Parameters (const AST::Operation& operation) :
+		op (operation)
+	{}
+
+	const AST::Operation& op;
+};
+
+Code& operator << (Code& stm, const AMI_ParametersABI& op);
+
 #endif

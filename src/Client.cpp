@@ -75,7 +75,42 @@ Code& operator << (Code& stm, const Client::PollerSignature& op)
 			stm << ", " << TypePrefix (*param) << "C_out " << param->name ();
 	}
 
-	return stm << ")";
+	return stm << ')';
+}
+
+Code& operator << (Code& stm, const Client::SendcSignature& op)
+{
+	stm << AMI_SENDC << static_cast <const std::string&> (op.op.name ())
+		<< " (" << TypePrefix (Type (&op.handler)) << "C_in " AMI_HANDLER;
+
+	// in/inout parameters
+	for (auto param : op.op) {
+		if (param->attribute () != Parameter::Attribute::OUT)
+			stm << ", " << TypePrefix (*param) << "C_in " << param->name ();
+	}
+
+	return stm << ')';
+}
+
+Code& operator << (Code& stm, const Client::SendpSignature& op)
+{
+	stm << AMI_SENDP << static_cast <const std::string&> (op.op.name ())
+		<< " (";
+
+	// in/inout parameters
+	auto it = op.op.begin ();
+	while (it != op.op.end () && (*it)->attribute () == Parameter::Attribute::OUT)
+		++it;
+
+	if (it != op.op.end ()) {
+		stm << TypePrefix (**it) << "C_in " << (*it)->name ();
+		for (++it; it != op.op.end (); ++it) {
+			if ((*it)->attribute () != Parameter::Attribute::OUT)
+				stm << ", " << TypePrefix (**it) << "C_in " << (*it)->name ();
+		}
+	}
+
+	return stm << ')';
 }
 
 void Client::end (const Root&)
@@ -403,7 +438,7 @@ void Client::end_interface (const IV_Base& container)
 
 	bool att_byref = false;
 	bool pseudo_interface = false;
-	Bases bases;
+	Bases bases; // All bases, direct and indirect
 	const Interface* concrete_itf = nullptr;
 	Bases supports;
 	const Compiler::AMI_Objects* ami = nullptr;
@@ -414,8 +449,8 @@ void Client::end_interface (const IV_Base& container)
 		switch (itf.interface_kind ()) {
 			case InterfaceKind::UNCONSTRAINED:
 			case InterfaceKind::LOCAL: {
-				auto it = compiler ().ami_map ().find (&itf);
-				if (it != compiler ().ami_map ().end ())
+				auto it = compiler ().ami_interfaces ().find (&itf);
+				if (it != compiler ().ami_interfaces ().end ())
 					ami = &it->second;
 
 				h_ << "NIRVANA_BASE_ENTRY (Object, CORBA_Object)\n";
@@ -536,6 +571,11 @@ void Client::end_interface (const IV_Base& container)
 
 				native_itf_template (op);
 
+				if (ami) {
+					h_ << "void " << SendcSignature (op, *ami->handler) << ";\n"
+						<< POLLER_TYPE_PREFIX "VRet " << SendpSignature (op) << ";\n";
+				}
+
 			} break;
 
 			case Item::Kind::STATE_MEMBER:
@@ -551,8 +591,24 @@ void Client::end_interface (const IV_Base& container)
 					h_ << ConstRef (m);
 				h_ << ' ' << m.name () << " ();\n";
 
-				if (!(m.kind () == Item::Kind::ATTRIBUTE && static_cast <const Attribute&> (m).readonly ()))
+				if (ami) {
+					h_ << "void " AMI_SENDC "get_" << static_cast <const std::string&> (m.name ())
+						<< " (" << TypePrefix (Type (ami->handler)) << "C_in " AMI_HANDLER ");\n"
+						POLLER_TYPE_PREFIX "VRet " AMI_SENDP "get_" << static_cast <const std::string&> (m.name ())
+						<< " ();\n";
+				}
+
+				if (!(m.kind () == Item::Kind::ATTRIBUTE && static_cast <const Attribute&> (m).readonly ())) {
 					h_ << "void " << m.name () << " (" << Param (m) << ");\n";
+
+					if (ami) {
+						h_ << "void " AMI_SENDC "set_" << static_cast <const std::string&> (m.name ())
+							<< " (" << TypePrefix (Type (ami->handler)) << "C_in " AMI_HANDLER ", "
+							<< Param (m) << ");\n"
+							POLLER_TYPE_PREFIX "VRet " AMI_SENDP "set_" << static_cast <const std::string&> (m.name ())
+							<< " (" << Param (m) << ");\n";
+					}
+				}
 
 				if (m.kind () == Item::Kind::STATE_MEMBER && is_var_len (m))
 					h_ << "void " << m.name () << " (" << Var (m) << "&&);\n";
@@ -590,18 +646,17 @@ void Client::end_interface (const IV_Base& container)
 
 				h_ << "\ntemplate <class T>\n"
 					<< VRet (op) << " Client <T, " << QName (container) << ">::" << Signature (op) << "\n"
-					"{\n"
-					<< indent;
+					"{\n" << indent;
 
 				environment (op.raises ());
-				h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n";
+				h_ << "Bridge <" << QName (container) << ">& _b (T::_get_bridge (_env));\n";
 
 				if (op.tkind () != Type::Kind::VOID)
 					h_ << TypePrefix (op) << "C_ret _ret (";
 
 				h_ << "(_b._epv ().epv." << op.name () << ") (&_b";
-				for (auto it = op.begin (); it != op.end (); ++it) {
-					h_ << ", &" << (*it)->name ();
+				for (auto param : op) {
+					h_ << ", &" << param->name ();
 				}
 				h_ << ", &_env)";
 
@@ -614,8 +669,44 @@ void Client::end_interface (const IV_Base& container)
 				if (op.tkind () != Type::Kind::VOID)
 					h_ << "return _ret;\n";
 
-				h_ << unindent
-					<< "}\n";
+				h_ << unindent << "}\n";
+
+				// AMI
+				if (ami) {
+					h_ << "\ntemplate <class T>\n"
+						"void Client <T, " << QName (container) << ">::" << SendcSignature (op, *ami->handler) << "\n"
+						"{\n" << indent;
+
+					environment (Raises ());
+					h_ << "Bridge <" << QName (container) << ">& _b (T::_get_bridge (_env));\n"
+						"(AMI_epv (_b)." AMI_SENDC << static_cast <const std::string&> (op.name ())
+						<< ") (&_b, &" AMI_HANDLER;
+					for (auto param : op) {
+						if (param->attribute () != Parameter::Attribute::OUT)
+							h_ << ", &" << param->name ();
+					}
+					h_ << ", &_env);\n"
+						"_env.check ();\n"
+						<< unindent << "}\n"
+
+						"\ntemplate <class T>\n"
+						POLLER_TYPE_PREFIX "VRet Client <T, " << QName (container) << ">::" << SendpSignature (op) << "\n"
+						"{\n" << indent;
+
+					environment (Raises ());
+					h_ << "Bridge <" << QName (container) << ">& _b (T::_get_bridge (_env));\n"
+						POLLER_TYPE_PREFIX "C_ret _ret ((AMI_epv (_b)." AMI_SENDP << static_cast <const std::string&> (op.name ())
+						<< ") (&_b";
+
+					for (auto param : op) {
+						if (param->attribute () != Parameter::Attribute::OUT)
+							h_ << ", &" << param->name ();
+					}
+					h_ << ", &_env));\n"
+						"_env.check ();\n"
+						"return _ret;\n"
+						<< unindent << "}\n";
+				}
 
 			} break;
 
@@ -637,9 +728,7 @@ void Client::end_interface (const IV_Base& container)
 						h_ << ConstRef (m);
 
 					h_ << " Client <T, " << QName (container) << ">::" << m.name () << " ()\n"
-						"{\n";
-
-					h_.indent ();
+						"{\n" << indent;
 
 					environment (att ? att->getraises () : Raises ());
 					h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n"
@@ -651,8 +740,38 @@ void Client::end_interface (const IV_Base& container)
 					h_ << "_ret _ret ((_b._epv ().epv._get_" << m.name () << ") (&_b, &_env));\n"
 						"_env.check ();\n"
 						"return _ret;\n"
-						<< unindent
-						<< "}\n";
+						<< unindent << "}\n";
+
+					// AMI
+					if (ami) {
+						h_ << "\ntemplate <class T>\n"
+							"void Client <T, " << QName (container) << ">::" 
+							AMI_SENDC "get_" << static_cast <const std::string&> (m.name ()) << " ("
+							<< TypePrefix (ami->handler) << "C_in " AMI_HANDLER ")\n"
+							"{\n" << indent;
+
+						environment (Raises ());
+						h_ << "Bridge <" << QName (container) << ">& _b (T::_get_bridge (_env));\n"
+							"(AMI_epv (_b)."
+							AMI_SENDC << "get_" << static_cast <const std::string&> (m.name ())
+							<< ") (&_b, &" AMI_HANDLER ", &_env);\n"
+							"_env.check ();\n"
+							<< unindent << "}\n"
+
+							"\ntemplate <class T>\n"
+							POLLER_TYPE_PREFIX "VRet Client <T, " << QName (container) << ">::"
+							AMI_SENDP "get_" << static_cast <const std::string&> (m.name ()) << " ()\n"
+							"{\n" << indent;
+
+						environment (Raises ());
+						h_ << "Bridge <" << QName (container) << ">& _b (T::_get_bridge (_env));\n"
+							POLLER_TYPE_PREFIX "C_ret _ret ((AMI_epv (_b)."
+							AMI_SENDP "get_" << static_cast <const std::string&> (m.name ())
+							<< ") (&_b, &_env));\n"
+							"_env.check ();\n"
+							"return _ret;\n"
+							<< unindent << "}\n";
+					}
 				}
 
 				if (!(att && (att->readonly () || is_native (att->setraises ())))) {
@@ -665,24 +784,52 @@ void Client::end_interface (const IV_Base& container)
 					h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n"
 						"(_b._epv ().epv._set_" << m.name () << ") (&_b, &val, &_env);\n"
 						"_env.check ();\n"
-					<< unindent
-					<< "}\n";
+					<< unindent << "}\n";
 				}
 
 				if (!att && is_var_len (m)) {
 					h_ << "\ntemplate <class T>\n"
 						"void Client <T, " << QName (container) << ">::" << m.name ()
 						<< " (" << Var (m) << "&& val)\n"
-						"{\n"
-
-					<< indent;
+						"{\n" << indent;
 
 					environment (Raises ());
 					h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n"
 						"(_b._epv ().epv._move_" << m.name () << ") (&_b, &val, &_env);\n"
 						"_env.check ();\n"
-						<< unindent
-						<< "}\n";
+						<< unindent << "}\n";
+
+					// AMI
+					if (ami) {
+						h_ << "\ntemplate <class T>\n"
+							"void Client <T, " << QName (container) << ">::"
+							AMI_SENDC "set_" << static_cast <const std::string&> (m.name ()) << " ("
+							<< TypePrefix (ami->handler) << "C_in " AMI_HANDLER ", " << Param (m) << " val)\n"
+							"{\n" << indent;
+
+						environment (Raises ());
+						h_ << "Bridge <" << QName (container) << ">& _b (T::_get_bridge (_env));\n"
+							"(AMI_epv (_b)."
+							AMI_SENDC << "set_" << static_cast <const std::string&> (m.name ())
+							<< ") (&_b, &" AMI_HANDLER ", &val, &_env);\n"
+							"_env.check ();\n"
+							<< unindent << "}\n"
+
+							"\ntemplate <class T>\n"
+							POLLER_TYPE_PREFIX "VRet Client <T, " << QName (container) << ">::"
+							AMI_SENDP "set_" << static_cast <const std::string&> (m.name ()) << " ("
+							<< Param (m) << " val)\n"
+							"{\n" << indent;
+
+						environment (Raises ());
+						h_ << "Bridge <" << QName (container) << ">& _b (T::_get_bridge (_env));\n"
+							POLLER_TYPE_PREFIX "C_ret _ret ((AMI_epv (_b)."
+							AMI_SENDP "set_" << static_cast <const std::string&> (m.name ())
+							<< ") (&_b, &val, &_env));\n"
+							"_env.check ();\n"
+							"return _ret;\n"
+							<< unindent << "}\n";
+					}
 				}
 
 			} break;
@@ -732,8 +879,18 @@ void Client::end_interface (const IV_Base& container)
 	}
 	h_ << ">\n"
 		<< unindent <<
-		"{\n"
-		"public:\n"
+		"{\n";
+
+	if (ami) {
+		h_ << indent << "typedef " << Namespace ("CORBA/Internal") << "ClientInterface <" << container.name ();
+		for (auto b : bases) {
+			h_ << ", " << QName (*b);
+		}
+		h_ << ", " << Namespace ("CORBA") << "Object> Base;\n"
+			<< unindent;
+	}
+
+	h_ << "public:\n"
 		<< indent;
 	for (auto item : container) {
 		switch (item->kind ()) {
@@ -742,6 +899,7 @@ void Client::end_interface (const IV_Base& container)
 			case Item::Kind::STATE_MEMBER:
 			case Item::Kind::VALUE_FACTORY:
 				break;
+
 			default: {
 				const NamedItem& def = static_cast <const NamedItem&> (*item);
 				h_ << "using " << Namespace ("CORBA/Internal") << "Decls <"
@@ -755,6 +913,7 @@ void Client::end_interface (const IV_Base& container)
 						case Item::Kind::TYPE_DEF:
 							if (static_cast <const TypeDef&> (*item).dereference_type ().tkind () == Type::Kind::BASIC_TYPE)
 								break;
+							[[fallthrough]];
 						case Item::Kind::STRUCT:
 						case Item::Kind::UNION:
 							h_ << "#ifdef LEGACY_CORBA_CPP\n";
@@ -777,8 +936,67 @@ void Client::end_interface (const IV_Base& container)
 	if (has_factory)
 		h_ << "static const ::Nirvana::ImportInterfaceT <" << container.name () << FACTORY_SUFFIX "> _factory;\n";
 
+	if (ami) {
+		override_sendp (static_cast <const Interface&> (container), *ami->poller);
+		for (auto b : bases)  {
+			const Interface& base = static_cast <const Interface&> (*b);
+			if (compiler ().ami_interfaces ().find (&base) != compiler ().ami_interfaces ().end ())
+				override_sendp (base, *ami->poller);
+		}
+	}
+
 	h_ << unindent
 		<< "};\n";
+}
+
+void Client::override_sendp (const Interface& itf, const ValueType& poller)
+{
+	for (auto item : itf) {
+		switch (item->kind ()) {
+		case Item::Kind::OPERATION: {
+			const Operation& op = static_cast <const Operation&> (*item);
+			h_ << TypePrefix (&poller) << "VRet " << SendpSignature (op) << "\n"
+				"{\n" << indent
+				<< "return Base::" AMI_SENDP
+				<< static_cast <const std::string&> (op.name ()) << " (";
+			// in/inout parameters
+			auto it = op.begin ();
+			while (it != op.end () && (*it)->attribute () == Parameter::Attribute::OUT)
+				++it;
+
+			if (it != op.end ()) {
+				h_ << (*it)->name ();
+				for (++it; it != op.end (); ++it) {
+					if ((*it)->attribute () != Parameter::Attribute::OUT)
+						h_ << ", " << (*it)->name ();
+				}
+			}
+
+			h_ << ")->_query_valuetype <" << QName (poller) << "> ();\n"
+				<< unindent << "}\n";
+		} break;
+
+		case Item::Kind::ATTRIBUTE: {
+			const Attribute& att = static_cast <const Attribute&> (*item);
+			h_ << TypePrefix (&poller) << "VRet " AMI_SENDP "get_"
+				<< static_cast <const std::string&> (att.name ()) << " ()\n"
+				"{\n" << indent
+				<< "return Base::" AMI_SENDP "get_"
+				<< static_cast <const std::string&> (att.name ()) << " ()->_query_valuetype <"
+				<< QName (poller) << "> ();\n"
+				<< unindent << "}\n";
+			if (!att.readonly ()) {
+				h_ << TypePrefix (&poller) << "VRet " AMI_SENDP "set_"
+					<< static_cast <const std::string&> (att.name ()) << " (" << Param (att) << " val)\n"
+					"{\n" << indent
+					<< "return Base::" AMI_SENDP "set_"
+					<< static_cast <const std::string&> (att.name ()) << " (val)->_query_valuetype <"
+					<< QName (poller) << "> ();\n"
+					<< unindent << "}\n";
+			}
+		} break;
+		}
+	}
 }
 
 void Client::bridge_bases (const Bases& bases)
@@ -798,8 +1016,15 @@ void Client::bridge_bases (const Bases& bases)
 
 void Client::begin (const Interface& itf)
 {
-	if (!itf.has_forward_dcl ())
-		forward_interface (itf);
+	if (!itf.has_forward_dcl ()
+		&& compiler ().ami_handlers ().find (&itf) == compiler ().ami_handlers ().end ())
+			forward_interface (itf);
+
+	auto ami = compiler ().ami_interfaces ().find (&itf);
+	if (ami != compiler ().ami_interfaces ().end ()) {
+		forward_interface (*ami->second.handler);
+		forward_interface (*ami->second.poller);
+	}
 
 	begin_interface (itf);
 }
@@ -812,7 +1037,8 @@ void Client::end (const Interface& itf)
 
 void Client::begin (const ValueType& itf)
 {
-	if (!itf.has_forward_dcl ())
+	if (!itf.has_forward_dcl ()
+		&& compiler ().ami_pollers ().find (&itf) == compiler ().ami_pollers ().end ())
 		forward_interface (itf);
 
 	begin_interface (itf);
@@ -2157,13 +2383,11 @@ void Client::marshal_union (const Union& u, bool out)
 		<< unindent << "}\n";
 }
 
+inline
 void Client::generate_ami (const Interface& itf)
 {
-	auto ami_it = compiler ().ami_map ().find (&itf);
-	if (ami_it == compiler ().ami_map ().end ())
+	if (compiler ().ami_interfaces ().find (&itf) == compiler ().ami_interfaces ().end ())
 		return;
-
-	const Compiler::AMI_Objects& ami (ami_it->second);
 
 	h_.namespace_open ("CORBA/Internal");
 
@@ -2189,16 +2413,16 @@ void Client::generate_ami (const Interface& itf)
 			const Attribute& att = static_cast <const Attribute&> (*item);
 
 			if (!is_native (att.getraises ())) {
-				h_ << "void (*" AMI_SENDC "_get_" << att.name () << ") (Bridge <" << QName (itf)
+				h_ << "void (*" AMI_SENDC "get_" << att.name () << ") (Bridge <" << QName (itf)
 					<< ">*, Interface*, Interface*);\n"
-					"Interface* (*" AMI_SENDP "_get_" << att.name () << ") (Bridge <" << QName (itf)
+					"Interface* (*" AMI_SENDP "get_" << att.name () << ") (Bridge <" << QName (itf)
 					<< ">*, Interface*);\n";
 			}
 
 			if (!att.readonly () && !is_native (att.setraises ())) {
-				h_ << "void (*" AMI_SENDC "_set_" << att.name () << ") (Bridge <" << QName (itf)
+				h_ << "void (*" AMI_SENDC "set_" << att.name () << ") (Bridge <" << QName (itf)
 					<< ">*, Interface*, " << ABI_param (att, Parameter::Attribute::IN) << ", Interface*);\n"
-					"Interface* (*" AMI_SENDP "_set_" << att.name () << ") (Bridge <" << QName (itf)
+					"Interface* (*" AMI_SENDP "set_" << att.name () << ") (Bridge <" << QName (itf)
 					<< ">*, " << ABI_param (att, Parameter::Attribute::IN) << ", Interface*);\n";
 			}
 

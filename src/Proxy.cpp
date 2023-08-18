@@ -224,8 +224,8 @@ void Proxy::end (const Interface& itf)
 
 	const Compiler::AMI_Objects* ami = nullptr;
 	{
-		auto f = compiler ().ami_map ().find (&itf);
-		if (f != compiler ().ami_map ().end ())
+		auto f = compiler ().ami_interfaces ().find (&itf);
+		if (f != compiler ().ami_interfaces ().end ())
 			ami = &f->second;
 	}
 	generate_proxy (itf, ami);
@@ -1026,8 +1026,8 @@ void Proxy::generate_poller (const Interface& itf, const ValueType& poller)
 	{
 		Interfaces bases = itf.get_all_bases ();
 		for (const auto& b : bases) {
-			auto f = compiler ().ami_map ().find (b);
-			if (f != compiler ().ami_map ().end ())
+			auto f = compiler ().ami_interfaces ().find (b);
+			if (f != compiler ().ami_interfaces ().end ())
 				base_pollers.push_back (f->second.poller);
 		}
 	}

@@ -491,11 +491,10 @@ void Proxy::end (const ValueType& vt)
 				concrete_base = nullptr;
 		}
 
-		if (concrete_base) {
+		if (concrete_base)
 			cpp_ << "Type <" << QName (*concrete_base) << ">::type_code";
-		} else {
+		else
 			cpp_ << "nullptr";
-		}
 	}
 	cpp_ << ">\n"
 		"{};\n";

@@ -139,7 +139,7 @@ void Servant::end (const Interface& itf)
 
 	if (compiler ().ami_interfaces ().find (&itf) != compiler ().ami_interfaces ().end ())
 		h_ << ",\n"
-			"{ NIRVANA_BRIDGE_AMI_INIT (S, " << QName (itf) << ") }";
+		"{ NIRVANA_BRIDGE_AMI_INIT (S, " << QName (itf) << ") }";
 
 	// EPV
 	epv ();
@@ -189,14 +189,14 @@ void Servant::end (const Interface& itf)
 			if (!has_base) {
 				const char* base;
 				switch (itf.interface_kind ()) {
-					case InterfaceKind::LOCAL:
-						base = "LocalObject";
-						break;
-					case InterfaceKind::ABSTRACT:
-						base = "AbstractBase";
-						break;
-					default:
-						base = "PortableServer::ServantBase";
+				case InterfaceKind::LOCAL:
+					base = "LocalObject";
+					break;
+				case InterfaceKind::ABSTRACT:
+					base = "AbstractBase";
+					break;
+				default:
+					base = "PortableServer::ServantBase";
 				}
 				h_ << "public virtual ServantPOA <" << base << ">,\n";
 			}
@@ -237,16 +237,16 @@ void Servant::end (const Interface& itf)
 			for (auto it = itf.begin (); it != itf.end (); ++it) {
 				const Item& item = **it;
 				switch (item.kind ()) {
-					case Item::Kind::OPERATION: {
-						const Operation& op = static_cast <const Operation&> (item);
-						h_ << "virtual " << ServantOp (op, true) << " = 0;\n";
-					} break;
-					case Item::Kind::ATTRIBUTE: {
-						const Attribute& att = static_cast <const Attribute&> (item);
-						h_ << "virtual " << VRet (att) << ' ' << att.name () << " () = 0;\n";
-						if (!att.readonly ())
-							h_ << "virtual void " << att.name () << " (" << ServantParam (att, true) << ") = 0;\n";
-					} break;
+				case Item::Kind::OPERATION: {
+					const Operation& op = static_cast <const Operation&> (item);
+					h_ << "virtual " << ServantOp (op, true) << " = 0;\n";
+				} break;
+				case Item::Kind::ATTRIBUTE: {
+					const Attribute& att = static_cast <const Attribute&> (item);
+					h_ << "virtual " << VRet (att) << ' ' << att.name () << " () = 0;\n";
+					if (!att.readonly ())
+						h_ << "virtual void " << att.name () << " (" << ServantParam (att, true) << ") = 0;\n";
+				} break;
 				}
 			}
 
@@ -280,7 +280,7 @@ void Servant::end (const Interface& itf)
 				}
 
 				h_ << "\ntypedef " << Namespace ("CORBA/Internal")
-				<< "ServantPOA <" << QName (itf) << "> " << itf.name () << ";\n";
+					<< "ServantPOA <" << QName (itf) << "> " << itf.name () << ";\n";
 
 				if (itf.interface_kind () != InterfaceKind::ABSTRACT)
 					h_ << "template <class T> using " << itf.name () << "_tie = "
@@ -292,7 +292,7 @@ void Servant::end (const Interface& itf)
 			} else {
 
 				h_ << "typedef " << Namespace ("CORBA/Internal")
-				<< "ServantPOA <" << QName (itf) << "> POA_" << static_cast <const std::string&> (itf.name ()) << ";\n";
+					<< "ServantPOA <" << QName (itf) << "> POA_" << static_cast <const std::string&> (itf.name ()) << ";\n";
 
 				if (itf.interface_kind () != InterfaceKind::ABSTRACT)
 					h_ << "template <class T> using POA_" << static_cast <const std::string&> (itf.name ()) << "_tie = "
@@ -416,12 +416,12 @@ void Servant::end (const ValueType& vt)
 		// ValueImpl
 		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
 			h_ << "template <class S>\n"
-			"class ValueImpl <S, " << QName (vt) << "> :\n"
-			<< indent
-			<< "public ValueImplBase <S, " << QName (vt) << ">,\n"
+				"class ValueImpl <S, " << QName (vt) << "> :\n"
+				<< indent
+				<< "public ValueImplBase <S, " << QName (vt) << ">,\n"
 				"public ValueData <" << QName (vt) << ">\n"
-			<< unindent
-			<< "{};";
+				<< unindent
+				<< "{};";
 		}
 
 		// Aggregated
@@ -475,220 +475,220 @@ void Servant::end (const ValueType& vt)
 		h_ << unindent << "};\n"; // End Aggregated
 
 		// Standard implementation
-		h_ << empty_line
-			<< "template <class S>\n"
-			"class Servant <S, " << QName (vt) << "> :\n"
-			<< indent <<
-			"public Aggregated <S, " << QName (vt) << '>';
-
-		if (!concrete_itf || concrete_itf->interface_kind () == InterfaceKind::PSEUDO)
-			h_ << ",\n"
-			"public RefCountBase <S>";
-
-		if (concrete_itf)
-			h_ << ",\n"
-			"public Servant <S, " << QName (*concrete_itf) << ">";
-
-		bool abstract_base = false;
-		std::vector <const ValueType*> concrete_bases;
-		for (auto it = all_bases.rbegin (); it != all_bases.rend (); ++it) {
-			auto b = *it;
-			h_ << ",\n"
-				"public ";
-			if (b->kind () == Item::Kind::VALUE_TYPE) {
-				h_ << "Value";
-
-				const ValueType& vt = static_cast <const ValueType&> (*b);
-				if (vt.modifier () != ValueType::Modifier::ABSTRACT)
-					concrete_bases.push_back (&vt);
-
-			} else {
-				assert (static_cast <const Interface&> (*b).interface_kind () == InterfaceKind::ABSTRACT);
-				abstract_base = true; // We need abstract base
-
-				// If value supports concrete interface, abstract interface references must be obtained
-				// via _this() call. If value supports abstract interfaces only, abstract interface references
-				// obtained directly from the servant reference.
-				if (concrete_itf)
-					h_ << "Interface";
-				else
-					h_ << "Value";
-			}
-			h_ << "Impl <S, " << QName (*b) << '>';
-		}
-
-		if (abstract_base)
-			h_ << ",\n"
-			"public InterfaceImpl <S, AbstractBase>";
-
-		h_ << "\n" << unindent <<
-			"{\n"
-			"public:\n" << indent;
-
-		if (abstract_base)
-			h_ << "using InterfaceImpl <S, AbstractBase>::_get_abstract_base;\n";
-
 		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
-			h_ << "void _marshal (I_ptr <IORequest> rq) const\n"
-				"{\n" << indent;
-			for (auto b : concrete_bases) {
-				h_ << "ValueData <" << QName (*b) << ">::_marshal (rq);\n";
-			}
-			h_ << "ValueData <" << QName (vt) << ">::_marshal (rq);\n"
-				<< unindent << "}\n"
-
-				"void _unmarshal (I_ptr <IORequest> rq)\n"
-				"{\n" << indent;
-			for (auto b : concrete_bases) {
-				h_ << "ValueData <" << QName (*b) << ">::_unmarshal (rq);\n";
-			}
-			h_ << "ValueData <" << QName (vt) << ">::_unmarshal (rq);\n"
-				<< unindent << "}\n\n";
-		}
-
-		h_ << unindent
-			<< "protected:\n"
-			<< indent
-
-			// Default constructor
-			<< "Servant () noexcept\n"
-			"{}\n";
-
-		// Explicit constructor
-		StateMembers all_members;
-		for (auto b : concrete_bases) {
-			StateMembers members = get_members (*b);
-			all_members.insert (all_members.end (), members.begin (), members.end ());
-		}
-		all_members.insert (all_members.end (), members.begin (), members.end ());
-
-		if (!all_members.empty ()) {
-			h_ << "explicit Servant (";
-			auto it = all_members.begin ();
-			h_ << Var (**it) << ' ' << (*it)->name ();
-			h_.indent ();
-			for (++it; it != all_members.end (); ++it) {
-				h_ << ",\n" << Var (**it) << ' ' << (*it)->name ();
-			}
-			h_ << ")\n"
-				<< unindent
-				<< "{\n"
-				<< indent;
-			for (auto m : all_members) {
-				h_ << "this->" << m->name () << " (std::move (" << m->name () << "));\n";
-			}
-			h_ << unindent
-				<< "}\n";
-		}
-
-		h_ << unindent
-			<< "};\n";
-	}
-
-	Factories factories = get_factories (vt);
-	if (!factories.empty ()) {
-		skeleton_begin (vt, FACTORY_SUFFIX);
-
-		for (auto f : factories) {
-			h_ << "static Interface* " SKELETON_FUNC_PREFIX << f->name () << "(Bridge <" << QName (vt)
-				<< FACTORY_SUFFIX ">* _b";
-			for (auto p : *f) {
-				h_ << ", " << ABI_param (*p) << ' ' << p->name ();
-			}
-			h_ << ", Interface* _env) noexcept\n"
-				"{\n"
-				<< indent
-				<< "try {\n"
-				<< indent
-				<< "return Type <" << QName (vt) << ">::ret (S::_implementation (_b)."
-				<< f->name () << " (";
-			if (!f->empty ()) {
-				auto par = f->begin ();
-				h_ << ABI2Servant (**par);
-				for (++par; par != f->end (); ++par) {
-					h_ << ", " << ABI2Servant (**par);
-				}
-			}
-			h_ << "));\n"
-				<< CatchBlock ()
-
-				// Return default value on exception
-				<< "return Type <" << QName (vt) << ">::ret ();\n";
-
-			h_ << unindent << "}\n\n";
-		}
-
-		skeleton_end (vt, FACTORY_SUFFIX);
-		h_ << ",\n"
-			"{ // base\n"
-			<< indent
-			<< "S::template _wide_val <ValueFactoryBase, " << QName (vt) << FACTORY_SUFFIX ">\n"
-			<< unindent << "},\n"
-			"{ // EPV\n"
-			<< indent;
-
-		{
-			auto f = factories.begin ();
-			h_ << "S::" SKELETON_FUNC_PREFIX << (*f)->name ();
-			for (++f; f != factories.end (); ++f) {
-				h_ << ",\nS::" SKELETON_FUNC_PREFIX << (*f)->name ();
-			}
-			h_ << unindent
-				<< "\n}"
-				<< unindent
-				<< "\n};\n\n";
-		}
-	}
-
-	h_ << "template <class Impl>\n"
-		"class ValueCreator <Impl, " << QName (vt) << "> :\n"
-		<< indent;
-	if (!factories.empty ()) {
-		h_ << "public ValueCreatorImpl <ValueCreator <Impl, " << QName (vt) << ">, " << QName (vt) << FACTORY_SUFFIX ">,\n"
-			"public ValueCreatorBase <Impl>\n"
-			<< unindent <<
-			"{\n"
-			"public:\n"
-			<< indent;
-
-		for (auto f : factories) {
-			h_ << "static I_ref <" << QName (vt) << "> " << f->name () << " (";
-			{
-				auto it = f->begin ();
-				if (it != f->end ()) {
-					h_ << ServantParam (**it) << ' ' << (*it)->name ();
-					++it;
-					for (; it != f->end (); ++it) {
-						h_ << ", " << ServantParam (**it) << ' ' << (*it)->name ();
-					}
-				}
-			}
-			h_ << ")\n"
-				"{\n"
+			h_ << empty_line
+				<< "template <class S>\n"
+				"class Servant <S, " << QName (vt) << "> :\n"
 				<< indent <<
-				"return make_reference <Impl> (";
-			{
-				auto it = f->begin ();
-				if (it != f->end ()) {
-					h_ << (*it)->name ();
-					++it;
-					for (; it != f->end (); ++it) {
-						h_ << ", " << (*it)->name ();
+				"public Aggregated <S, " << QName (vt) << '>';
+
+			if (!concrete_itf || concrete_itf->interface_kind () == InterfaceKind::PSEUDO)
+				h_ << ",\n"
+				"public RefCountBase <S>";
+
+			if (concrete_itf)
+				h_ << ",\n"
+				"public Servant <S, " << QName (*concrete_itf) << ">";
+
+			bool abstract_base = false;
+			std::vector <const ValueType*> concrete_bases;
+			for (auto it = all_bases.rbegin (); it != all_bases.rend (); ++it) {
+				auto b = *it;
+				h_ << ",\n"
+					"public ";
+				if (b->kind () == Item::Kind::VALUE_TYPE) {
+					h_ << "Value";
+
+					const ValueType& vt = static_cast <const ValueType&> (*b);
+					if (vt.modifier () != ValueType::Modifier::ABSTRACT)
+						concrete_bases.push_back (&vt);
+
+				} else {
+					assert (static_cast <const Interface&> (*b).interface_kind () == InterfaceKind::ABSTRACT);
+					abstract_base = true; // We need abstract base
+
+					// If value supports concrete interface, abstract interface references must be obtained
+					// via _this() call. If value supports abstract interfaces only, abstract interface references
+					// obtained directly from the servant reference.
+					if (concrete_itf)
+						h_ << "Interface";
+					else
+						h_ << "Value";
+				}
+				h_ << "Impl <S, " << QName (*b) << '>';
+			}
+
+			if (abstract_base)
+				h_ << ",\n"
+				"public InterfaceImpl <S, AbstractBase>";
+
+			h_ << "\n" << unindent <<
+				"{\n"
+				"public:\n" << indent;
+
+			if (abstract_base)
+				h_ << "using InterfaceImpl <S, AbstractBase>::_get_abstract_base;\n";
+
+			if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
+				h_ << "void _marshal (I_ptr <IORequest> rq) const\n"
+					"{\n" << indent;
+				for (auto b : concrete_bases) {
+					h_ << "ValueData <" << QName (*b) << ">::_marshal (rq);\n";
+				}
+				h_ << "ValueData <" << QName (vt) << ">::_marshal (rq);\n"
+					<< unindent << "}\n"
+
+					"void _unmarshal (I_ptr <IORequest> rq)\n"
+					"{\n" << indent;
+				for (auto b : concrete_bases) {
+					h_ << "ValueData <" << QName (*b) << ">::_unmarshal (rq);\n";
+				}
+				h_ << "ValueData <" << QName (vt) << ">::_unmarshal (rq);\n"
+					<< unindent << "}\n\n";
+			}
+
+			h_ << unindent
+				<< "protected:\n"
+				<< indent
+
+				// Default constructor
+				<< "Servant () noexcept\n"
+				"{}\n";
+
+			// Explicit constructor
+			StateMembers all_members;
+			for (auto b : concrete_bases) {
+				StateMembers members = get_members (*b);
+				all_members.insert (all_members.end (), members.begin (), members.end ());
+			}
+			all_members.insert (all_members.end (), members.begin (), members.end ());
+
+			if (!all_members.empty ()) {
+				h_ << "explicit Servant (";
+				auto it = all_members.begin ();
+				h_ << Var (**it) << ' ' << (*it)->name ();
+				h_.indent ();
+				for (++it; it != all_members.end (); ++it) {
+					h_ << ",\n" << Var (**it) << ' ' << (*it)->name ();
+				}
+				h_ << ")\n"
+					<< unindent
+					<< "{\n"
+					<< indent;
+				for (auto m : all_members) {
+					h_ << "this->" << m->name () << " (std::move (" << m->name () << "));\n";
+				}
+				h_ << unindent
+					<< "}\n";
+			}
+
+			h_ << unindent
+				<< "};\n";
+
+			Factories factories = get_factories (vt);
+			if (!factories.empty ()) {
+				skeleton_begin (vt, FACTORY_SUFFIX);
+
+				for (auto f : factories) {
+					h_ << "static Interface* " SKELETON_FUNC_PREFIX << f->name () << "(Bridge <" << QName (vt)
+						<< FACTORY_SUFFIX ">* _b";
+					for (auto p : *f) {
+						h_ << ", " << ABI_param (*p) << ' ' << p->name ();
 					}
+					h_ << ", Interface* _env) noexcept\n"
+						"{\n"
+						<< indent
+						<< "try {\n"
+						<< indent
+						<< "return Type <" << QName (vt) << ">::ret (S::_implementation (_b)."
+						<< f->name () << " (";
+					if (!f->empty ()) {
+						auto par = f->begin ();
+						h_ << ABI2Servant (**par);
+						for (++par; par != f->end (); ++par) {
+							h_ << ", " << ABI2Servant (**par);
+						}
+					}
+					h_ << "));\n"
+						<< CatchBlock ()
+
+						// Return default value on exception
+						<< "return Type <" << QName (vt) << ">::ret ();\n";
+
+					h_ << unindent << "}\n\n";
+				}
+
+				skeleton_end (vt, FACTORY_SUFFIX);
+				h_ << ",\n"
+					"{ // base\n"
+					<< indent
+					<< "S::template _wide_val <ValueFactoryBase, " << QName (vt) << FACTORY_SUFFIX ">\n"
+					<< unindent << "},\n"
+					"{ // EPV\n"
+					<< indent;
+
+				{
+					auto f = factories.begin ();
+					h_ << "S::" SKELETON_FUNC_PREFIX << (*f)->name ();
+					for (++f; f != factories.end (); ++f) {
+						h_ << ",\nS::" SKELETON_FUNC_PREFIX << (*f)->name ();
+					}
+					h_ << unindent
+						<< "\n}"
+						<< unindent
+						<< "\n};\n\n";
 				}
 			}
-			h_ << ");\n"
-				<< unindent <<
-				"}\n\n";
+			h_ << "template <class Impl>\n"
+				"class ValueCreator <Impl, " << QName (vt) << "> :\n"
+				<< indent;
+			if (!factories.empty ()) {
+				h_ << "public ValueCreatorImpl <ValueCreator <Impl, " << QName (vt) << ">, " << QName (vt) << FACTORY_SUFFIX ">,\n"
+					"public ValueCreatorBase <Impl>\n"
+					<< unindent <<
+					"{\n"
+					"public:\n"
+					<< indent;
+
+				for (auto f : factories) {
+					h_ << "static I_ref <" << QName (vt) << "> " << f->name () << " (";
+					{
+						auto it = f->begin ();
+						if (it != f->end ()) {
+							h_ << ServantParam (**it) << ' ' << (*it)->name ();
+							++it;
+							for (; it != f->end (); ++it) {
+								h_ << ", " << ServantParam (**it) << ' ' << (*it)->name ();
+							}
+						}
+					}
+					h_ << ")\n"
+						"{\n"
+						<< indent <<
+						"return make_reference <Impl> (";
+					{
+						auto it = f->begin ();
+						if (it != f->end ()) {
+							h_ << (*it)->name ();
+							++it;
+							for (; it != f->end (); ++it) {
+								h_ << ", " << (*it)->name ();
+							}
+						}
+					}
+					h_ << ");\n"
+						<< unindent <<
+						"}\n\n";
+				}
+
+				h_ << unindent << "};\n";
+			} else {
+				h_ << "public ValueCreatorNoFactory <Impl>\n"
+					<< unindent <<
+					"{};\n";
+			}
 		}
-
-		h_ << unindent << "};\n";
-	} else {
-		h_ << "public ValueCreatorNoFactory <Impl>\n"
-			<< unindent <<
-			"{};\n";
 	}
-
 }
 
 void Servant::epv (bool val_with_concrete_itf)
@@ -722,12 +722,12 @@ void Servant::epv (bool val_with_concrete_itf)
 void Servant::implementation_suffix (const InterfaceKind ik)
 {
 	switch (ik.interface_kind ()) {
-		case InterfaceKind::LOCAL:
-			h_ << "Local";
-			break;
-		case InterfaceKind::PSEUDO:
-			h_ << "Pseudo";
-			break;
+	case InterfaceKind::LOCAL:
+		h_ << "Local";
+		break;
+	case InterfaceKind::PSEUDO:
+		h_ << "Pseudo";
+		break;
 	}
 }
 
@@ -825,7 +825,7 @@ void Servant::leaf (const Operation& op)
 			h_ << ')';
 		h_ << ");\n";
 	}
-	h_	<< CatchBlock ();
+	h_ << CatchBlock ();
 	if (op.tkind () != Type::Kind::VOID) {
 		// Return default value on exception
 		h_ << "return " << TypePrefix (op) << "ret ();\n";

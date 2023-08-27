@@ -708,7 +708,7 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 						"{\n" << indent
 						// Create request
 						<< "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx (" << op_idx
-						<< "), 3, ::Messaging::ReplyHandler::_ptr_type (" AMI_HANDLER "));\n";
+						<< "), " AMI_HANDLER " ? 3 : 0, ::Messaging::ReplyHandler::_ptr_type (" AMI_HANDLER "));\n";
 
 					// Marshal input
 					for (auto p : op_md.params_in) {
@@ -813,7 +813,7 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 						"{\n" << indent
 						// Create request and call
 						<< "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx (" << op_idx
-						<< "), 3, ::Messaging::ReplyHandler::_ptr_type (" AMI_HANDLER "));\n"
+						<< "), " AMI_HANDLER " ? 3 : 0, ::Messaging::ReplyHandler::_ptr_type (" AMI_HANDLER "));\n"
 						"_call->invoke ();\n"
 						<< unindent << "}\n";
 
@@ -890,7 +890,7 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 						"{\n" << indent
 						// Create request, marshal val and call
 						<< "IORequest::_ref_type _call = _target ()->create_request (_make_op_idx (" << op_idx
-						<< "), 3, ::Messaging::ReplyHandler::_ptr_type (" AMI_HANDLER "));\n"
+						<< "), " AMI_HANDLER " ? 3 : 0, ::Messaging::ReplyHandler::_ptr_type (" AMI_HANDLER "));\n"
 						<< TypePrefix (att) << "marshal_in (val, _call);\n"
 						"_call->invoke ();\n"
 						<< unindent << "}\n";

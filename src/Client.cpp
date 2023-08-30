@@ -1503,9 +1503,26 @@ void Client::define_structured_type (const ItemWithId& item)
 
 			h_ << "static void unmarshal (IORequest::_ptr_type, Var&);\n";
 		} else {
-			h_ << "static void byteswap (Var&) noexcept;\n"
+			h_ << "\n"
+				"static void byteswap (Var& v) noexcept\n"
+				"{\n" << indent;
+			for (const auto& m : members) {
+				const Type* t = &m->dereference_type ();
+				if (t->tkind () == Type::Kind::ARRAY)
+					t = &t->array ();
+				if (t->tkind () == Type::Kind::BASIC_TYPE) {
+					switch (t->basic_type ()) {
+					case BasicType::OCTET:
+					case BasicType::CHAR:
+					case BasicType::BOOLEAN:
+						continue;
+					}
+				}
+				h_ << TypePrefix (*m) << "byteswap (v._" << m->name () << ");\n";
+			}
+			h_ << unindent << "}\n\n"
 
-				<< "static const size_t CDR_align = " << TypePrefix (*members.front ()) << "CDR_align;\n";
+				"static const size_t CDR_align = " << TypePrefix (*members.front ()) << "CDR_align;\n";
 
 			if (options ().legacy && item.kind () == Item::Kind::STRUCT)
 				h_ << "\n#ifndef LEGACY_CORBA_CPP\n";
@@ -2342,15 +2359,6 @@ void Client::implement_marshaling (const StructBase& item)
 			"{\n";
 		unmarshal_members (cpp_, item, my_prefix.c_str ());
 		cpp_ << "}\n";
-	} else {
-		cpp_ << "\n"
-			"void Type <" << QName (item) << suffix
-			<< ">::byteswap (Var& v) noexcept\n"
-			"{\n" << indent;
-		for (const auto& m : item) {
-			cpp_ << TypePrefix (*m) << "byteswap (v._" << m->name () << ");\n";
-		}
-		cpp_ << unindent << "}\n";
 	}
 }
 

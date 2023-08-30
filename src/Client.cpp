@@ -1503,9 +1503,7 @@ void Client::define_structured_type (const ItemWithId& item)
 
 			h_ << "static void unmarshal (IORequest::_ptr_type, Var&);\n";
 		} else {
-			h_ << "\n"
-				"static void byteswap (Var& v) noexcept\n"
-				"{\n" << indent;
+			std::vector <const Member*> byteswap_members;
 			for (const auto& m : members) {
 				const Type* t = &m->dereference_type ();
 				if (t->tkind () == Type::Kind::ARRAY)
@@ -1518,7 +1516,25 @@ void Client::define_structured_type (const ItemWithId& item)
 						continue;
 					}
 				}
-				h_ << TypePrefix (*m) << "byteswap (v._" << m->name () << ");\n";
+				byteswap_members.push_back (m);
+			}
+
+			h_ << "\n"
+				"static void byteswap (Var& v) noexcept\n"
+				"{\n" << indent;
+			if (!byteswap_members.empty ()) {
+				if (options ().legacy && item.kind () != Item::Kind::EXCEPTION)
+					h_ << "#ifndef LEGACY_CORBA_CPP\n";
+				for (auto m : byteswap_members) {
+					h_ << TypePrefix (*m) << "byteswap (v._" << m->name () << ");\n";
+				}
+				if (options ().legacy && item.kind () != Item::Kind::EXCEPTION) {
+					h_ << "#else\n";
+					for (auto m : byteswap_members) {
+						h_ << TypePrefix (*m) << "byteswap (v." << m->name () << ");\n";
+					}
+					h_ << "#endif\n";
+				}
 			}
 			h_ << unindent << "}\n\n"
 

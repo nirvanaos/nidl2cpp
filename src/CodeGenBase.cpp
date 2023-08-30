@@ -184,7 +184,6 @@ bool CodeGenBase::is_CDR (const Type& type)
 				case BasicType::ANY:
 				case BasicType::OBJECT:
 				case BasicType::VALUE_BASE:
-				case BasicType::CHAR:
 				case BasicType::WCHAR:
 					return false;
 				default:

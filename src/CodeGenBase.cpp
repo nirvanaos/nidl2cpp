@@ -491,8 +491,8 @@ void CodeGenBase::get_all_bases (const ValueType& vt,
 {
 	for (auto pb : vt.bases ()) {
 		if (bset.insert (pb).second) {
-			bvec.push_back (pb);
 			get_all_bases (*pb, bset, bvec);
+			bvec.push_back (pb);
 		}
 	}
 	if (!vt.supports ().empty ()) {
@@ -503,8 +503,8 @@ void CodeGenBase::get_all_bases (const ValueType& vt,
 			const Interface* pai = *it;
 			assert (pai->interface_kind () == InterfaceKind::ABSTRACT);
 			if (bset.insert (pai).second) {
-				bvec.push_back (pai);
 				get_all_bases (*pai, bset, bvec);
+				bvec.push_back (pai);
 			}
 		}
 	}

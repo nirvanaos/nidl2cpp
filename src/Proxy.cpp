@@ -312,7 +312,7 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op, bool no_rq
 	if (no_rq)
 		cpp_ << ", nullptr, 0 }";
 	else
-		cpp_ << ", RqProcWrapper <" PREFIX_OP_PROC << op.name << ">, " << flags << " }";
+		cpp_ << ", call <" PREFIX_OP_PROC << op.name << ">, " << flags << " }";
 }
 
 std::string Proxy::export_name (const NamedItem& item)

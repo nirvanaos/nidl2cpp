@@ -47,15 +47,17 @@ public:
 		char fi [] = "-FI";
 		char ami [] = "CORBA/AMI.idl";
 
-		if (argc > 1) {
-			const char* arg1 = argv [1];
-			size_t len = strlen (arg1);
-			if (len >= 8) {
-				const char* end = arg1 + len;
-				if (std::equal (end - 7, end, "AMI.idl")) {
-					const char slash = *(end - 8);
-					if ('/' == slash || '\\' == slash)
-						return IDL_FrontEnd::main (argc, argv);
+		for (int i = 1; i < argc; ++i) {
+			const char* arg = argv [i];
+			if (arg [0] != '-') {
+				size_t len = strlen (arg);
+				if (len >= 7) {
+					const char* end = arg + len;
+					if (std::equal (end - 7, end, "AMI.idl")) {
+						const char slash = *(end - 8);
+						if ('/' == slash || '\\' == slash)
+							return IDL_FrontEnd::main (argc, argv);
+					}
 				}
 			}
 		}

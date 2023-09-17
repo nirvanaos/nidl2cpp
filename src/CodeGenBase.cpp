@@ -931,17 +931,24 @@ Code& operator << (Code& stm, const Accessors& a)
 	}
 
 	// setter
-	stm << "void " << a.member.name () << " (" << ConstRef (a.member) << " val)\n"
-		"{\n" << indent <<
-		'_' << static_cast <const std::string&> (a.member.name ()) << " = val;\n"
-		<< unindent << "}\n";
-
-	if (CodeGenBase::is_var_len (a.member)) {
-		// The move setter
-		stm << "void " << a.member.name () << " (" << Var (a.member) << "&& val)\n"
+	if (CodeGenBase::is_ref_type (a.member)) {
+		stm << "void " << a.member.name () << " (" << Var (a.member) << " val)\n"
 			"{\n" << indent <<
 			'_' << static_cast <const std::string&> (a.member.name ()) << " = std::move (val);\n"
 			<< unindent << "}\n";
+	} else {
+		stm << "void " << a.member.name () << " (" << ConstRef (a.member) << " val)\n"
+			"{\n" << indent <<
+			'_' << static_cast <const std::string&> (a.member.name ()) << " = val;\n"
+			<< unindent << "}\n";
+
+		if (CodeGenBase::is_var_len (a.member)) {
+			// The move setter
+			stm << "void " << a.member.name () << " (" << Var (a.member) << "&& val)\n"
+				"{\n" << indent <<
+				'_' << static_cast <const std::string&> (a.member.name ()) << " = std::move (val);\n"
+				<< unindent << "}\n";
+		}
 	}
 
 	return stm;

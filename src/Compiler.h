@@ -42,35 +42,6 @@ public:
 		return IDL_FrontEnd::err_out ();
 	}
 
-	int main (int argc, char* argv [])
-	{
-		char fi [] = "-FI";
-		char ami [] = "CORBA/AMI.idl";
-
-		for (int i = 1; i < argc; ++i) {
-			const char* arg = argv [i];
-			if (arg [0] != '-') {
-				size_t len = strlen (arg);
-				if (len >= 7) {
-					const char* end = arg + len;
-					if (std::equal (end - 7, end, "AMI.idl")) {
-						const char slash = *(end - 8);
-						if ('/' == slash || '\\' == slash)
-							return IDL_FrontEnd::main (argc, argv);
-					}
-				}
-			}
-		}
-
-		std::vector <char*> args;
-		args.resize (argc + 2);
-		auto arg = std::copy (argv, argv + argc, args.begin ());
-		*(arg++) = fi;
-		*(arg++) = ami;
-
-		return IDL_FrontEnd::main ((int)args.size (), args.data ());
-	}
-
 	struct AMI_Objects
 	{
 		const AST::ValueType* poller;
@@ -106,6 +77,8 @@ private:
 	// Override print_usage_info for additional usage information.
 	virtual void print_usage_info (const char* exe_name) override;
 
+	virtual void parse_arguments (CmdLine& args) override;
+
 	// Override parse_command_line to parse own command line switches.
 	virtual bool parse_command_line (CmdLine& args) override;
 
@@ -119,7 +92,7 @@ private:
 
 	AST::Identifier make_ami_id (const AST::Interface& itf, const char* suffix);
 
-	static bool async_supported (const AST::Interface& itf);
+	bool async_supported (const AST::Interface& itf) const;
 
 	static AST::ScopedNames poller_raises (const AST::Location& loc, const AST::Raises& op_raises);
 

@@ -55,7 +55,8 @@ void Compiler::print_usage_info (const char* exe_name)
 		"\t-legacy                 Generate code compatible with C++ language mapping 1.3.\n"
 		"\t                        To enable the compatibility define macro LEGACY_CORBA_CPP.\n"
 		"\t-no_servant             Do not generate servant implementations.\n"
-		"\t-inc_cpp <file>         Add additional include file to each .cpp file\n";
+		"\t-inc_cpp <file>         Add additional include file to each .cpp file\n"
+		"\t-no_ami                 Do not generate AMI\n";
 }
 
 const char* Compiler::option (const char* arg, const char* opt)
@@ -66,6 +67,41 @@ const char* Compiler::option (const char* arg, const char* opt)
 		return arg + cc;
 	else
 		return nullptr;
+}
+
+void Compiler::parse_arguments (CmdLine& args)
+{
+	IDL_FrontEnd::parse_arguments (args);
+
+#ifdef _WIN32
+	static const char* INCLUDE_ENV = "INCLUDE";
+	static const char PATH_SEPARATOR = ';';
+#else
+	static const char* INCLUDE_ENV = "IDL_INCLUDE_PATH";
+	static const char PATH_SEPARATOR = ':';
+#endif
+
+	const char* inc = getenv (INCLUDE_ENV);
+	if (inc) {
+		const char* end = inc + strlen (inc);
+		for (;;) {
+			while (isspace (*inc))
+				++inc;
+			const char* sem = strchr (inc, PATH_SEPARATOR);
+			const char* endi = sem ? sem : end;
+			while (inc < endi && isspace (*(endi - 1)))
+				--endi;
+			if (inc < endi)
+				include_paths ().emplace_back (inc, endi);
+			if (sem)
+				inc = sem + 1;
+			else
+				break;
+		}
+	}
+
+	if (!no_ami)
+		includes ().emplace_back ("CORBA/AMI.idl");
 }
 
 bool Compiler::parse_command_line (CmdLine& args)
@@ -109,6 +145,8 @@ bool Compiler::parse_command_line (CmdLine& args)
 		no_servant = true;
 	else if ((arg = option (args.arg (), "inc_cpp")))
 		inc_cpp = args.parameter (arg);
+	else if ((arg = option (args.arg (), "no_ami")))
+		no_ami = true;
 
 	if (arg) {
 		args.next ();
@@ -301,9 +339,9 @@ void Compiler::interface_end (const Interface& itf, Builder& builder)
 	}
 }
 
-bool Compiler::async_supported (const Interface& itf)
+bool Compiler::async_supported (const Interface& itf) const
 {
-	return CodeGenBase::async_supported (itf);
+	return !no_ami && CodeGenBase::async_supported (itf);
 }
 
 Identifier Compiler::make_ami_id (const Interface& itf, const char* suffix)

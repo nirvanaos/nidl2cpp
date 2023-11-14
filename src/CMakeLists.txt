@@ -8,7 +8,7 @@ add_executable(nidl2cpp
 	Proxy.cpp
 	Servant.cpp)
 
-FIND_PACKAGE(nirvanaos.idlfe REQUIRED)
+find_package(nirvanaos.idlfe REQUIRED)
 
 #[===[
 get_cmake_property(_variableNames VARIABLES)
@@ -19,6 +19,6 @@ endforeach()
 ]===]
 
 target_precompile_headers(nidl2cpp PRIVATE pch.h)
-target_compile_features(nidl2cpp PUBLIC cxx_std_20)
+target_compile_features(nidl2cpp PRIVATE cxx_std_20)
 target_include_directories(nidl2cpp PRIVATE ${nirvanaos.idlfe_INCLUDE_DIR})
-target_link_libraries(nidl2cpp ${nirvanaos.idlfe_LIBRARIES_TARGETS})
+target_link_libraries(nidl2cpp nirvanaos.idlfe::nirvanaos.idlfe)

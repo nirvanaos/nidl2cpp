@@ -10,13 +10,13 @@ add_executable(nidl2cpp
 
 FIND_PACKAGE(nirvanaos.idlfe REQUIRED)
 
-##[===[
+#[===[
 get_cmake_property(_variableNames VARIABLES)
 list (SORT _variableNames)
 foreach (_variableName ${_variableNames})
     message(STATUS "${_variableName}=${${_variableName}}")
 endforeach()
-#]===]
+]===]
 
 target_precompile_headers(nidl2cpp PRIVATE pch.h)
 target_compile_features(nidl2cpp PUBLIC cxx_std_20)

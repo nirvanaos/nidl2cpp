@@ -27,6 +27,7 @@
 #define NIDL2CPP_PROXY_H_
 #pragma once
 
+#include <list>
 #include "CodeGenBase.h"
 #include "Code.h"
 

@@ -8,7 +8,7 @@
     {
       "kind": "git",
       "repository": "https://github.com/nirvanaos/vcpkg-registry.git",
-      "baseline": "2be33334077db8643d150f887c285e0f29a36bc3",
+      "baseline": "3bcb66d5b5b2796dae65dbdf4f5da7b8b5f032a1",
       "packages": ["idlfe"]
     }
   ]

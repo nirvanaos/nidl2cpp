@@ -1,3 +1,5 @@
+find_package(idlfe CONFIG REQUIRED)
+
 add_executable(nidl2cpp
 	Client.cpp
 	Code.cpp
@@ -8,17 +10,8 @@ add_executable(nidl2cpp
 	Proxy.cpp
 	Servant.cpp)
 
-find_package(nirvanaos.idlfe REQUIRED)
-
-#[===[
-get_cmake_property(_variableNames VARIABLES)
-list (SORT _variableNames)
-foreach (_variableName ${_variableNames})
-    message(STATUS "${_variableName}=${${_variableName}}")
-endforeach()
-]===]
-
+find_path(IDLFE_INCLUDE_DIR NAMES IDL_FrontEnd.h)
+target_include_directories(nidl2cpp PRIVATE ${IDLFE_INCLUDE_DIR})
 target_precompile_headers(nidl2cpp PRIVATE pch.h)
 target_compile_features(nidl2cpp PRIVATE cxx_std_20)
-target_include_directories(nidl2cpp PRIVATE ${nirvanaos.idlfe_INCLUDE_DIR})
-target_link_libraries(nidl2cpp nirvanaos.idlfe::nirvanaos.idlfe)
+target_link_libraries(nidl2cpp PRIVATE idlfe::idlfe idlfe::decNumber)

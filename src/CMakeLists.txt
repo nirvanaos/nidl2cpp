@@ -9,8 +9,8 @@ add_executable(nidl2cpp
 	Servant.cpp)
 
 find_package(idlfe CONFIG REQUIRED)
-find_path(IDLFE_INCLUDE_DIR NAMES IDL_FrontEnd.h)
-target_include_directories(nidl2cpp PRIVATE ${IDLFE_INCLUDE_DIR})
+find_path(IDLFE_INCLUDE_DIR NAMES IDL_FrontEnd.h REQUIRED)
+target_include_directories(nidl2cpp PUBLIC ${IDLFE_INCLUDE_DIR})
 target_link_libraries(nidl2cpp PRIVATE idlfe::idlfe idlfe::decNumber)
 
 target_precompile_headers(nidl2cpp PRIVATE pch.h)

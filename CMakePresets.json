@@ -1,0 +1,91 @@
+{
+	"version": 6,
+	"cmakeMinimumRequired": {
+		"major": 3,
+		"minor": 20
+	},
+	"configurePresets": [
+		{
+			"name": "default",
+			"generator": "Ninja Multi-Config",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+			}
+		},
+		{
+			"name": "clang",
+			"inherits": "default",
+			"cacheVariables": {
+				"CMAKE_CXX_COMPILER": "clang++",
+				"CMAKE_CXX_COMPILER_TARGET": "x86_64-w64-windows-gnu",
+				"VCPKG_HOST_TRIPLET": "x64-mingw-static",
+				"VCPKG_TARGET_TRIPLET": "x64-mingw-static"
+			}
+		},
+		{
+			"name": "msvc",
+			"inherits": "default",
+			"displayName": "Visual Studio Build Tools 2019 Release - amd64",
+			"description": "Using compilers for Visual Studio 16 2019 (x64 architecture)",
+			"generator": "Visual Studio 16 2019",
+			"toolset": "host=x64",
+			"architecture": "x64",
+			"cacheVariables": {
+				"CMAKE_INSTALL_PREFIX": "${sourceDir}/build/install/${presetName}",
+				"CMAKE_C_COMPILER": "cl.exe",
+				"CMAKE_CXX_COMPILER": "cl.exe"
+			}
+		}
+	],
+	"buildPresets": [
+		{
+			"name": "debug",
+			"description": "",
+			"displayName": "",
+			"configurePreset": "default",
+			"configuration": "Debug"
+		},
+		{
+			"name": "release",
+			"description": "",
+			"displayName": "",
+			"configurePreset": "default",
+			"configuration": "Release"
+		},
+		{
+			"name": "msvc-debug",
+			"description": "",
+			"displayName": "",
+			"configurePreset": "msvc",
+			"configuration": "Debug"
+		},
+		{
+			"name": "msvc-release",
+			"description": "",
+			"displayName": "",
+			"configurePreset": "msvc",
+			"configuration": "Release"
+		},
+		{
+			"name": "clang-debug",
+			"description": "",
+			"displayName": "",
+			"configurePreset": "clang",
+			"configuration": "Debug"
+		},
+		{
+			"name": "clang-release",
+			"description": "",
+			"displayName": "",
+			"configurePreset": "clang",
+			"configuration": "Release"
+		},
+		{
+			"name": "msvc-debug",
+			"displayName": "Visual Studio Build Tools 2019 Release - amd64 - Debug",
+			"configurePreset": "msvc",
+			"configuration": "Debug"
+		}
+	]
+}

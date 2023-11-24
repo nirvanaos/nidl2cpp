@@ -97,7 +97,7 @@ private:
 	static AST::ScopedNames poller_raises (const AST::Location& loc, const AST::Raises& op_raises);
 
 	std::filesystem::path out_file (const AST::Root& tree, const std::filesystem::path& dir,
-		const std::string& suffix, const std::filesystem::path& ext) const;
+		const std::string& suffix, const char* ext) const;
 
 private:
 	AMI_Interfaces ami_interfaces_;

@@ -155,7 +155,7 @@ bool Compiler::parse_command_line (CmdLine& args)
 		return false;
 }
 
-path Compiler::out_file (const Root& tree, const path& dir, const std::string& suffix, const path& ext) const
+path Compiler::out_file (const Root& tree, const path& dir, const std::string& suffix, const char* ext) const
 {
 	path name (tree.file ().stem ().string () + suffix);
 	name.replace_extension (ext);
@@ -218,10 +218,8 @@ void Compiler::interface_end (const Interface& itf, Builder& builder)
 			for (const auto b : async_bases) {
 				bases.push_front (b->second.poller->scoped_name ());
 			}
-			if (bases.empty ()) {
-				ScopedName base (loc, true, { "Messaging", "Poller" });
-				bases.push_front (std::move (base));
-			}
+			if (bases.empty ())
+				bases.push_front (ScopedName (loc, true, { "Messaging", "Poller" }));
 			builder.valuetype_bases (false, bases);
 
 			for (auto item : itf) {
@@ -277,10 +275,8 @@ void Compiler::interface_end (const Interface& itf, Builder& builder)
 			for (const auto b : async_bases) {
 				bases.push_front (b->second.handler->scoped_name ());
 			}
-			if (bases.empty ()) {
-				ScopedName base (loc, true, { "Messaging", "ReplyHandler" });
-				bases.push_front (std::move (base));
-			}
+			if (bases.empty ())
+				bases.push_front (ScopedName (loc, true, { "Messaging", "ReplyHandler" }));
 			builder.interface_bases (bases);
 
 			for (auto item : itf) {

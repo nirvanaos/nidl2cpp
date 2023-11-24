@@ -431,6 +431,16 @@ void Client::end_interface (const IV_Base& container)
 
 	implement_nested_items (container);
 
+	const Compiler::AMI_Objects* ami = nullptr;
+	if (container.kind () == Item::Kind::INTERFACE) {
+		const Interface& itf = static_cast <const Interface&> (container);
+		auto it = compiler ().ami_interfaces ().find (&itf);
+		if (it != compiler ().ami_interfaces ().end ()) {
+			ami = &it->second;
+			generate_ami (itf);
+		}
+	}
+
 	// Bridge
 	h_.namespace_open ("CORBA/Internal");
 	h_ << empty_line <<
@@ -441,20 +451,16 @@ void Client::end_interface (const IV_Base& container)
 	Bases bases; // All bases, direct and indirect
 	const Interface* concrete_itf = nullptr;
 	Bases supports;
-	const Compiler::AMI_Objects* ami = nullptr;
 	if (container.kind () == Item::Kind::INTERFACE) {
 
 		const Interface& itf = static_cast <const Interface&> (container);
 
 		switch (itf.interface_kind ()) {
 			case InterfaceKind::UNCONSTRAINED:
-			case InterfaceKind::LOCAL: {
-				auto it = compiler ().ami_interfaces ().find (&itf);
-				if (it != compiler ().ami_interfaces ().end ())
-					ami = &it->second;
-
+			case InterfaceKind::LOCAL:
 				h_ << "NIRVANA_BASE_ENTRY (Object, CORBA_Object)\n";
-			} break;
+				break;
+
 			case InterfaceKind::ABSTRACT:
 				h_ << "NIRVANA_BASE_ENTRY (AbstractBase, CORBA_AbstractBase)\n";
 				break;
@@ -1032,7 +1038,6 @@ void Client::begin (const Interface& itf)
 void Client::end (const Interface& itf)
 {
 	end_interface (itf);
-	generate_ami (itf);
 }
 
 void Client::begin (const ValueType& itf)
@@ -2410,12 +2415,12 @@ void Client::marshal_union (const Union& u, bool out)
 inline
 void Client::generate_ami (const Interface& itf)
 {
-	if (compiler ().ami_interfaces ().find (&itf) == compiler ().ami_interfaces ().end ())
-		return;
+	assert (compiler ().ami_interfaces ().find (&itf) != compiler ().ami_interfaces ().end ());
 
 	h_.namespace_open ("CORBA/Internal");
 
-	h_ << "NIRVANA_AMI_BEGIN (" << QName (itf) << ")\n";
+	h_ << empty_line <<
+		"NIRVANA_AMI_BEGIN (" << QName (itf) << ")\n";
 
 	for (auto item : itf) {
 		switch (item->kind ()) {

@@ -34,6 +34,8 @@
 using std::filesystem::path;
 using namespace AST;
 
+unsigned short version [] = { 0, 0, 1 };
+
 void Compiler::print_usage_info (const char* exe_name)
 {
 	std::cout << "Nirvana IDL compiler.\n";
@@ -56,7 +58,8 @@ void Compiler::print_usage_info (const char* exe_name)
 		"\t                        To enable the compatibility define macro LEGACY_CORBA_CPP.\n"
 		"\t-no_servant             Do not generate servant implementations.\n"
 		"\t-inc_cpp <file>         Add additional include file to each .cpp file\n"
-		"\t-no_ami                 Do not generate AMI\n";
+		"\t-no_ami                 Do not generate AMI\n"
+		"\t--version               Print compiler version\n";
 }
 
 const char* Compiler::option (const char* arg, const char* opt)
@@ -147,6 +150,8 @@ bool Compiler::parse_command_line (CmdLine& args)
 		inc_cpp = args.parameter (arg);
 	else if ((arg = option (args.arg (), "no_ami")))
 		no_ami = true;
+	else if ((arg = option (args.arg (), "-version")))
+		std::cout << "Version " << version [0] << '.' << version [1] << '.' << version [2] << std::endl;
 
 	if (arg) {
 		args.next ();

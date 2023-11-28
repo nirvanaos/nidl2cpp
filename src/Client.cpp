@@ -152,12 +152,12 @@ void Client::type_code_def (const ItemWithId& item)
 		return;
 
 	cpp_.namespace_close ();
-	cpp_ << empty_line;
-		
+	cpp_ << empty_line
+		<< "NIRVANA_OLF_SECTION_N (" << (export_count_++) << ')';
 	if (!is_nested (item))
-		 cpp_ << "extern";
+		 cpp_ << " extern";
 	cpp_ << " const " << Namespace ("Nirvana") << "ImportInterfaceT <" << Namespace ("CORBA") << "TypeCode>\n"
-		<< "NIRVANA_OLF_SECTION_N (" << (export_count_++) << ", " << TC_Name (item) << ") = { Nirvana::OLF_IMPORT_INTERFACE, ";
+		<< TC_Name (item) << " = { Nirvana::OLF_IMPORT_INTERFACE, ";
 
 	switch (item.kind ()) {
 		case Item::Kind::TYPE_DEF:
@@ -241,9 +241,9 @@ void Client::leaf (const TypeDef& item)
 			cpp_.namespace_open (item);
 			cpp_ << "extern ";
 		}
-		cpp_
-			<< "const " << Namespace ("CORBA/Internal") << "Alias NIRVANA_SELECTANY (" << TC_Name (item) << ") { \""
-			<< item.repository_id () << "\", \"" << name << "\",\n"
+		cpp_ << "NIRVANA_SELECTANY\n"
+			"const " << Namespace ("CORBA/Internal") << "Alias " << TC_Name (item)
+			<< " { \"" << item.repository_id () << "\", \"" << name << "\",\n"
 			"NIRVANA_STATIC_BRIDGE ("
 			<< Namespace ("CORBA") << "TypeCode, "
 			<< Namespace ("CORBA/Internal") << "TypeDef <&" << TC_Name (item) << ">) }; \n";
@@ -1138,8 +1138,9 @@ void Client::end (const ValueType& vt)
 			"{};\n";
 	
 		cpp_ << empty_line
-			<< "const " << Namespace ("Nirvana") << "ImportInterfaceT <" << QName (vt) << FACTORY_SUFFIX ">\n"
-			<< "NIRVANA_OLF_SECTION_N (" << (export_count_++) << ", " << QName (vt) << "::_factory) = { Nirvana::OLF_IMPORT_INTERFACE, CORBA::Internal::RepIdOf <"
+			<< "NIRVANA_OLF_SECTION_N (" << (export_count_++) << ')';
+		cpp_ << " const " << Namespace ("Nirvana") << "ImportInterfaceT <" << QName (vt) << FACTORY_SUFFIX ">\n"
+			<< QName (vt) << "::_factory = { Nirvana::OLF_IMPORT_INTERFACE, CORBA::Internal::RepIdOf <"
 			<< QName (vt) << ">::id, CORBA::Internal::RepIdOf <" << QName (vt) << FACTORY_SUFFIX ">::id };\n";
 	}
 }

@@ -233,8 +233,7 @@ void Proxy::end (const Interface& itf)
 		generate_poller (itf, *ami->poller);
 
 	cpp_.namespace_close ();
-	cpp_ << empty_line <<
-		"NIRVANA_EXPORT (" << export_name (itf) << ", CORBA::Internal::RepIdOf <" << QName (itf)
+	cpp_ << "NIRVANA_EXPORT (" << export_name (itf) << ", CORBA::Internal::RepIdOf <" << QName (itf)
 		<< ">::id, CORBA::Internal::PseudoBase, CORBA::Internal::ProxyFactoryImpl"
 		<< " <" << QName (itf);
 
@@ -364,7 +363,7 @@ void Proxy::type_code_members (const ItemWithId& item, const Members& members)
 
 Code& Proxy::exp (const NamedItem& item)
 {
-	return cpp_ << empty_line <<
+	return cpp_ <<
 		"NIRVANA_EXPORT (" << export_name (item) << ", "
 		"CORBA::Internal::RepIdOf <" << QName (item) << ">::id, CORBA::TypeCode, CORBA::Internal::";
 }
@@ -501,9 +500,8 @@ void Proxy::end (const ValueType& vt)
 		"{};\n";
 
 	cpp_.namespace_close ();
-	cpp_ << empty_line << 
-		"NIRVANA_EXPORT (" << export_name (vt) << ", CORBA::Internal::RepIdOf <" << QName (vt) << ">::id, CORBA"
-		<< (vt.modifier () != ValueType::Modifier::ABSTRACT ?
+	cpp_ << "NIRVANA_EXPORT (" << export_name (vt) << ", CORBA::Internal::RepIdOf <" << QName (vt) << ">::id, CORBA"
+	<< (vt.modifier () != ValueType::Modifier::ABSTRACT ?
 		"::Internal::PseudoBase, CORBA::Internal::ValueFactoryImpl <"
 		:
 		"::TypeCode, CORBA::Internal::TypeCodeValue <")
@@ -517,8 +515,7 @@ void Proxy::leaf (const ValueBox& vb)
 	type_code_name (vb);
 
 	cpp_.namespace_close ();
-	cpp_ << empty_line <<
-		"NIRVANA_EXPORT (" << export_name (vb) << ", CORBA::Internal::RepIdOf <" << QName (vb) << ">::id, CORBA"
+	cpp_ << "NIRVANA_EXPORT (" << export_name (vb) << ", CORBA::Internal::RepIdOf <" << QName (vb) << ">::id, CORBA"
 		<< "::Internal::PseudoBase, CORBA::Internal::ValueBoxFactory <"
 		<< QName (vb) << ">)\n";
 }

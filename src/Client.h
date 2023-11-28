@@ -38,8 +38,7 @@ public:
 		const std::filesystem::path& file_h, const std::filesystem::path& file_cpp) :
 		CodeGenBase (compiler),
 		h_ (file_h, root),
-		cpp_ (file_cpp, root),
-		export_count_ (0)
+		cpp_ (file_cpp, root)
 	{
 		if (!compiler.inc_cpp.empty ())
 			cpp_ << "#include \"" << compiler.inc_cpp << "\"\n";
@@ -206,7 +205,6 @@ private:
 	Header h_; // .h file
 	Code cpp_; // .cpp file.
 	size_t initial_cpp_size_;
-	unsigned export_count_;
 };
 
 Code& operator << (Code& stm, const Client::Param& t);

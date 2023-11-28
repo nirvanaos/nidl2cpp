@@ -153,7 +153,7 @@ void Client::type_code_def (const ItemWithId& item)
 
 	cpp_.namespace_close ();
 	cpp_ << empty_line
-		<< "NIRVANA_OLF_SECTION_N (" << (export_count_++) << ')';
+		<< "NIRVANA_OLF_SECTION_OPT";
 	if (!is_nested (item))
 		 cpp_ << " extern";
 	cpp_ << " const " << Namespace ("Nirvana") << "ImportInterfaceT <" << Namespace ("CORBA") << "TypeCode>\n"
@@ -1138,8 +1138,8 @@ void Client::end (const ValueType& vt)
 			"{};\n";
 	
 		cpp_ << empty_line
-			<< "NIRVANA_OLF_SECTION_N (" << (export_count_++) << ')';
-		cpp_ << " const " << Namespace ("Nirvana") << "ImportInterfaceT <" << QName (vt) << FACTORY_SUFFIX ">\n"
+			<< "NIRVANA_OLF_SECTION_OPT const "
+			<< Namespace ("Nirvana") << "ImportInterfaceT <" << QName (vt) << FACTORY_SUFFIX ">\n"
 			<< QName (vt) << "::_factory = { Nirvana::OLF_IMPORT_INTERFACE, CORBA::Internal::RepIdOf <"
 			<< QName (vt) << ">::id, CORBA::Internal::RepIdOf <" << QName (vt) << FACTORY_SUFFIX ">::id };\n";
 	}

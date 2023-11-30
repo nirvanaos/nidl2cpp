@@ -1271,7 +1271,9 @@ void Client::leaf (const Constant& item)
 		outline = t.tkind () != Type::Kind::BASIC_TYPE || !AST::is_integral (t.basic_type ());
 	}
 
-	if (is_nested (item))
+	bool nested = is_nested (item);
+
+	if (nested)
 		h_ << "static ";
 	else {
 		h_.namespace_open (item);
@@ -1281,18 +1283,23 @@ void Client::leaf (const Constant& item)
 
 	h_ << "const " << ConstType (item) << ' ' << item.name ();
 
-	if (outline) {
-		if (!is_nested (item))
+	if (nested || outline) {
+		if (!nested)
 			cpp_.namespace_open (item);
 		else
 			cpp_.namespace_open ("CORBA/Internal");
-
-		cpp_ << "const " << ConstType (item) << ' ' << QName (item) << " = "
-			<< static_cast <const Variant&> (item) << ";\n";
-	} else {
-		h_ << " = " << static_cast <const Variant&> (item);
+		cpp_ << "const " << ConstType (item) << ' ' << QName (item);
 	}
+
+	if (outline)
+		cpp_ << " = " << static_cast <const Variant&> (item);
+	else
+		h_ << " = " << static_cast <const Variant&> (item);
+
 	h_ << ";\n";
+
+	if (nested || outline)
+		cpp_ << ";\n";
 }
 
 void Client::define (const Exception& item)

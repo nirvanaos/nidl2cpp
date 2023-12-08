@@ -47,7 +47,6 @@ public:
 			"#include <Nirvana/OLF.h>\n"
 			"#include ";
 		cpp_.include_header (file_h);
-		initial_cpp_size_ = cpp_.size ();
 	}
 
 	struct Param
@@ -204,7 +203,6 @@ private:
 private:
 	Header h_; // .h file
 	Code cpp_; // .cpp file.
-	size_t initial_cpp_size_;
 };
 
 Code& operator << (Code& stm, const Client::Param& t);

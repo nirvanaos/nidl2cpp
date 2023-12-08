@@ -116,9 +116,7 @@ Code& operator << (Code& stm, const Client::SendpSignature& op)
 void Client::end (const Root&)
 {
 	h_.close ();
-	if (cpp_.size () > initial_cpp_size_)
-		cpp_.close ();
-	// Otherwise the .cpp file will be deleted.
+	cpp_.close ();
 }
 
 void Client::leaf (const Include& item)

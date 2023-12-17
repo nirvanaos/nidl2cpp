@@ -6,3 +6,4 @@ set(CMAKE_CONFIGURATION_TYPES Debug Release)
 project(nidl2cpp CXX)
 
 add_subdirectory(src)
+install(TARGETS nidl2cpp)

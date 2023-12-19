@@ -15,7 +15,7 @@ This repository contains source code for Nirvana CORBA IDL to C++ compiler.
 
 ## How to build
 
-Use CMake.
+> ./build.sh [Debug|Release]
 
 ## Dependencies
 

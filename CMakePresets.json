@@ -80,12 +80,6 @@
 			"displayName": "",
 			"configurePreset": "clang",
 			"configuration": "Release"
-		},
-		{
-			"name": "msvc-debug",
-			"displayName": "Visual Studio Build Tools 2019 Release - amd64 - Debug",
-			"configurePreset": "msvc",
-			"configuration": "Debug"
 		}
 	]
 }

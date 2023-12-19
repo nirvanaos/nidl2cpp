@@ -6,9 +6,16 @@ This is a part of the Nirvana project.
 
 This repository contains source code for Nirvana CORBA IDL to C++ compiler.
 
+## Prerequisites
+
+* CMake
+* vcpkg
+* flex
+* bison
+
 ## How to build
-This repository does not contain any project files.
-To build under Visual C++ use *nirvanaos/nidl2cpp.vc* supermodule.
+
+Use CMake.
 
 ## Dependencies
 

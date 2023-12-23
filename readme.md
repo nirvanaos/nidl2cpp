@@ -10,12 +10,10 @@ This repository contains source code for Nirvana CORBA IDL to C++ compiler.
 
 * CMake
 * vcpkg
-* flex
-* bison
 
 ## How to build
 
-Use CMake with vcpkg toolchain.
+Use CMake.
 
 ## Dependencies
 

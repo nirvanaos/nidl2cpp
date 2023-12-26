@@ -724,6 +724,8 @@ void Client::end_interface (const IV_Base& container)
 				if (m.kind () == Item::Kind::ATTRIBUTE)
 					att = &static_cast <const Attribute&> (m);
 
+				// att == nullptr for members
+
 				if (!att || !is_native (att->getraises ())) {
 					h_ << "\ntemplate <class T>\n";
 					if (!att_byref)
@@ -799,7 +801,7 @@ void Client::end_interface (const IV_Base& container)
 
 					environment (Raises ());
 					h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n"
-						"(_b._epv ().epv._move_" << m.name () << ") (&_b, &val, &_env);\n"
+						"(_b._epv ().epv._move_" << m.name () << ") (&_b, &" << Param (m, Parameter::Attribute::INOUT) << " (val), & _env); \n"
 						"_env.check ();\n"
 						<< unindent << "}\n";
 

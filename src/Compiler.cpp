@@ -151,7 +151,8 @@ bool Compiler::parse_command_line (CmdLine& args)
 	else if ((arg = option (args.arg (), "no_ami")))
 		no_ami = true;
 	else if ((arg = option (args.arg (), "-version")))
-		std::cout << "Version " << version [0] << '.' << version [1] << '.' << version [2] << std::endl;
+		std::cout << "Nirvana IDL to C++ compiler\n"
+			"Version " << version [0] << '.' << version [1] << '.' << version [2] << std::endl;
 
 	if (arg) {
 		args.next ();

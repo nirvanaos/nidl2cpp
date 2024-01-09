@@ -34,11 +34,12 @@
 using std::filesystem::path;
 using namespace AST;
 
-unsigned short version [] = { 0, 0, 1 };
+const char Compiler::name_ [] = "Nirvana IDL to C++ compiler";
+const unsigned short Compiler::version_ [3] = { 0, 0, 1 };
 
 void Compiler::print_usage_info (const char* exe_name)
 {
-	std::cout << "Nirvana IDL compiler.\n";
+	std::cout << name_ << ".\n";
 	IDL_FrontEnd::print_usage_info (exe_name);
 	std::cout << "Output options:\n"
 		"\t-out <directory>        Directory for output files.\n"
@@ -150,10 +151,16 @@ bool Compiler::parse_command_line (CmdLine& args)
 		inc_cpp = args.parameter (arg);
 	else if ((arg = option (args.arg (), "no_ami")))
 		no_ami = true;
-	else if ((arg = option (args.arg (), "-version")))
-		std::cout << "Nirvana IDL to C++ compiler\n"
-			"Version " << version [0] << '.' << version [1] << '.' << version [2] << std::endl;
-
+	else if ((arg = option (args.arg (), "-version"))) {
+		std::cout << name_ << "\n"
+			"Version ";
+		auto it = std::begin (version_);
+		std::cout << *it;
+		for (++it; it != std::end (version_); ++it) {
+			std::cout << '.' << *it;
+		}
+		std::cout << std::endl;
+	}
 	if (arg) {
 		args.next ();
 		return true;

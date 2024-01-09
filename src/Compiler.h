@@ -37,6 +37,9 @@ class Compiler :
 	public Options
 {
 public:
+	static const char name_ [];
+	static const unsigned short version_ [3];
+
 	std::ostream& err_out () const noexcept
 	{
 		return IDL_FrontEnd::err_out ();

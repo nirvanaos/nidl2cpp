@@ -59,7 +59,13 @@ void Code::open (const path& file, const Root& root)
 	cur_namespace_.clear ();
 	file_ = file;
 	*this << "// This file was generated from " << root.file ().filename () << std::endl;
-	*this << "// Nirvana IDL compiler version 1.0\n";
+	*this << "// " << Compiler::name_ << " version ";
+	auto it = std::begin (Compiler::version_);
+	*this << *it;
+	for (++it; it != std::end (Compiler::version_); ++it) {
+		*this << '.' << *it;
+	}
+	*this << std::endl;
 }
 
 void Code::close ()

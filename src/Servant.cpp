@@ -472,119 +472,122 @@ void Servant::end (const ValueType& vt)
 		h_ << ">::find (static_cast <S&> (*this), id);\n"
 			<< unindent << "}\n";
 
-		h_ << unindent << "};\n"; // End Aggregated
+		h_ << unindent << "};\n";
+		
+		// End Aggregated
 
 		// Standard implementation
-		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
-			h_ << empty_line
-				<< "template <class S>\n"
-				"class Servant <S, " << QName (vt) << "> :\n"
-				<< indent <<
-				"public Aggregated <S, " << QName (vt) << '>';
 
-			if (!concrete_itf || concrete_itf->interface_kind () == InterfaceKind::PSEUDO)
-				h_ << ",\n"
-				"public RefCountBase <S>";
+		h_ << empty_line
+			<< "template <class S>\n"
+			"class Servant <S, " << QName (vt) << "> :\n"
+			<< indent <<
+			"public Aggregated <S, " << QName (vt) << '>';
 
-			if (concrete_itf)
-				h_ << ",\n"
-				"public Servant <S, " << QName (*concrete_itf) << ">";
+		if (!concrete_itf || concrete_itf->interface_kind () == InterfaceKind::PSEUDO)
+			h_ << ",\n"
+			"public RefCountBase <S>";
 
-			bool abstract_base = false;
-			std::vector <const ValueType*> concrete_bases;
-			for (auto it = all_bases.rbegin (); it != all_bases.rend (); ++it) {
-				auto b = *it;
-				h_ << ",\n"
-					"public ";
-				if (b->kind () == Item::Kind::VALUE_TYPE) {
+		if (concrete_itf)
+			h_ << ",\n"
+			"public Servant <S, " << QName (*concrete_itf) << ">";
+
+		bool abstract_base = false;
+		std::vector <const ValueType*> concrete_bases;
+		for (auto it = all_bases.rbegin (); it != all_bases.rend (); ++it) {
+			auto b = *it;
+			h_ << ",\n"
+				"public ";
+			if (b->kind () == Item::Kind::VALUE_TYPE) {
+				h_ << "Value";
+
+				const ValueType& vt = static_cast <const ValueType&> (*b);
+				if (vt.modifier () != ValueType::Modifier::ABSTRACT)
+					concrete_bases.push_back (&vt);
+
+			} else {
+				assert (static_cast <const Interface&> (*b).interface_kind () == InterfaceKind::ABSTRACT);
+				abstract_base = true; // We need abstract base
+
+				// If value supports concrete interface, abstract interface references must be obtained
+				// via _this() call. If value supports abstract interfaces only, abstract interface references
+				// obtained directly from the servant reference.
+				if (concrete_itf)
+					h_ << "Interface";
+				else
 					h_ << "Value";
-
-					const ValueType& vt = static_cast <const ValueType&> (*b);
-					if (vt.modifier () != ValueType::Modifier::ABSTRACT)
-						concrete_bases.push_back (&vt);
-
-				} else {
-					assert (static_cast <const Interface&> (*b).interface_kind () == InterfaceKind::ABSTRACT);
-					abstract_base = true; // We need abstract base
-
-					// If value supports concrete interface, abstract interface references must be obtained
-					// via _this() call. If value supports abstract interfaces only, abstract interface references
-					// obtained directly from the servant reference.
-					if (concrete_itf)
-						h_ << "Interface";
-					else
-						h_ << "Value";
-				}
-				h_ << "Impl <S, " << QName (*b) << '>';
 			}
+			h_ << "Impl <S, " << QName (*b) << '>';
+		}
 
-			if (abstract_base)
-				h_ << ",\n"
-				"public InterfaceImpl <S, AbstractBase>";
+		if (abstract_base)
+			h_ << ",\n"
+			"public InterfaceImpl <S, AbstractBase>";
 
-			h_ << "\n" << unindent <<
-				"{\n"
-				"public:\n" << indent;
+		h_ << "\n" << unindent <<
+			"{\n"
+			"public:\n" << indent;
 
-			if (abstract_base)
-				h_ << "using InterfaceImpl <S, AbstractBase>::_get_abstract_base;\n";
+		if (abstract_base)
+			h_ << "using InterfaceImpl <S, AbstractBase>::_get_abstract_base;\n";
 
-			if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
-				h_ << "void _marshal (I_ptr <IORequest> rq) const\n"
-					"{\n" << indent;
-				for (auto b : concrete_bases) {
-					h_ << "ValueData <" << QName (*b) << ">::_marshal (rq);\n";
-				}
-				h_ << "ValueData <" << QName (vt) << ">::_marshal (rq);\n"
-					<< unindent << "}\n"
-
-					"void _unmarshal (I_ptr <IORequest> rq)\n"
-					"{\n" << indent;
-				for (auto b : concrete_bases) {
-					h_ << "ValueData <" << QName (*b) << ">::_unmarshal (rq);\n";
-				}
-				h_ << "ValueData <" << QName (vt) << ">::_unmarshal (rq);\n"
-					<< unindent << "}\n\n";
-			}
-
-			h_ << unindent
-				<< "protected:\n"
-				<< indent
-
-				// Default constructor
-				<< "Servant () noexcept\n"
-				"{}\n";
-
-			// Explicit constructor
-			StateMembers all_members;
+		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
+			h_ << "void _marshal (I_ptr <IORequest> rq) const\n"
+				"{\n" << indent;
 			for (auto b : concrete_bases) {
-				StateMembers members = get_members (*b);
-				all_members.insert (all_members.end (), members.begin (), members.end ());
+				h_ << "ValueData <" << QName (*b) << ">::_marshal (rq);\n";
 			}
+			h_ << "ValueData <" << QName (vt) << ">::_marshal (rq);\n"
+				<< unindent << "}\n"
+
+				"void _unmarshal (I_ptr <IORequest> rq)\n"
+				"{\n" << indent;
+			for (auto b : concrete_bases) {
+				h_ << "ValueData <" << QName (*b) << ">::_unmarshal (rq);\n";
+			}
+			h_ << "ValueData <" << QName (vt) << ">::_unmarshal (rq);\n"
+				<< unindent << "}\n\n";
+		}
+
+		h_ << unindent
+			<< "protected:\n"
+			<< indent
+
+			// Default constructor
+			<< "Servant () noexcept\n"
+			"{}\n";
+
+		// Explicit constructor
+		StateMembers all_members;
+		for (auto b : concrete_bases) {
+			StateMembers members = get_members (*b);
 			all_members.insert (all_members.end (), members.begin (), members.end ());
+		}
+		all_members.insert (all_members.end (), members.begin (), members.end ());
 
-			if (!all_members.empty ()) {
-				h_ << "explicit Servant (";
-				auto it = all_members.begin ();
-				h_ << Var (**it) << ' ' << (*it)->name ();
-				h_.indent ();
-				for (++it; it != all_members.end (); ++it) {
-					h_ << ",\n" << Var (**it) << ' ' << (*it)->name ();
-				}
-				h_ << ")\n"
-					<< unindent
-					<< "{\n"
-					<< indent;
-				for (auto m : all_members) {
-					h_ << "this->" << m->name () << " (std::move (" << m->name () << "));\n";
-				}
-				h_ << unindent
-					<< "}\n";
+		if (!all_members.empty ()) {
+			h_ << "explicit Servant (";
+			auto it = all_members.begin ();
+			h_ << Var (**it) << ' ' << (*it)->name ();
+			h_.indent ();
+			for (++it; it != all_members.end (); ++it) {
+				h_ << ",\n" << Var (**it) << ' ' << (*it)->name ();
 			}
-
+			h_ << ")\n"
+				<< unindent
+				<< "{\n"
+				<< indent;
+			for (auto m : all_members) {
+				h_ << "this->" << m->name () << " (std::move (" << m->name () << "));\n";
+			}
 			h_ << unindent
-				<< "};\n";
+				<< "}\n";
+		}
 
+		h_ << unindent
+			<< "};\n";
+
+		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
 			Factories factories = get_factories (vt);
 			if (!factories.empty ()) {
 				skeleton_begin (vt, FACTORY_SUFFIX);

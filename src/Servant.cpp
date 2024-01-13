@@ -424,65 +424,17 @@ void Servant::end (const ValueType& vt)
 				<< "{};";
 		}
 
-		// Aggregated
-
-		h_ << empty_line
-			<< "template <class S>\n"
-			"class Aggregated <S, " << QName (vt) << "> :\n"
-			<< indent;
-
-		if (concrete_itf && concrete_itf->interface_kind () != InterfaceKind::PSEUDO)
-			h_ << "public ValueImplBase <S, ValueBase>,\n";
-		else
-			h_ << "public ValueImpl <S, ValueBase>,\n";
-
-		h_ << "public ValueImpl <S, " << QName (vt) << ">,\n";
-
-		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
-			h_ << "public ValueBaseCopy <S>,\n"
-				"public ValueBaseFactory <" << QName (vt) << ">,\n"
-				"public ValueBaseMarshal <S>,\n";
-		} else {
-			h_ << "public ValueBaseNoCopy,\n"
-				"public ValueBaseNoFactory,\n";
-		}
-
-		if (vt.modifier () == ValueType::Modifier::TRUNCATABLE)
-			h_ << "public ValueTruncatable <&" << TC_Name (*vt.bases ().front ()) << ">\n";
-		else
-			h_ << "public ValueNonTruncatable\n";
-
-		h_ << unindent
-			<< "{\n"
-			"public:\n"
-			<< indent
-			<< "typedef " << QName (vt) << " PrimaryInterface;\n"
-			"\n"
-			"Interface* _query_valuetype (String_in id) noexcept\n"
-			"{\n"
-			<< indent
-			<< "return FindInterface <" << QName (vt);
-
-		for (auto b : all_bases) {
-			h_ << ", " << QName (*b);
-		}
-		if (concrete_itf && concrete_itf->interface_kind () == InterfaceKind::PSEUDO)
-			h_ << ", " << QName (*concrete_itf);
-
-		h_ << ">::find (static_cast <S&> (*this), id);\n"
-			<< unindent << "}\n";
-
-		h_ << unindent << "};\n";
-		
-		// End Aggregated
-
 		// Standard implementation
 
 		h_ << empty_line
 			<< "template <class S>\n"
 			"class Servant <S, " << QName (vt) << "> :\n"
-			<< indent <<
-			"public Aggregated <S, " << QName (vt) << '>';
+			<< indent;
+
+			if (concrete_itf && concrete_itf->interface_kind () != InterfaceKind::PSEUDO)
+				h_ << "public ValueImplBase <S, ValueBase>";
+			else
+				h_ << "public ValueImpl <S, ValueBase>";
 
 		if (!concrete_itf || concrete_itf->interface_kind () == InterfaceKind::PSEUDO)
 			h_ << ",\n"
@@ -520,9 +472,30 @@ void Servant::end (const ValueType& vt)
 			h_ << "Impl <S, " << QName (*b) << '>';
 		}
 
+		h_ << ",\n"
+			"public ValueImpl <S, " << QName (vt) << ">";
+
+		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
+			h_ << ",\n"
+				"public ValueBaseCopy <S>,\n"
+				"public ValueBaseFactory <" << QName (vt) << ">,\n"
+				"public ValueBaseMarshal <S>";
+		} else {
+			h_ << ",\n"
+				"public ValueBaseNoCopy,\n"
+				"public ValueBaseNoFactory";
+		}
+
+		if (vt.modifier () == ValueType::Modifier::TRUNCATABLE)
+			h_ << ",\n"
+				"public ValueTruncatable <&" << TC_Name (*vt.bases ().front ()) << ">";
+		else
+			h_ << ",\n"
+				"public ValueNonTruncatable";
+
 		if (abstract_base)
 			h_ << ",\n"
-			"public InterfaceImpl <S, AbstractBase>";
+				"public InterfaceImpl <S, AbstractBase>";
 
 		h_ << "\n" << unindent <<
 			"{\n"
@@ -531,9 +504,26 @@ void Servant::end (const ValueType& vt)
 		if (abstract_base)
 			h_ << "using InterfaceImpl <S, AbstractBase>::_get_abstract_base;\n";
 
+		h_ << "typedef " << QName (vt) << " PrimaryInterface;\n"
+			"\n"
+			"Interface* _query_valuetype (String_in id) noexcept\n"
+			"{\n"
+			<< indent
+			<< "return FindInterface <" << QName (vt);
+
+		for (auto b : all_bases) {
+			h_ << ", " << QName (*b);
+		}
+		if (concrete_itf && concrete_itf->interface_kind () == InterfaceKind::PSEUDO)
+			h_ << ", " << QName (*concrete_itf);
+
+		h_ << ">::find (static_cast <S&> (*this), id);\n"
+			<< unindent << "}\n";
+
 		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
 			h_ << "void _marshal (I_ptr <IORequest> rq) const\n"
 				"{\n" << indent;
+			
 			for (auto b : concrete_bases) {
 				h_ << "ValueData <" << QName (*b) << ">::_marshal (rq);\n";
 			}
@@ -542,6 +532,7 @@ void Servant::end (const ValueType& vt)
 
 				"void _unmarshal (I_ptr <IORequest> rq)\n"
 				"{\n" << indent;
+
 			for (auto b : concrete_bases) {
 				h_ << "ValueData <" << QName (*b) << ">::_unmarshal (rq);\n";
 			}

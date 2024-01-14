@@ -431,12 +431,28 @@ void Servant::end (const ValueType& vt)
 			"class Servant <S, " << QName (vt) << "> :\n"
 			<< indent;
 
-			if (concrete_itf && concrete_itf->interface_kind () != InterfaceKind::PSEUDO)
-				h_ << "public ValueImplBase <S, ValueBase>";
-			else
-				h_ << "public ValueImpl <S, ValueBase>";
+		enum class BaseType {
+			ABSTRACT,
+			CONCRETE,
+			SUPPORTS
+		} base_type = (concrete_itf && concrete_itf->interface_kind () != InterfaceKind::PSEUDO) ? BaseType::SUPPORTS :
+			(vt.modifier () == ValueType::Modifier::ABSTRACT ? BaseType::ABSTRACT : BaseType::CONCRETE);
 
-		if (!concrete_itf || concrete_itf->interface_kind () == InterfaceKind::PSEUDO)
+		h_ << "public ValueBase";
+		if (BaseType::ABSTRACT == base_type)
+			h_ << "Abstract <S>";
+		else {
+			if (BaseType::CONCRETE == base_type)
+				h_ << "Concrete <S, ";
+			else
+				h_ << "Supports <S, ";
+			h_ << QName (vt);
+			if (vt.modifier () == ValueType::Modifier::TRUNCATABLE)
+				h_ << ", &" << TC_Name (*vt.bases ().front ());
+			h_ << ">";
+		}
+
+		if (BaseType::SUPPORTS != base_type)
 			h_ << ",\n"
 			"public RefCountBase <S>";
 
@@ -474,24 +490,6 @@ void Servant::end (const ValueType& vt)
 
 		h_ << ",\n"
 			"public ValueImpl <S, " << QName (vt) << ">";
-
-		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
-			h_ << ",\n"
-				"public ValueBaseCopy <S>,\n"
-				"public ValueBaseFactory <" << QName (vt) << ">,\n"
-				"public ValueBaseMarshal <S>";
-		} else {
-			h_ << ",\n"
-				"public ValueBaseNoCopy,\n"
-				"public ValueBaseNoFactory";
-		}
-
-		if (vt.modifier () == ValueType::Modifier::TRUNCATABLE)
-			h_ << ",\n"
-				"public ValueTruncatable <&" << TC_Name (*vt.bases ().front ()) << ">";
-		else
-			h_ << ",\n"
-				"public ValueNonTruncatable";
 
 		if (abstract_base)
 			h_ << ",\n"

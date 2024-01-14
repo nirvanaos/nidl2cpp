@@ -91,6 +91,10 @@ private:
 
 	void skeleton_ami (const AST::Interface& itf);
 
+	void virtual_operations (const AST::IV_Base& item);
+
+	void value_constructors (const char* class_name, const StateMembers& all_members);
+
 private:
 	Header h_;
 	std::vector <std::string> epv_;

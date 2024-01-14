@@ -103,6 +103,25 @@ void Servant::skeleton_end (const IV_Base& item, const char* suffix)
 		<< "}";
 }
 
+void Servant::virtual_operations (const IV_Base& item)
+{
+	for (auto it = item.begin (); it != item.end (); ++it) {
+		const Item& item = **it;
+		switch (item.kind ()) {
+		case Item::Kind::OPERATION: {
+			const Operation& op = static_cast <const Operation&> (item);
+			h_ << "virtual " << ServantOp (op, true) << " = 0;\n";
+		} break;
+		case Item::Kind::ATTRIBUTE: {
+			const Attribute& att = static_cast <const Attribute&> (item);
+			h_ << "virtual " << VRet (att) << ' ' << att.name () << " () = 0;\n";
+			if (!att.readonly ())
+				h_ << "virtual void " << att.name () << " (" << ServantParam (att, true) << ") = 0;\n";
+		} break;
+		}
+	}
+}
+
 void Servant::end (const Interface& itf)
 {
 	skeleton_end (itf);
@@ -213,7 +232,7 @@ void Servant::end (const Interface& itf)
 				<< "typedef " << QName (itf) << " PrimaryInterface;\n\n";
 
 			if (itf.interface_kind () != InterfaceKind::ABSTRACT) {
-				h_ << "virtual Interface* _query_interface (const String& id) override\n"
+				h_ << "virtual Interface* _query_interface (const String& id) noexcept override\n"
 					"{\n"
 					<< indent
 					<< "return FindInterface <" << QName (itf);
@@ -234,21 +253,7 @@ void Servant::end (const Interface& itf)
 
 			h_.empty_line ();
 
-			for (auto it = itf.begin (); it != itf.end (); ++it) {
-				const Item& item = **it;
-				switch (item.kind ()) {
-				case Item::Kind::OPERATION: {
-					const Operation& op = static_cast <const Operation&> (item);
-					h_ << "virtual " << ServantOp (op, true) << " = 0;\n";
-				} break;
-				case Item::Kind::ATTRIBUTE: {
-					const Attribute& att = static_cast <const Attribute&> (item);
-					h_ << "virtual " << VRet (att) << ' ' << att.name () << " () = 0;\n";
-					if (!att.readonly ())
-						h_ << "virtual void " << att.name () << " (" << ServantParam (att, true) << ") = 0;\n";
-				} break;
-				}
-			}
+			virtual_operations (itf);
 
 			h_
 				<< unindent
@@ -279,7 +284,8 @@ void Servant::end (const Interface& itf)
 					h_ << "namespace " << *it << " {\n";
 				}
 
-				h_ << "\ntypedef " << Namespace ("CORBA/Internal")
+				h_ << "\n"
+					"typedef " << Namespace ("CORBA/Internal")
 					<< "ServantPOA <" << QName (itf) << "> " << itf.name () << ";\n";
 
 				if (itf.interface_kind () != InterfaceKind::ABSTRACT)
@@ -341,6 +347,7 @@ void Servant::end (const ValueType& vt)
 	epv (concrete_itf && concrete_itf->interface_kind () != InterfaceKind::PSEUDO);
 
 	// Servant implementations
+
 	StateMembers members;
 	if (!options ().no_servant) {
 
@@ -356,26 +363,32 @@ void Servant::end (const ValueType& vt)
 			members = get_members (vt);
 
 			// Accessors
-			for (auto p : members) {
-				if (p->is_public ()) {
-					h_ << Accessors (*p)
-						<< empty_line;
-				}
-			}
+			{
+				bool pub = true;
+				for (auto m : members) {
+					
+					if (m->is_public () != pub) {
+						h_ << unindent;
+						if (pub) {
+							h_ << "protected:\n";
+							pub = false;
+						} else {
+							h_ << "public:\n";
+							pub = false;
+						}
+						h_ << indent;
+					}
 
-			h_ << unindent
-				<< "protected:\n"
-				<< indent;
-
-			for (auto p : members) {
-				if (!p->is_public ()) {
-					h_ << Accessors (*p)
+					h_ << Accessors (*m)
 						<< empty_line;
 				}
 			}
 
 			// Default constructor
-			h_ << "ValueData ()";
+			h_ << unindent
+				<< "protected:\n"
+				<< indent
+				<< "ValueData ()";
 			if (!members.empty ()) {
 				h_ << " :\n"
 					<< indent;
@@ -504,7 +517,7 @@ void Servant::end (const ValueType& vt)
 
 		h_ << "typedef " << QName (vt) << " PrimaryInterface;\n"
 			"\n"
-			"Interface* _query_valuetype (String_in id) noexcept\n"
+			"Interface* _query_valuetype (const String& id) noexcept\n"
 			"{\n"
 			<< indent
 			<< "return FindInterface <" << QName (vt);
@@ -538,15 +551,6 @@ void Servant::end (const ValueType& vt)
 				<< unindent << "}\n\n";
 		}
 
-		h_ << unindent
-			<< "protected:\n"
-			<< indent
-
-			// Default constructor
-			<< "Servant () noexcept\n"
-			"{}\n";
-
-		// Explicit constructor
 		StateMembers all_members;
 		for (auto b : concrete_bases) {
 			StateMembers members = get_members (*b);
@@ -554,27 +558,128 @@ void Servant::end (const ValueType& vt)
 		}
 		all_members.insert (all_members.end (), members.begin (), members.end ());
 
-		if (!all_members.empty ()) {
-			h_ << "explicit Servant (";
-			auto it = all_members.begin ();
-			h_ << Var (**it) << ' ' << (*it)->name ();
-			h_.indent ();
-			for (++it; it != all_members.end (); ++it) {
-				h_ << ",\n" << Var (**it) << ' ' << (*it)->name ();
-			}
-			h_ << ")\n"
-				<< unindent
-				<< "{\n"
-				<< indent;
-			for (auto m : all_members) {
-				h_ << "this->" << m->name () << " (std::move (" << m->name () << "));\n";
-			}
-			h_ << unindent
-				<< "}\n";
-		}
+		value_constructors ("Servant", all_members);
 
 		h_ << unindent
 			<< "};\n";
+
+		// Virtual implementation
+
+		h_ << empty_line
+			<< "template <>\n"
+			"class ServantPOA <" << QName (vt) << "> :\n"
+			<< indent;
+		if (vt.bases ().empty ())
+			h_ << "public virtual ServantPOA <ValueBase>,\n";
+		else
+			for (auto b : vt.bases ()) {
+				h_ << "public virtual ServantPOA <" << QName (*b) << ">,\n";
+			}
+		for (auto b : vt.supports ()) {
+			h_ << "public virtual ServantPOA <" << QName (*b) << ">,\n";
+		}
+		h_ << "public ValueImpl <ServantPOA <" << QName (vt) << ">, " << QName (vt) << ">\n"
+			<< unindent <<
+			"{\n"
+			"public:\n" << indent
+			<< "virtual Interface* _query_valuetype (const String& id) noexcept override\n"
+			"{\n" << indent
+			<< "return FindInterface <" << QName (vt);
+		for (auto b : all_bases) {
+			h_ << ", " << QName (*b);
+		}
+		if (concrete_itf && concrete_itf->interface_kind () == InterfaceKind::PSEUDO)
+			h_ << ", " << QName (*concrete_itf);
+
+		h_ << ">::find (*this, id);\n"
+			<< unindent << "}\n";
+
+		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
+			h_ << "virtual void _marshal (I_ptr <IORequest> rq) const override\n"
+				"{\n" << indent;
+
+			for (auto b : concrete_bases) {
+				h_ << "ValueData <" << QName (*b) << ">::_marshal (rq);\n";
+			}
+			h_ << "ValueData <" << QName (vt) << ">::_marshal (rq);\n"
+				<< unindent << "}\n"
+
+				"virtual void _unmarshal (I_ptr <IORequest> rq) override\n"
+				"{\n" << indent;
+
+			for (auto b : concrete_bases) {
+				h_ << "ValueData <" << QName (*b) << ">::_unmarshal (rq);\n";
+			}
+			h_ << "ValueData <" << QName (vt) << ">::_unmarshal (rq);\n"
+				<< unindent << "}\n\n";
+		}
+
+		if (vt.modifier () == ValueType::Modifier::TRUNCATABLE) {
+			h_ << "virtual Type <TypeCode>::VRet _truncatable_base () const noexcept\n"
+				"{\n" << indent;
+			if (options ().legacy) {
+				h_ << "#ifdef LEGACY_CORBA_CPP\n"
+					"return TypeCode::_duplicate (" << TC_Name (*vt.bases ().front ()) << ");\n"
+					"#else\n";
+			}
+			h_ << "return TypeCode::_ref_type (" << TC_Name (*vt.bases ().front ()) << ");\n";
+			if (options ().legacy)
+				h_ << "#endif\n";
+			h_ << unindent << "}\n";
+		}
+
+		virtual_operations (vt);
+
+		{
+			bool pub = true;
+			for (auto m : members) {
+
+				if (m->is_public () != pub) {
+					h_ << unindent;
+					if (pub) {
+						h_ << "protected:\n";
+						pub = false;
+					} else {
+						h_ << "public:\n";
+						pub = false;
+					}
+					h_ << indent;
+				}
+
+				// Getter
+				h_ << "virtual " << ConstRef (*m) << ' ' << m->name () << " () const\n"
+					"{\n" << indent <<
+					"return ValueData <" << QName (vt) << ">::" << m->name () << " ();\n"
+					<< unindent << "}\n";
+
+				// Setter
+				if (is_ref_type (*m)) {
+					h_ << "virtual void " << m->name () << " (" << Var (*m) << " val)\n"
+						"{\n" << indent <<
+						"ValueData <" << QName (vt) << ">::" << m->name () << " (std::move (val)); \n"
+						<< unindent << "}\n";
+				} else {
+					h_ << "virtual void " << m->name () << " (" << ConstRef (*m) << " val)\n"
+						"{\n" << indent <<
+						"ValueData <" << QName (vt) << ">::" << m->name () << " (val); \n"
+						<< unindent << "}\n";
+
+					if (is_var_len (*m)) {
+						// The move setter
+						h_ << "virtual void " << m->name () << " (" << Var (*m) << "&& val)\n"
+							"{\n" << indent <<
+							"ValueData <" << QName (vt) << ">::" << m->name () << " (std::move (val)); \n"
+							<< unindent << "}\n";
+					}
+				}
+			}
+		}
+
+		value_constructors ("ServantPOA", all_members);
+
+		h_ << unindent << "};\n";
+
+		// Factories
 
 		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
 			Factories factories = get_factories (vt);
@@ -680,6 +785,41 @@ void Servant::end (const ValueType& vt)
 					"{};\n";
 			}
 		}
+
+		h_.namespace_open (vt);
+		h_ << "typedef " << Namespace ("CORBA/Internal") << "ServantPOA <" << vt.name () << "> OBV_"
+			<< static_cast <const std::string&> (vt.name ()) << ";\n";
+	}
+}
+
+void Servant::value_constructors (const char* class_name, const StateMembers& all_members)
+{
+	h_ << unindent
+		<< "protected:\n"
+		<< indent
+
+		// Default constructor
+		<< class_name << " () noexcept\n"
+		"{}\n";
+
+	// Explicit constructor
+	if (!all_members.empty ()) {
+		h_ << "explicit " << class_name << " (";
+		auto it = all_members.begin ();
+		h_ << Var (**it) << ' ' << (*it)->name ();
+		h_.indent ();
+		for (++it; it != all_members.end (); ++it) {
+			h_ << ",\n" << Var (**it) << ' ' << (*it)->name ();
+		}
+		h_ << ")\n"
+			<< unindent
+			<< "{\n"
+			<< indent;
+		for (auto m : all_members) {
+			h_ << "this->" << m->name () << " (std::move (" << m->name () << "));\n";
+		}
+		h_ << unindent
+			<< "}\n";
 	}
 }
 

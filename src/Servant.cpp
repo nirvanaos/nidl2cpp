@@ -232,7 +232,7 @@ void Servant::end (const Interface& itf)
 				<< "typedef " << QName (itf) << " PrimaryInterface;\n\n";
 
 			if (itf.interface_kind () != InterfaceKind::ABSTRACT) {
-				h_ << "virtual Interface* _query_interface (const String& id) noexcept override\n"
+				h_ << "virtual I_ptr <Interface> _query_interface (const String& id) override\n"
 					"{\n"
 					<< indent
 					<< "return FindInterface <" << QName (itf);
@@ -437,6 +437,12 @@ void Servant::end (const ValueType& vt)
 				<< "{};";
 		}
 
+		// Factory function specialization
+		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
+			h_ << empty_line
+				<< "template <> ValueFactoryBase::_ptr_type get_factory <" << QName (vt) << "> () noexcept;\n";
+		}
+
 		// Standard implementation
 
 		h_ << empty_line
@@ -517,7 +523,7 @@ void Servant::end (const ValueType& vt)
 
 		h_ << "typedef " << QName (vt) << " PrimaryInterface;\n"
 			"\n"
-			"Interface* _query_valuetype (const String& id) noexcept\n"
+			"I_ptr <Interface> _query_valuetype (const String& id)\n"
 			"{\n"
 			<< indent
 			<< "return FindInterface <" << QName (vt);
@@ -582,7 +588,7 @@ void Servant::end (const ValueType& vt)
 			<< unindent <<
 			"{\n"
 			"public:\n" << indent
-			<< "virtual Interface* _query_valuetype (const String& id) noexcept override\n"
+			<< "virtual I_ptr <Interface> _query_valuetype (const String& id) override\n"
 			"{\n" << indent
 			<< "return FindInterface <" << QName (vt);
 		for (auto b : all_bases) {
@@ -615,36 +621,24 @@ void Servant::end (const ValueType& vt)
 		}
 
 		if (vt.modifier () == ValueType::Modifier::TRUNCATABLE) {
-			h_ << "virtual Type <TypeCode>::VRet _truncatable_base () const noexcept\n"
-				"{\n" << indent;
-			if (options ().legacy) {
-				h_ << "#ifdef LEGACY_CORBA_CPP\n"
-					"return TypeCode::_duplicate (" << TC_Name (*vt.bases ().front ()) << ");\n"
-					"#else\n";
-			}
-			h_ << "return TypeCode::_ref_type (" << TC_Name (*vt.bases ().front ()) << ");\n";
-			if (options ().legacy)
-				h_ << "#endif\n";
-			h_ << unindent << "}\n";
+			h_ << "virtual TypeCode::_ptr_type _truncatable_base () const noexcept override\n"
+				"{\n" << indent
+				<< "return " << TC_Name (*vt.bases ().front ()) << ";\n"
+				<< unindent << "}\n";
+		}
+
+		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
+			h_ << "virtual ValueFactoryBase::_ptr_type _factory () const override\n"
+				"{\n" << indent
+				<< "return get_factory <" << QName (vt) << "> ();\n"
+				<< unindent << "}\n";
 		}
 
 		virtual_operations (vt);
 
-		{
-			bool pub = true;
-			for (auto m : members) {
-
-				if (m->is_public () != pub) {
-					h_ << unindent;
-					if (pub) {
-						h_ << "protected:\n";
-						pub = false;
-					} else {
-						h_ << "public:\n";
-						pub = false;
-					}
-					h_ << indent;
-				}
+		// Generate virtual accessors for public members only
+		for (auto m : members) {
+			if (m->is_public ()) {
 
 				// Getter
 				h_ << "virtual " << ConstRef (*m) << ' ' << m->name () << " () const\n"

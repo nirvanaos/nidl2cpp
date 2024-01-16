@@ -200,6 +200,9 @@ private:
 
 	void override_sendp (const AST::Interface& itf, const AST::ValueType& poller);
 
+	void iv_traits_begin (const AST::ItemWithId& item);
+	void traits_end ();
+
 private:
 	Header h_; // .h file
 	Code cpp_; // .cpp file.

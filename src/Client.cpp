@@ -312,8 +312,10 @@ void Client::forward_interface (const ItemWithId& item)
 		"struct Type <" << QName (item) << "> : ";
 
 	bool has_type_code = true;
+	InterfaceKind::Kind ikind;
+	const ValueType* value_type = nullptr;
+	const ValueTypeDecl* value_type_decl = nullptr;
 	if (item.kind () == Item::Kind::INTERFACE_DECL || item.kind () == Item::Kind::INTERFACE) {
-		InterfaceKind::Kind ikind;
 		if (item.kind () == Item::Kind::INTERFACE_DECL)
 			ikind = static_cast <const InterfaceDecl&> (item).interface_kind ();
 		else
@@ -344,6 +346,10 @@ void Client::forward_interface (const ItemWithId& item)
 
 	} else {
 		assert (item.kind () == Item::Kind::VALUE_TYPE_DECL || item.kind () == Item::Kind::VALUE_TYPE);
+		if (item.kind () == Item::Kind::VALUE_TYPE_DECL)
+			value_type_decl = &static_cast <const ValueTypeDecl&> (item);
+		else
+			value_type = &static_cast <const ValueType&> (item);
 		h_ << "TypeValue";
 	}
 
@@ -361,6 +367,33 @@ void Client::forward_interface (const ItemWithId& item)
 
 	h_.namespace_close ();
 
+	// Traits
+
+	iv_traits_begin (item);
+
+	if (value_type || value_type_decl || ikind == InterfaceKind::LOCAL) {
+		h_ << "template <class S>\n"
+			"using Servant = " << Namespace ("CORBA/Internal") << "Servant <S, " << QName (item) << ">;\n";
+
+		if (value_type || value_type_decl)
+			h_ << "using obv_type = " << Namespace ("CORBA/Internal") << "ServantPOA <" << QName (item) << ">;\n";
+	}
+
+	bool abstract;
+	if (value_type)
+		abstract = value_type->modifier () == ValueType::Modifier::ABSTRACT;
+	else if (value_type_decl)
+		abstract = value_type_decl->is_abstract ();
+	else
+		abstract = ikind == InterfaceKind::ABSTRACT;
+
+	h_ << "using is_abstract = std::" << (abstract ? "true_type" : "false_type") << ";\n";
+
+	if (!(value_type || value_type_decl))
+		h_ << "using is_local = std::" << (ikind == InterfaceKind::LOCAL ? "true_type" : "false_type") << ";\n";
+
+	traits_end ();
+
 	h_ << empty_line
 		<< "#endif\n"; // Close forward guard
 }
@@ -368,18 +401,16 @@ void Client::forward_interface (const ItemWithId& item)
 void Client::define_itf_suppl (const Identifier& name)
 {
 	// A namespace level swap must be provided
-	if (options ().legacy)
-		h_ << "#ifndef LEGACY_CORBA_CPP\n";
-
-	h_ << "inline void swap (" <<
-		Namespace ("IDL") << "traits <" << name << ">::ref_type& x, " <<
-		Namespace ("IDL") << "traits <" << name << ">::ref_type& y)\n" <<
+	h_ << "inline void swap ("
+		<< Namespace ("CORBA/Internal") << "I_ref <" << name << ">& x, "
+		<< Namespace ("CORBA/Internal") << "I_ref <" << name << ">& y)\n"
 		"{\n" << indent <<
 		Namespace ("std") << "swap (x, y);\n"
 		<< unindent << "}\n";
 
+	// Legacy type definitions
 	if (options ().legacy) {
-		h_ << "#else\n"
+		h_ << "#ifdef LEGACY_CORBA_CPP\n"
 			"typedef " << Namespace ("CORBA/Internal") << "I_ptr <" << name << "> "
 			<< static_cast <const std::string&> (name) << "_ptr;\n"
 			"typedef " << Namespace ("CORBA/Internal") << "I_var <" << name << "> "
@@ -1066,6 +1097,8 @@ size_t Client::version (const std::string& rep_id)
 void Client::end (const ValueType& vt)
 {
 	end_interface (vt);
+
+	// Factory
 
 	Factories factories = get_factories (vt);
 
@@ -2344,16 +2377,10 @@ void Client::define_swap (const ItemWithId& item)
 	// A namespace level swap() must be provided to exchange the values of two structs in an efficient manner.
 	h_.namespace_open (item);
 	
-	if (options ().legacy)
-		h_ << "#ifndef LEGACY_CORBA_CPP\n";
-
 	h_ << "inline void swap (" << QName (item) << "& x, " << QName (item) << "& y)\n"
 		"{\n" << indent <<
 		Namespace ("std") << "swap (x, y);\n"
 		<< unindent << "}\n";
-	
-	if (options ().legacy)
-		h_ << "#endif\n";
 }
 
 void Client::implement_marshaling (const StructBase& item)
@@ -2467,4 +2494,19 @@ void Client::generate_ami (const Interface& itf)
 	}
 
 	h_ << "NIRVANA_AMI_END ()\n";
+}
+
+void Client::iv_traits_begin (const ItemWithId& item)
+{
+	h_.namespace_open ("IDL");
+	h_ << "template <> struct traits <" << QName (item) << ">\n"
+		"{\n" << indent <<
+		"using ref_type = " << Namespace ("CORBA/Internal") << "I_ref <" << QName (item) << ">;\n"
+		"using ptr_type = " << Namespace ("CORBA/Internal") << "I_ptr <" << QName (item) << ">;\n";
+}
+
+void Client::traits_end ()
+{
+	h_ << unindent << "};\n";
+	h_.namespace_close ();
 }

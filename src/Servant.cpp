@@ -588,7 +588,49 @@ void Servant::end (const ValueType& vt)
 			<< unindent <<
 			"{\n"
 			"public:\n" << indent
-			<< "virtual I_ptr <Interface> _query_valuetype (const String& id) override\n"
+			<< "typedef " << QName (vt) << " PrimaryInterface;\n\n";
+
+		virtual_operations (vt);
+
+		// Generate virtual accessors for public members only
+		for (auto m : members) {
+			if (m->is_public ()) {
+
+				// Getter
+				h_ << "virtual " << ConstRef (*m) << ' ' << m->name () << " () const\n"
+					"{\n" << indent <<
+					"return ValueData <" << QName (vt) << ">::" << m->name () << " ();\n"
+					<< unindent << "}\n";
+
+				// Setter
+				if (is_ref_type (*m)) {
+					h_ << "virtual void " << m->name () << " (" << Var (*m) << " val)\n"
+						"{\n" << indent <<
+						"ValueData <" << QName (vt) << ">::" << m->name () << " (std::move (val)); \n"
+						<< unindent << "}\n";
+				} else {
+					h_ << "virtual void " << m->name () << " (" << ConstRef (*m) << " val)\n"
+						"{\n" << indent <<
+						"ValueData <" << QName (vt) << ">::" << m->name () << " (val); \n"
+						<< unindent << "}\n";
+
+					if (is_var_len (*m)) {
+						// The move setter
+						h_ << "virtual void " << m->name () << " (" << Var (*m) << "&& val)\n"
+							"{\n" << indent <<
+							"ValueData <" << QName (vt) << ">::" << m->name () << " (std::move (val)); \n"
+							<< unindent << "}\n";
+					}
+				}
+			}
+		}
+
+		value_constructors ("ServantPOA", all_members);
+
+		h_ << unindent << 
+			"\nprivate:\n"
+			<< indent <<
+			"virtual I_ptr <Interface> _query_valuetype (const String& id) override\n"
 			"{\n" << indent
 			<< "return FindInterface <" << QName (vt);
 		for (auto b : all_bases) {
@@ -634,48 +676,19 @@ void Servant::end (const ValueType& vt)
 				<< unindent << "}\n";
 		}
 
-		virtual_operations (vt);
+		h_ << unindent << "};\n\n";
 
-		// Generate virtual accessors for public members only
-		for (auto m : members) {
-			if (m->is_public ()) {
+		// OBV_ type
 
-				// Getter
-				h_ << "virtual " << ConstRef (*m) << ' ' << m->name () << " () const\n"
-					"{\n" << indent <<
-					"return ValueData <" << QName (vt) << ">::" << m->name () << " ();\n"
-					<< unindent << "}\n";
-
-				// Setter
-				if (is_ref_type (*m)) {
-					h_ << "virtual void " << m->name () << " (" << Var (*m) << " val)\n"
-						"{\n" << indent <<
-						"ValueData <" << QName (vt) << ">::" << m->name () << " (std::move (val)); \n"
-						<< unindent << "}\n";
-				} else {
-					h_ << "virtual void " << m->name () << " (" << ConstRef (*m) << " val)\n"
-						"{\n" << indent <<
-						"ValueData <" << QName (vt) << ">::" << m->name () << " (val); \n"
-						<< unindent << "}\n";
-
-					if (is_var_len (*m)) {
-						// The move setter
-						h_ << "virtual void " << m->name () << " (" << Var (*m) << "&& val)\n"
-							"{\n" << indent <<
-							"ValueData <" << QName (vt) << ">::" << m->name () << " (std::move (val)); \n"
-							<< unindent << "}\n";
-					}
-				}
-			}
-		}
-
-		value_constructors ("ServantPOA", all_members);
-
-		h_ << unindent << "};\n";
+		h_.namespace_open (vt);
+		h_ << "typedef " << Namespace ("CORBA/Internal") << "ServantPOA <" << vt.name () << "> OBV_"
+			<< static_cast <const std::string&> (vt.name ()) << ";\n";
 
 		// Factories
-
 		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
+			
+			h_.namespace_open ("CORBA/Internal");
+
 			Factories factories = get_factories (vt);
 			if (!factories.empty ()) {
 				skeleton_begin (vt, FACTORY_SUFFIX);
@@ -739,7 +752,8 @@ void Servant::end (const ValueType& vt)
 					<< unindent <<
 					"{\n"
 					"public:\n"
-					<< indent;
+					<< indent
+					<< "using ImplType = typename ValueCreatorBase <Impl>::ImplType;\n";
 
 				for (auto f : factories) {
 					h_ << "static I_ref <" << QName (vt) << "> " << f->name () << " (";
@@ -756,7 +770,7 @@ void Servant::end (const ValueType& vt)
 					h_ << ")\n"
 						"{\n"
 						<< indent <<
-						"return make_reference <Impl> (";
+						"return make_reference <ImplType> (";
 					{
 						auto it = f->begin ();
 						if (it != f->end ()) {
@@ -779,16 +793,13 @@ void Servant::end (const ValueType& vt)
 					"{};\n";
 			}
 		}
-
-		h_.namespace_open (vt);
-		h_ << "typedef " << Namespace ("CORBA/Internal") << "ServantPOA <" << vt.name () << "> OBV_"
-			<< static_cast <const std::string&> (vt.name ()) << ";\n";
 	}
 }
 
 void Servant::value_constructors (const char* class_name, const StateMembers& all_members)
 {
 	h_ << unindent
+		<< empty_line
 		<< "protected:\n"
 		<< indent
 

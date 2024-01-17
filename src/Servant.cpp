@@ -569,6 +569,29 @@ void Servant::end (const ValueType& vt)
 		h_ << unindent
 			<< "};\n";
 
+		// Static implementation for abstract value types
+
+		if (vt.modifier () == ValueType::Modifier::ABSTRACT) {
+			h_ << empty_line
+				<< "template <class S>\n"
+				"class ServantStatic <S, " << QName (vt) << "> : public ValueStatic";
+			
+			if (BaseType::CONCRETE == base_type)
+				h_ << "Supports";
+			else if (abstract_base)
+				h_ << "AbstractBase";
+			
+			h_ << " <S, " << QName (vt);
+			if (concrete_itf)
+				h_ << ", " << QName (*concrete_itf);
+
+			for (auto b : all_bases) {
+				h_ << ", " << QName (*b);
+			}
+
+			h_ << ">\n{};";
+		}
+
 		// Virtual implementation
 
 		h_ << empty_line

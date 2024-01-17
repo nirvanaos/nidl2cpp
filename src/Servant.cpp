@@ -779,7 +779,7 @@ void Servant::end (const ValueType& vt)
 					<< "using ImplType = typename ValueCreatorBase <Impl>::ImplType;\n";
 
 				for (auto f : factories) {
-					h_ << "static I_ref <" << QName (vt) << "> " << f->name () << " (";
+					h_ << "static Type <" << QName (vt) << ">::VRet " << f->name () << " (";
 					{
 						auto it = f->begin ();
 						if (it != f->end ()) {
@@ -793,14 +793,13 @@ void Servant::end (const ValueType& vt)
 					h_ << ")\n"
 						"{\n"
 						<< indent <<
-						"return make_reference <ImplType> (";
+						"return create_value <ImplType> (";
 					{
 						auto it = f->begin ();
 						if (it != f->end ()) {
-							h_ << (*it)->name ();
-							++it;
-							for (; it != f->end (); ++it) {
-								h_ << ", " << (*it)->name ();
+							h_ << "std::ref (" << (*it)->name () << ')';
+							for (++it; it != f->end (); ++it) {
+								h_ << ", std::ref (" << (*it)->name () << ')';
 							}
 						}
 					}

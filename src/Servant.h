@@ -95,6 +95,8 @@ private:
 
 	void value_constructors (const char* class_name, const StateMembers& all_members);
 
+	void state_member (const AST::StateMember& m);
+
 private:
 	Header h_;
 	std::vector <std::string> epv_;

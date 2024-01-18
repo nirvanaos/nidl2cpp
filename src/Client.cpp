@@ -1102,6 +1102,104 @@ void Client::end (const ValueType& vt)
 {
 	end_interface (vt);
 
+	if (vt.modifier () == ValueType::Modifier::ABSTRACT)
+		return;
+
+	StateMembers members = get_members (vt);
+
+	h_.namespace_open ("CORBA/Internal");
+
+	// ValueData
+	h_ << empty_line
+		<< "template <>\n"
+		"class ValueData <" << QName (vt) << ">\n"
+		"{\n"
+		"public:\n"
+		<< indent;
+
+	// Accessors
+	{
+		bool pub = true;
+		for (auto m : members) {
+
+			if (m->is_public () != pub) {
+				h_ << unindent;
+				if (pub) {
+					h_ << "protected:\n";
+					pub = false;
+				} else {
+					h_ << "public:\n";
+					pub = false;
+				}
+				h_ << indent;
+			}
+
+			h_ << Accessors (*m)
+				<< empty_line;
+		}
+	}
+
+	// Default constructor
+	h_ << unindent
+		<< "protected:\n"
+		<< indent
+		<< "ValueData ()";
+	if (!members.empty ()) {
+		h_ << " :\n"
+			<< indent;
+		auto it = members.begin ();
+		h_ << MemberDefault (**it, "_");
+		for (++it; it != members.end (); ++it) {
+			h_ << ",\n" << MemberDefault (**it, "_");
+		}
+		h_.unindent ();
+	}
+	h_ << "\n{}\n\n";
+
+
+	// Marshaling
+	h_ << "void _marshal (I_ptr <IORequest>) const";
+	if (!members.empty ())
+		h_ << ";\n";
+	else
+		h_ << " {}\n";
+	h_ << "void _unmarshal (I_ptr <IORequest>)";
+	if (!members.empty ())
+		h_ << ";\n";
+	else
+		h_ << " {}\n";
+
+	// Member variables
+	if (!members.empty ()) {
+		h_ << std::endl << unindent
+			<< "private:\n"
+			<< indent;
+
+		for (auto p : members) {
+			h_ << MemberVariable (*p);
+		}
+	}
+	h_ << unindent
+		<< "};\n"
+		"\n";
+
+	// End ValueData
+
+	// Marshaling implementation
+
+	cpp_.namespace_open ("CORBA/Internal");
+	if (!members.empty ()) {
+		cpp_ << empty_line <<
+			"void ValueData <" << QName (vt) << ">::_marshal (I_ptr <IORequest> rq) const\n"
+			"{\n";
+		marshal_members (cpp_, (const Members&)members, "marshal_in", "_");
+		cpp_ << "}\n\n"
+			"void ValueData <" << QName (vt) << ">::_unmarshal (I_ptr <IORequest> rq)\n"
+			"{\n";
+		unmarshal_members (cpp_, (const Members&)members, "_");
+		cpp_ << "}\n";
+	}
+
 	// Factory
 
 	Factories factories = get_factories (vt);
@@ -1174,6 +1272,7 @@ void Client::end (const ValueType& vt)
 			<< FACTORY_SUFFIX ", CORBA::ValueFactoryBase>\n"
 			"{};\n";
 	
+		cpp_.namespace_close ();
 		cpp_ << empty_line
 			<< "NIRVANA_OLF_SECTION_OPT const "
 			<< Namespace ("Nirvana") << "ImportInterfaceT <" << QName (vt) << FACTORY_SUFFIX ">\n"
@@ -2389,7 +2488,6 @@ void Client::define_swap (const ItemWithId& item)
 
 void Client::implement_marshaling (const StructBase& item)
 {
-	cpp_.namespace_open ("CORBA/Internal");
 	const char* suffix = "";
 	if (item.kind () == Item::Kind::EXCEPTION)
 		suffix = EXCEPTION_SUFFIX;
@@ -2398,6 +2496,7 @@ void Client::implement_marshaling (const StructBase& item)
 
 		std::string my_prefix = "v._";
 
+		cpp_.namespace_open ("CORBA/Internal");
 		cpp_ << "\n"
 			"void Type <" << QName (item) << suffix
 			<< ">::marshal_in (const Var& v, IORequest::_ptr_type rq)\n"

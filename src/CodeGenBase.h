@@ -440,4 +440,15 @@ struct AMI_Parameters
 
 Code& operator << (Code& stm, const AMI_ParametersABI& op);
 
+struct TypeCodeName
+{
+	TypeCodeName (const AST::NamedItem& ni) :
+		item (ni)
+	{}
+
+	const AST::NamedItem& item;
+};
+
+Code& operator << (Code& stm, const TypeCodeName& it);
+
 #endif

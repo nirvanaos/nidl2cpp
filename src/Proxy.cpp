@@ -368,20 +368,12 @@ Code& Proxy::exp (const NamedItem& item)
 		"CORBA::Internal::RepIdOf <" << QName (item) << ">::id, CORBA::TypeCode, CORBA::Internal::";
 }
 
-void Proxy::type_code_name (const NamedItem& item)
-{
-	cpp_ << empty_line
-		<< "template <>\n"
-		"const Char TypeCodeName <" << QName (item) << ">::name_ [] = \"" << static_cast <const std::string&> (item.name ()) << "\";\n";
-}
-
 void Proxy::leaf (const Enum& item)
 {
 	if (is_pseudo (item))
 		return;
 
-	cpp_.namespace_open ("CORBA/Internal");
-	type_code_name (item);
+	cpp_ << TypeCodeName (item);
 	cpp_ << "\n"
 		"template <>\n"
 		"const char* const TypeCodeEnum <" << QName (item) << ">::members_ [] = {\n";
@@ -415,8 +407,7 @@ void Proxy::leaf (const Struct& item)
 	if (is_pseudo (item) || is_native (item))
 		return;
 
-	cpp_.namespace_open ("CORBA/Internal");
-	type_code_name (item);
+	cpp_ << TypeCodeName (item);
 	type_code_members (item, item);
 
 	// Export TypeCode
@@ -424,95 +415,19 @@ void Proxy::leaf (const Struct& item)
 	exp (item) << "TypeCodeStruct <" << QName (item) << ">)\n";
 }
 
-void Proxy::state_member (const AST::StateMember& m)
-{
-	cpp_ << "{ \"" << static_cast <const std::string&> (m.name ()) << "\", Type <"
-		<< static_cast <const Type&> (m) << ">::type_code, "
-		<< (m.is_public () ? "PUBLIC_MEMBER" : "PRIVATE_MEMBER")
-		<< " }";
-}
-
 void Proxy::end (const ValueType& vt)
 {
-	cpp_.namespace_open ("CORBA/Internal");
-	StateMembers members = get_members (vt);
-	if (!members.empty ()) {
-		cpp_ << empty_line <<
-			"void ValueData <" << QName (vt) << ">::_marshal (I_ptr <IORequest> rq) const\n"
-			"{\n";
-		marshal_members (cpp_, (const Members&)members, "marshal_in", "_");
-		cpp_ << "}\n\n"
-			"void ValueData <" << QName (vt) << ">::_unmarshal (I_ptr <IORequest> rq)\n"
-			"{\n";
-		unmarshal_members (cpp_, (const Members&)members, "_");
-		cpp_ << "}\n";
-	}
-
-	type_code_name (vt);
-
-	if (!members.empty ()) {
-		cpp_ << empty_line
-			<< "template <>\n"
-			"const StateMember TypeCodeStateMembers <" << QName (vt) << ">::members_ [] = {\n";
-
-		cpp_.indent ();
-		auto it = members.begin ();
-		state_member (**it);
-		for (++it; it != members.end (); ++it) {
-			cpp_ << ",\n";
-			state_member (**it);
-		}
-		cpp_ << unindent
-			<< "\n};\n\n";
-	}
-
-	cpp_ << empty_line <<
-		"template <>\n"
-		"class TypeCodeValue <" << QName (vt) << "> : public TypeCodeValue";
 	if (vt.modifier () == ValueType::Modifier::ABSTRACT) {
-		cpp_ << "Abstract <" << QName (vt);
-	} else {
-		const char* mod = "VM_NONE";
-		switch (vt.modifier ()) {
-		case ValueType::Modifier::CUSTOM:
-			mod = "VM_CUSTOM";
-			break;
-		case ValueType::Modifier::TRUNCATABLE:
-			mod = "TRUNCATABLE";
-			break;
-		}
-		cpp_ << "Concrete <" << QName (vt) << ", " << mod << ", "
-			<< (members.empty () ? "false" : "true") << ", ";
-
-		const ValueType* concrete_base = nullptr;
-		if (!vt.bases ().empty ()) {
-			concrete_base = vt.bases ().front ();
-			if (concrete_base->modifier () == ValueType::Modifier::ABSTRACT)
-				concrete_base = nullptr;
-		}
-
-		if (concrete_base)
-			cpp_ << "Type <" << QName (*concrete_base) << ">::type_code";
-		else
-			cpp_ << "nullptr";
+		cpp_ << TypeCodeName (vt);
+		cpp_.namespace_close ();
+		cpp_ << "NIRVANA_EXPORT (" << export_name (vt) << ", CORBA::Internal::RepIdOf <" << QName (vt) << ">::id, CORBA"
+			"::TypeCode, CORBA::Internal::TypeCodeValueAbstract <" << QName (vt) << ">)\n";
 	}
-	cpp_ << ">\n"
-		"{};\n";
-
-	cpp_.namespace_close ();
-	cpp_ << "NIRVANA_EXPORT (" << export_name (vt) << ", CORBA::Internal::RepIdOf <" << QName (vt) << ">::id, CORBA"
-	<< (vt.modifier () != ValueType::Modifier::ABSTRACT ?
-		"::Internal::PseudoBase, CORBA::Internal::ValueFactoryImpl <"
-		:
-		"::TypeCode, CORBA::Internal::TypeCodeValue <")
-	<< QName (vt) << ">)\n";
 }
 
 void Proxy::leaf (const ValueBox& vb)
 {
-	cpp_.namespace_open ("CORBA/Internal");
-
-	type_code_name (vb);
+	cpp_ << TypeCodeName (vb);
 
 	cpp_.namespace_close ();
 	cpp_ << "NIRVANA_EXPORT (" << export_name (vb) << ", CORBA::Internal::RepIdOf <" << QName (vb) << ">::id, CORBA"
@@ -525,9 +440,7 @@ void Proxy::leaf (const Union& item)
 	if (is_pseudo (item) || is_native (item))
 		return;
 
-	cpp_.namespace_open ("CORBA/Internal");
-
-	type_code_name (item);
+	cpp_ << TypeCodeName (item);
 	type_code_members (item, item);
 
 	cpp_ << "template <>\n"
@@ -550,9 +463,7 @@ void Proxy::leaf (const Union& item)
 
 void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* ami)
 {
-	cpp_.namespace_open ("CORBA/Internal");
-	cpp_.empty_line ();
-	type_code_name (itf);
+	cpp_ << TypeCodeName (itf);
 
 	bool stateless = is_stateless (itf);
 

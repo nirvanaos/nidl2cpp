@@ -89,8 +89,6 @@ private:
 	void md_operation (const AST::Interface& itf, const OpMetadata& op, bool no_rq);
 
 	void type_code_members (const AST::ItemWithId& item, const Members& members);
-	void type_code_name (const AST::NamedItem& item);
-	void state_member (const AST::StateMember& m);
 
 	Code& exp (const AST::NamedItem& item);
 

@@ -993,3 +993,11 @@ Code& operator << (Code& stm, const AMI_ParametersABI& op)
 
 	return stm << ", Interface* _env)";
 }
+
+Code& operator << (Code& stm, const TypeCodeName& it)
+{
+	stm.namespace_open ("CORBA/Internal");
+	return stm << empty_line
+		<< "template <>\n"
+		"const Char TypeCodeName <" << QName (it.item) << ">::name_ [] = \"" << static_cast <const std::string&> (it.item.name ()) << "\";\n";
+}

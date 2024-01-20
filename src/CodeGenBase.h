@@ -451,4 +451,6 @@ struct TypeCodeName
 
 Code& operator << (Code& stm, const TypeCodeName& it);
 
+Code& operator << (Code& stm, const AST::StateMember& m);
+
 #endif

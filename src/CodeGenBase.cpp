@@ -1001,3 +1001,12 @@ Code& operator << (Code& stm, const TypeCodeName& it)
 		<< "template <>\n"
 		"const Char TypeCodeName <" << QName (it.item) << ">::name_ [] = \"" << static_cast <const std::string&> (it.item.name ()) << "\";\n";
 }
+
+Code& operator << (Code& stm, const AST::StateMember& m)
+{
+	return
+		stm << "{ \"" << static_cast <const std::string&> (m.name ()) << "\", Type <"
+			<< static_cast <const Type&> (m) << ">::type_code, "
+			<< (m.is_public () ? "PUBLIC_MEMBER" : "PRIVATE_MEMBER")
+			<< " }";
+}

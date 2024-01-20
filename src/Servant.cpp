@@ -630,10 +630,44 @@ void Servant::end (const ValueType& vt)
 		h_ << "typedef " << Namespace ("CORBA/Internal") << "ServantPOA <" << vt.name () << "> OBV_"
 			<< static_cast <const std::string&> (vt.name ()) << ";\n";
 
-		// Factories
 		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
 			
 			h_.namespace_open ("CORBA/Internal");
+
+			// TypeCodeValue
+			{
+				const char* mod = "VM_NONE";
+				switch (vt.modifier ()) {
+				case ValueType::Modifier::CUSTOM:
+					mod = "VM_CUSTOM";
+					break;
+				case ValueType::Modifier::TRUNCATABLE:
+					mod = "TRUNCATABLE";
+					break;
+				}
+
+				h_ << empty_line <<
+					"template <>\n"
+					"class TypeCodeValue <" << QName (vt) << "> : public TypeCodeValueConcrete <" << QName (vt) << ", " << mod << ", "
+					<< (members.empty () ? "false" : "true") << ", ";
+
+				const ValueType* concrete_base = nullptr;
+				if (!vt.bases ().empty ()) {
+					concrete_base = vt.bases ().front ();
+					if (concrete_base->modifier () == ValueType::Modifier::ABSTRACT)
+						concrete_base = nullptr;
+				}
+
+				if (concrete_base)
+					h_ << "Type <" << QName (*concrete_base) << ">::type_code";
+				else
+					h_ << "nullptr";
+
+				h_ << ">\n"
+					"{};\n";
+			}
+
+			// Factories
 
 			Factories factories = get_factories (vt);
 			if (!factories.empty ()) {
@@ -738,58 +772,6 @@ void Servant::end (const ValueType& vt)
 					"{};\n";
 			}
 		}
-	}
-
-	// Type code
-	if (vt.modifier () != ValueType::Modifier::ABSTRACT) {
-
-		h_ << TypeCodeName (vt);
-
-		if (!members.empty ()) {
-			h_ << empty_line
-				<< "template <>\n"
-				"const StateMember TypeCodeStateMembers <" << QName (vt) << ">::members_ [] = {\n";
-
-			h_.indent ();
-			auto it = members.begin ();
-			state_member (**it);
-			for (++it; it != members.end (); ++it) {
-				h_ << ",\n";
-				state_member (**it);
-			}
-			h_ << unindent
-				<< "\n};\n\n";
-		}
-
-		const char* mod = "VM_NONE";
-		switch (vt.modifier ()) {
-		case ValueType::Modifier::CUSTOM:
-			mod = "VM_CUSTOM";
-			break;
-		case ValueType::Modifier::TRUNCATABLE:
-			mod = "TRUNCATABLE";
-			break;
-		}
-
-		h_ << empty_line <<
-			"template <>\n"
-			"class TypeCodeValue <" << QName (vt) << "> : public TypeCodeValueConcrete <" << QName (vt) << ", " << mod << ", "
-			<< (members.empty () ? "false" : "true") << ", ";
-
-		const ValueType* concrete_base = nullptr;
-		if (!vt.bases ().empty ()) {
-			concrete_base = vt.bases ().front ();
-			if (concrete_base->modifier () == ValueType::Modifier::ABSTRACT)
-				concrete_base = nullptr;
-		}
-
-		if (concrete_base)
-			h_ << "Type <" << QName (*concrete_base) << ">::type_code";
-		else
-			h_ << "nullptr";
-
-		h_ << ">\n"
-			"{};\n";
 	}
 }
 
@@ -1223,14 +1205,6 @@ void Servant::skeleton_ami (const AST::Interface& itf)
 
 	h_ << unindent
 		<< "\n};\n";
-}
-
-void Servant::state_member (const AST::StateMember& m)
-{
-	h_ << "{ \"" << static_cast <const std::string&> (m.name ()) << "\", Type <"
-		<< static_cast <const Type&> (m) << ">::type_code, "
-		<< (m.is_public () ? "PUBLIC_MEMBER" : "PRIVATE_MEMBER")
-		<< " }";
 }
 
 Code& operator << (Code& stm, const Servant::ABI2Servant& val)

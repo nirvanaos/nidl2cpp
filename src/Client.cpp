@@ -1200,6 +1200,28 @@ void Client::end (const ValueType& vt)
 		cpp_ << "}\n";
 	}
 
+	// Type code
+
+	h_ << TypeCodeName (vt);
+
+	if (!members.empty ()) {
+		h_ << empty_line
+			<< "template <>\n"
+			"const StateMember TypeCodeStateMembers <" << QName (vt) << ">::members_ [" << members.size () << "];\n";
+
+		cpp_ << empty_line
+			<< "const StateMember TypeCodeStateMembers <" << QName (vt) << ">::members_ [" << members.size () << "] = {\n"
+			<< indent;
+
+		auto it = members.begin ();
+		cpp_ << **it;
+		for (++it; it != members.end (); ++it) {
+			cpp_ << ",\n" << **it;
+		}
+		cpp_ << unindent
+			<< "\n};\n\n";
+	}
+
 	// Factory
 
 	Factories factories = get_factories (vt);

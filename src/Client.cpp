@@ -1320,7 +1320,7 @@ void Client::native_itf_template (const Operation& op)
 		if (par_iid) {
 			// Generate template
 			h_ << "template <class I>\n"
-				"I_ref <I> " << op.name () << " (";
+				"typename Type <I>::VRet " << op.name () << " (";
 
 			auto it = op.begin ();
 			if (par_iid == *it)

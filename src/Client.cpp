@@ -1205,12 +1205,13 @@ void Client::end (const ValueType& vt)
 	h_ << TypeCodeName (vt);
 
 	if (!members.empty ()) {
-		h_ << empty_line
-			<< "template <>\n"
+		h_ << empty_line <<
+			"template <>\n"
 			"const StateMember TypeCodeStateMembers <" << QName (vt) << ">::members_ [" << members.size () << "];\n";
 
-		cpp_ << empty_line
-			<< "const StateMember TypeCodeStateMembers <" << QName (vt) << ">::members_ [" << members.size () << "] = {\n"
+		cpp_ << empty_line <<
+			"template <>\n"
+			"const StateMember TypeCodeStateMembers <" << QName (vt) << ">::members_ [" << members.size () << "] = {\n"
 			<< indent;
 
 		auto it = members.begin ();

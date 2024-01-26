@@ -1207,6 +1207,17 @@ void Servant::skeleton_ami (const AST::Interface& itf)
 		<< "\n};\n";
 }
 
+void Servant::leaf (const Constant& c)
+{
+	if (c.vtype () == Variant::VT::EMPTY) {
+		h_.namespace_open (c);
+		h_ << "class Static_" << static_cast <const std::string&> (c.name ()) << ";\n";
+		h_.namespace_open ("CORBA/Internal");
+		h_ << "template <> const char StaticId <" << ItemNamespace (c) << "Static_" << static_cast <const std::string&> (c.name ())
+			<< ">::id [] = \"" << const_id (c) << "\";\n";
+	}
+}
+
 Code& operator << (Code& stm, const Servant::ABI2Servant& val)
 {
 	stm << TypePrefix (val.type);

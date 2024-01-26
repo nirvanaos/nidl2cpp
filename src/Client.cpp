@@ -1402,6 +1402,9 @@ Code& operator << (Code& stm, const Client::ConstType& ct)
 			stm << Namespace ("IDL") << "FixedBCD <" <<
 				ct.c.as_Fixed ().digits () << ", " << ct.c.as_Fixed ().scale () << '>';
 			break;
+		case Type::Kind::NAMED_TYPE:
+			stm << Namespace ("Nirvana") << "ImportInterfaceT <" << QName (ct.c.named_type ()) << '>';
+			break;
 		default:
 			assert (t.tkind () == Type::Kind::BASIC_TYPE);
 			// CORBA floating point types may be emulated, use native types.
@@ -1442,19 +1445,24 @@ void Client::leaf (const Constant& item)
 
 	h_ << "const " << ConstType (item) << ' ' << item.name ();
 
-	if (nested || outline) {
-		if (!nested)
-			cpp_.namespace_open (item);
-		else
-			cpp_.namespace_open ("CORBA/Internal");
-		cpp_ << "const " << ConstType (item) << ' ' << QName (item);
+	if (item.vtype () != Variant::VT::EMPTY) {
+		if (nested || outline) {
+			if (!nested)
+				cpp_.namespace_open (item);
+			else
+				cpp_.namespace_open ("CORBA/Internal");
+			cpp_ << "const " << ConstType (item) << ' ' << QName (item);
+		}
+
+		(outline ? cpp_ : h_) << " = " << static_cast <const Variant&> (item);
+	} else {
+		// const object reference
+		cpp_.namespace_open (item);
+		cpp_ << "NIRVANA_OLF_SECTION_OPT extern const "
+			<< Namespace ("Nirvana") << "ImportInterfaceT <" << QName (item.named_type ()) << "> " << item.name () << " =\n"
+			"{ Nirvana::OLF_IMPORT_INTERFACE, \"" << const_id (item) << "\", "
+			<< Namespace ("CORBA/Internal") << "RepIdOf <" << QName (item.named_type ()) << ">::id };\n";
 	}
-
-	if (outline)
-		cpp_ << " = " << static_cast <const Variant&> (item);
-	else
-		h_ << " = " << static_cast <const Variant&> (item);
-
 	h_ << ";\n";
 
 	if (nested || outline)

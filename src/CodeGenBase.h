@@ -159,6 +159,8 @@ protected:
 	static bool is_custom (const AST::Operation& op) noexcept;
 	static bool is_custom (const AST::Interface& itf) noexcept;
 
+	static std::string const_id (const AST::Constant& c);
+
 private:
 	static bool pred (const char* l, const char* r)
 	{

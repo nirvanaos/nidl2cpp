@@ -113,39 +113,39 @@ public:
 	};
 
 private:
-	virtual void end (const AST::Root&);
+	virtual void end (const AST::Root&) override;
 
-	virtual void leaf (const AST::Include& item);
-	virtual void leaf (const AST::TypeDef& item);
+	virtual void leaf (const AST::Include& item) override;
+	virtual void leaf (const AST::TypeDef& item) override;
 
-	virtual void leaf (const AST::InterfaceDecl& item);
-	virtual void begin (const AST::Interface& item);
-	virtual void end (const AST::Interface& item);
+	virtual void leaf (const AST::InterfaceDecl& item) override;
+	virtual void begin (const AST::Interface& item) override;
+	virtual void end (const AST::Interface& item) override;
 
-	virtual void leaf (const AST::Constant& item);
+	virtual void leaf (const AST::Constant& item) override;
 
-	virtual void leaf (const AST::Exception& item);
+	virtual void leaf (const AST::Exception& item) override;
 	void define (const AST::Exception& item);
 	void implement (const AST::Exception& item);
 
-	virtual void leaf (const AST::StructDecl& item);
-	virtual void leaf (const AST::Struct& item);
+	virtual void leaf (const AST::StructDecl& item) override;
+	virtual void leaf (const AST::Struct& item) override;
 	void define (const AST::Struct& item);
 	void implement (const AST::Struct& item);
 
-	virtual void leaf (const AST::UnionDecl& item);
-	virtual void leaf (const AST::Union&);
+	virtual void leaf (const AST::UnionDecl& item) override;
+	virtual void leaf (const AST::Union&) override;
 	void define (const AST::Union& item);
 	void implement (const AST::Union& item);
 
-	virtual void leaf (const AST::Enum& item);
+	virtual void leaf (const AST::Enum& item) override;
 	void implement (const AST::Enum& item);
 
-	virtual void leaf (const AST::ValueTypeDecl& item);
-	virtual void begin (const AST::ValueType& item);
-	virtual void end (const AST::ValueType& item);
+	virtual void leaf (const AST::ValueTypeDecl& item) override;
+	virtual void begin (const AST::ValueType& item) override;
+	virtual void end (const AST::ValueType& item) override;
 
-	virtual void leaf (const AST::ValueBox& item);
+	virtual void leaf (const AST::ValueBox& item) override;
 
 	void forward_guard (const AST::NamedItem& item);
 	void forward_define (const AST::NamedItem& item);

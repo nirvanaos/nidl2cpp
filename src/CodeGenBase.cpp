@@ -755,6 +755,18 @@ bool CodeGenBase::async_supported (const Interface& itf) noexcept
 	return false;
 }
 
+std::string CodeGenBase::const_id (const Constant& c)
+{
+	ScopedName sn = c.scoped_name ();
+	ScopedName::const_iterator n = sn.begin ();
+	std::string name = *n;
+	for (++n; n != sn.end (); ++n) {
+		name += '/';
+		name += *n;
+	}
+	return name;
+}
+
 Code& operator << (Code& stm, const QName& qn)
 {
 	return stm << ParentName (qn.item) << qn.item.name ();

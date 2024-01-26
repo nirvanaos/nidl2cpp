@@ -40,6 +40,10 @@ public:
 	static const char name_ [];
 	static const unsigned short version_ [3];
 
+	Compiler () :
+		IDL_FrontEnd (IDL_FrontEnd::FLAG_ENABLE_CONST_OBJREF)
+	{}
+
 	std::ostream& err_out () const noexcept
 	{
 		return IDL_FrontEnd::err_out ();

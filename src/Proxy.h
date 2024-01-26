@@ -50,18 +50,18 @@ public:
 	}
 
 private:
-	virtual void end (const AST::Root&);
+	virtual void end (const AST::Root&) override;
 
-	virtual void begin (const AST::Interface& itf) {}
-	virtual void end (const AST::Interface& itf);
+	virtual void begin (const AST::Interface& itf) override {}
+	virtual void end (const AST::Interface& itf) override;
 
-	virtual void leaf (const AST::Exception& item);
-	virtual void leaf (const AST::Struct& item);
-	virtual void leaf (const AST::Union& item);
-	virtual void leaf (const AST::Enum& item);
+	virtual void leaf (const AST::Exception& item) override;
+	virtual void leaf (const AST::Struct& item) override;
+	virtual void leaf (const AST::Union& item) override;
+	virtual void leaf (const AST::Enum& item) override;
 
-	virtual void end (const AST::ValueType& item);
-	virtual void leaf (const AST::ValueBox& item);
+	virtual void end (const AST::ValueType& item) override;
+	virtual void leaf (const AST::ValueBox& item) override;
 
 	static void get_parameters (const AST::Operation& op, Members& params_in, Members& params_out);
 

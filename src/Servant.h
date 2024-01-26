@@ -67,15 +67,16 @@ public:
 	{};
 
 protected:
-	virtual void end (const AST::Root&);
-	virtual void leaf (const AST::Include& item);
-	virtual void begin (const AST::Interface& itf);
-	virtual void end (const AST::Interface& itf);
-	virtual void begin (const AST::ValueType& vt);
-	virtual void end (const AST::ValueType& vt);
-	virtual void leaf (const AST::Operation& op);
-	virtual void leaf (const AST::Attribute& att);
-	virtual void leaf (const AST::StateMember& sm);
+	virtual void end (const AST::Root&) override;
+	virtual void leaf (const AST::Include& item) override;
+	virtual void begin (const AST::Interface& itf) override;
+	virtual void end (const AST::Interface& itf) override;
+	virtual void begin (const AST::ValueType& vt) override;
+	virtual void end (const AST::ValueType& vt) override;
+	virtual void leaf (const AST::Operation& op) override;
+	virtual void leaf (const AST::Attribute& att) override;
+	virtual void leaf (const AST::StateMember& sm) override;
+	virtual void leaf (const AST::Constant& c) override;
 
 private:
 	void skeleton_begin (const AST::IV_Base& item, const char* suffix = "");

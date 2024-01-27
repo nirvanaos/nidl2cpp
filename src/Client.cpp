@@ -155,17 +155,17 @@ void Client::type_code_def (const ItemWithId& item)
 	if (!is_nested (item))
 		 cpp_ << " extern";
 	cpp_ << " const " << Namespace ("Nirvana") << "ImportInterfaceT <" << Namespace ("CORBA") << "TypeCode>\n"
-		<< TC_Name (item) << " = { Nirvana::OLF_IMPORT_INTERFACE, ";
+		<< TC_Name (item) << " = { " << Namespace ("Nirvana") << "OLF_IMPORT_INTERFACE, ";
 
 	switch (item.kind ()) {
 		case Item::Kind::TYPE_DEF:
 			cpp_ << '"' << item.repository_id () << '"';
 			break;
 		default:
-			cpp_ << "CORBA::Internal::RepIdOf <" << QName (item) << ">::id";
+			cpp_ << Namespace ("CORBA/Internal") << "RepIdOf <" << QName (item) << ">::id";
 			break;
 	}
-	cpp_ << ", CORBA::Internal::RepIdOf <CORBA::TypeCode>::id };\n\n";
+	cpp_ << ", " << Namespace ("CORBA/Internal") << "RepIdOf <" << Namespace ("CORBA") << "TypeCode>::id }; \n\n";
 }
 
 bool Client::is_nested (const NamedItem& item)
@@ -217,10 +217,10 @@ void Client::leaf (const TypeDef& item)
 		// Define type code
 
 		if (!is_nested (item))
-			h_ << "extern ";
+			h_ << "extern";
 		else
-			h_ << "static ";
-		h_ << "const " << Namespace ("CORBA/Internal") << "Alias _tc_" << name << ";\n";
+			h_ << "static";
+		h_ << " const " << Namespace ("CORBA/Internal") << "Alias _tc_" << name << ";\n";
 
 		cpp_.namespace_open ("CORBA/Internal");
 		cpp_ << empty_line <<
@@ -1469,10 +1469,10 @@ void Client::leaf (const Constant& item)
 			break;
 		}
 		bool is_object = ik && (ik->interface_kind () == InterfaceKind::Kind::UNCONSTRAINED || ik->interface_kind () == InterfaceKind::Kind::LOCAL);
-		cpp_.namespace_open (item);
+		cpp_.namespace_close ();
 		cpp_ << "NIRVANA_OLF_SECTION_OPT extern const "
-			<< Namespace ("Nirvana") << "ImportInterfaceT <" << QName (item.named_type ()) << "> " << item.name () << " =\n"
-			"{ Nirvana::OLF_IMPORT_" << (is_object ? "OBJECT" : "INTERFACE")
+			<< Namespace ("Nirvana") << "ImportInterfaceT <" << QName (item.named_type ()) << ">\n"
+			<< QName (item) << " = { " << Namespace ("Nirvana") << "OLF_IMPORT_" << (is_object ? "OBJECT" : "INTERFACE")
 			<< ", \"" << const_id (item) << "\", "
 			<< Namespace ("CORBA/Internal") << "RepIdOf <" << QName (item.named_type ()) << ">::id };\n";
 	}

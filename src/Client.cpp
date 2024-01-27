@@ -1457,10 +1457,23 @@ void Client::leaf (const Constant& item)
 		(outline ? cpp_ : h_) << " = " << static_cast <const Variant&> (item);
 	} else {
 		// const object reference
+		const NamedItem& type = item.dereference_type ().named_type ();
+
+		const InterfaceKind* ik = nullptr;
+		switch (type.kind ()) {
+		case Item::Kind::INTERFACE:
+			ik = &static_cast <const Interface&> (type);
+			break;
+		case Item::Kind::INTERFACE_DECL:
+			ik = &static_cast <const InterfaceDecl&> (type);
+			break;
+		}
+		bool is_object = ik && (ik->interface_kind () == InterfaceKind::Kind::UNCONSTRAINED || ik->interface_kind () == InterfaceKind::Kind::LOCAL);
 		cpp_.namespace_open (item);
 		cpp_ << "NIRVANA_OLF_SECTION_OPT extern const "
 			<< Namespace ("Nirvana") << "ImportInterfaceT <" << QName (item.named_type ()) << "> " << item.name () << " =\n"
-			"{ Nirvana::OLF_IMPORT_INTERFACE, \"" << const_id (item) << "\", "
+			"{ Nirvana::OLF_IMPORT_" << (is_object ? "OBJECT" : "INTERFACE")
+			<< ", \"" << const_id (item) << "\", "
 			<< Namespace ("CORBA/Internal") << "RepIdOf <" << QName (item.named_type ()) << ">::id };\n";
 	}
 	h_ << ";\n";

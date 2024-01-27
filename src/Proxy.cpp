@@ -234,7 +234,7 @@ void Proxy::end (const Interface& itf)
 
 	cpp_.namespace_close ();
 	cpp_ << "NIRVANA_EXPORT (" << export_name (itf) << ", CORBA::Internal::RepIdOf <" << QName (itf)
-		<< ">::id, CORBA::Internal::PseudoBase, CORBA::Internal::ProxyFactoryImpl"
+		<< ">::id, CORBA::Internal::ProxyFactory, CORBA::Internal::ProxyFactoryImpl"
 		<< " <" << QName (itf);
 
 	if (ami)

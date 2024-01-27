@@ -136,6 +136,10 @@ void Client::type_code_decl (const NamedItem& item)
 
 	bool no_import = false;
 	switch (item.kind ()) {
+	case Item::Kind::INTERFACE:
+	case Item::Kind::INTERFACE_DECL:
+		no_import = true;
+		break;
 	case Item::Kind::VALUE_TYPE_DECL:
 		no_import = static_cast <const ValueTypeDecl&> (item).is_abstract ();
 		break;
@@ -273,7 +277,7 @@ void Client::forward_decl (const NamedItem& item)
 	type_code_decl (item);
 }
 
-void Client::forward_decl (const AST::StructBase& item)
+void Client::forward_decl (const StructBase& item)
 {
 	forward_decl (static_cast <const NamedItem&> (item));
 	if (item.kind () != Item::Kind::EXCEPTION)
@@ -454,6 +458,9 @@ void Client::begin_interface (const IV_Base& container)
 {
 	bool no_import = false;
 	switch (container.kind ()) {
+	case Item::Kind::INTERFACE:
+		no_import = true;
+		break;
 	case Item::Kind::VALUE_TYPE:
 		no_import = (static_cast <const ValueType&> (container).modifier () == ValueType::Modifier::ABSTRACT);
 		break;
@@ -1087,6 +1094,16 @@ void Client::begin (const Interface& itf)
 void Client::end (const Interface& itf)
 {
 	end_interface (itf);
+
+	if (itf.interface_kind () != Interface::InterfaceKind::PSEUDO) {
+		// Do not import type code
+		cpp_ << TypeCodeName (itf);
+		cpp_.namespace_close ();
+		cpp_ << empty_line
+			<< "NIRVANA_SELECTANY const " << Namespace ("CORBA/Internal") << "StaticTC\n"
+			<< TC_Name (itf) << " = { NIRVANA_STATIC_BRIDGE (" << Namespace ("CORBA") << "TypeCode, "
+			<< Namespace ("CORBA/Internal") << "TypeCodeInterface <" << QName (itf) << ">) };\n";
+	}
 }
 
 void Client::begin (const ValueType& itf)

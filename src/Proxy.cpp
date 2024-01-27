@@ -415,16 +415,6 @@ void Proxy::leaf (const Struct& item)
 	exp (item) << "TypeCodeStruct <" << QName (item) << ">)\n";
 }
 
-void Proxy::end (const ValueType& vt)
-{
-	if (vt.modifier () == ValueType::Modifier::ABSTRACT) {
-		cpp_ << TypeCodeName (vt);
-		cpp_.namespace_close ();
-		cpp_ << "NIRVANA_EXPORT (" << export_name (vt) << ", CORBA::Internal::RepIdOf <" << QName (vt) << ">::id, CORBA"
-			"::TypeCode, CORBA::Internal::TypeCodeValueAbstract <" << QName (vt) << ">)\n";
-	}
-}
-
 void Proxy::leaf (const ValueBox& vb)
 {
 	cpp_ << TypeCodeName (vb);

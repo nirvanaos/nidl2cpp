@@ -60,7 +60,6 @@ private:
 	virtual void leaf (const AST::Union& item) override;
 	virtual void leaf (const AST::Enum& item) override;
 
-	virtual void end (const AST::ValueType& item) override;
 	virtual void leaf (const AST::ValueBox& item) override;
 
 	static void get_parameters (const AST::Operation& op, Members& params_in, Members& params_out);

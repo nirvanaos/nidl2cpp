@@ -134,14 +134,28 @@ void Client::type_code_decl (const NamedItem& item)
 	if (is_pseudo (item))
 		return;
 
+	bool no_import = false;
+	switch (item.kind ()) {
+	case Item::Kind::VALUE_TYPE_DECL:
+		no_import = static_cast <const ValueTypeDecl&> (item).is_abstract ();
+		break;
+	case Item::Kind::VALUE_TYPE:
+		no_import = (static_cast <const ValueType&> (item).modifier () == ValueType::Modifier::ABSTRACT);
+		break;
+	}
+
 	if (!is_nested (item)) {
 		h_.namespace_open (item);
-		h_ << "extern ";
+		h_ << "extern const ";
 	} else
-		h_ << "static ";
-	h_ << "const " << Namespace ("Nirvana") << "ImportInterfaceT <"
-		<< Namespace ("CORBA") << "TypeCode> _tc_"
-		<< static_cast <const std::string&> (item.name ()) << ";\n";
+		h_ << "static const ";
+
+	if (no_import)
+		h_ << Namespace ("CORBA/Internal") << "StaticTC ";
+	else
+		h_ << Namespace ("Nirvana") << "ImportInterfaceT <" << Namespace ("CORBA") << "TypeCode> ";
+
+	h_ << "_tc_" << static_cast <const std::string&> (item.name ()) << ";\n";
 }
 
 void Client::type_code_def (const ItemWithId& item)
@@ -155,17 +169,9 @@ void Client::type_code_def (const ItemWithId& item)
 	if (!is_nested (item))
 		 cpp_ << " extern";
 	cpp_ << " const " << Namespace ("Nirvana") << "ImportInterfaceT <" << Namespace ("CORBA") << "TypeCode>\n"
-		<< TC_Name (item) << " = { " << Namespace ("Nirvana") << "OLF_IMPORT_INTERFACE, ";
-
-	switch (item.kind ()) {
-		case Item::Kind::TYPE_DEF:
-			cpp_ << '"' << item.repository_id () << '"';
-			break;
-		default:
-			cpp_ << Namespace ("CORBA/Internal") << "RepIdOf <" << QName (item) << ">::id";
-			break;
-	}
-	cpp_ << ", " << Namespace ("CORBA/Internal") << "RepIdOf <" << Namespace ("CORBA") << "TypeCode>::id }; \n\n";
+		<< TC_Name (item) << " = { " << Namespace ("Nirvana") << "OLF_IMPORT_INTERFACE, "
+		<< Namespace ("CORBA/Internal") << "RepIdOf <" << QName (item) << ">::id"
+		<< ", " << Namespace ("CORBA/Internal") << "RepIdOf <" << Namespace ("CORBA") << "TypeCode>::id }; \n\n";
 }
 
 bool Client::is_nested (const NamedItem& item)
@@ -446,7 +452,15 @@ void Client::type_code_func (const NamedItem& item)
 
 void Client::begin_interface (const IV_Base& container)
 {
-	type_code_def (container);
+	bool no_import = false;
+	switch (container.kind ()) {
+	case Item::Kind::VALUE_TYPE:
+		no_import = (static_cast <const ValueType&> (container).modifier () == ValueType::Modifier::ABSTRACT);
+		break;
+	}
+
+	if (!no_import)
+		type_code_def (container);
 
 	h_.namespace_open ("CORBA/Internal");
 	h_ << empty_line
@@ -1102,8 +1116,16 @@ void Client::end (const ValueType& vt)
 {
 	end_interface (vt);
 
-	if (vt.modifier () == ValueType::Modifier::ABSTRACT)
+	if (vt.modifier () == ValueType::Modifier::ABSTRACT) {
+		// Do not import type code
+		cpp_ << TypeCodeName (vt);
+		cpp_.namespace_close ();
+		cpp_ << empty_line
+			<< "NIRVANA_SELECTANY const " << Namespace ("CORBA/Internal") << "StaticTC\n"
+			<< TC_Name (vt) << " = { NIRVANA_STATIC_BRIDGE (" << Namespace ("CORBA") << "TypeCode, "
+			<< Namespace ("CORBA/Internal") << "TypeCodeValueAbstract <" << QName (vt) << ">) };\n";
 		return;
+	}
 
 	StateMembers members = get_members (vt);
 
@@ -1207,11 +1229,13 @@ void Client::end (const ValueType& vt)
 	if (!members.empty ()) {
 		h_ << empty_line <<
 			"template <>\n"
-			"const StateMember TypeCodeStateMembers <" << QName (vt) << ">::members_ [" << members.size () << "];\n";
+			"const StateMember TypeCodeStateMembers <" << QName (vt) << ">::members_ ["
+			<< members.size () << "];\n";
 
 		cpp_ << empty_line <<
 			"template <>\n"
-			"const StateMember TypeCodeStateMembers <" << QName (vt) << ">::members_ [" << members.size () << "] = {\n"
+			"const StateMember TypeCodeStateMembers <" << QName (vt) << ">::members_ ["
+			<< members.size () << "] = {\n"
 			<< indent;
 
 		auto it = members.begin ();
@@ -1470,11 +1494,12 @@ void Client::leaf (const Constant& item)
 		}
 		bool is_object = ik && (ik->interface_kind () == InterfaceKind::Kind::UNCONSTRAINED || ik->interface_kind () == InterfaceKind::Kind::LOCAL);
 		cpp_.namespace_close ();
-		cpp_ << "NIRVANA_OLF_SECTION_OPT extern const "
+		cpp_ << empty_line
+			<< "NIRVANA_OLF_SECTION_OPT extern const "
 			<< Namespace ("Nirvana") << "ImportInterfaceT <" << QName (item.named_type ()) << ">\n"
 			<< QName (item) << " = { " << Namespace ("Nirvana") << "OLF_IMPORT_" << (is_object ? "OBJECT" : "INTERFACE")
 			<< ", \"" << const_id (item) << "\", "
-			<< Namespace ("CORBA/Internal") << "RepIdOf <" << QName (item.named_type ()) << ">::id };\n";
+			<< Namespace ("CORBA/Internal") << "RepIdOf <" << QName (item.named_type ()) << ">::id }";
 	}
 	h_ << ";\n";
 

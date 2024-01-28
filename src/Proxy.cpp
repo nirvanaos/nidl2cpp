@@ -245,9 +245,15 @@ void Proxy::end (const Interface& itf)
 
 void Proxy::md_operation (const Interface& itf, const OpMetadata& op, bool no_rq)
 {
-	cpp_ << "{ \"" << op.name << "\", { ";
+	bool not_local = itf.interface_kind () != Interface::InterfaceKind::LOCAL;
+	if (not_local)
+		cpp_ << "{ \"" << op.name << "\", { ";
+	else
+		cpp_ << "{ nullptr, { ";
+
 	bool in_complex = false, out_complex = false;
-	if (!op.params_in.empty ()) {
+
+	if (not_local && !op.params_in.empty ()) {
 		for (const Member* par : op.params_in) {
 			if (is_complex_type (*par)) {
 				in_complex = true;
@@ -261,10 +267,10 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op, bool no_rq
 		cpp_ << "0, 0";
 	cpp_ << " }, { ";
 
-	if (op.type && is_complex_type (*op.type))
+	if (not_local && op.type && is_complex_type (*op.type))
 		out_complex = true;
 
-	if (!op.params_out.empty ()) {
+	if (not_local && !op.params_out.empty ()) {
 		if (!out_complex)
 			for (const Member* par : op.params_out) {
 				if (is_complex_type (*par)) {
@@ -279,7 +285,7 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op, bool no_rq
 		cpp_ << "0, 0";
 	cpp_ << " }, { ";
 
-	if (!op.raises->empty()) {
+	if (not_local && !op.raises->empty()) {
 		std::string raises = PREFIX_OP_RAISES;
 		raises += op.name;
 		cpp_ << raises << ", countof (" << raises << ')';
@@ -295,7 +301,7 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op, bool no_rq
 		cpp_ << "0, 0";
 	cpp_ << " }, ";
 
-	if (op.type && op.type->tkind () != Type::Kind::VOID)
+	if (not_local && op.type && op.type->tkind () != Type::Kind::VOID)
 		cpp_ << "Type <" << *op.type << ">::type_code";
 	else
 		cpp_ << "0";
@@ -456,8 +462,8 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 	cpp_ << TypeCodeName (itf);
 
 	bool stateless = is_stateless (itf);
-
-	bool local_stateless = stateless && (itf.interface_kind () == InterfaceKind::LOCAL);
+	bool local = (itf.interface_kind () == InterfaceKind::LOCAL);
+	bool local_stateless = stateless && local;
 
 	const char* proxy_base = stateless ? "ProxyBaseStateless" : "ProxyBase";
 
@@ -816,6 +822,7 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 		}
 	}
 
+	// Metadata
 	cpp_ << "static const char* const __interfaces [];\n";
 	if (!metadata.empty ())
 		cpp_ << "static const Operation __operations [];\n";
@@ -824,55 +831,57 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 
 	if (!metadata.empty ()) {
 
-		for (const auto& op : metadata) {
+		if (!local) {
+			for (const auto& op : metadata) {
 
-			if (!op.params_in.empty ()) {
-				cpp_ << "const Parameter Proxy <" << QName (itf) << ">::" PREFIX_OP_PARAM_IN << op.name
-					<< " [" << op.params_in.size () << "] = {\n";
-				if (op.type) {
-					md_members (op.params_in);
-				} else {
-					// _set_ operation
-					assert (op.params_in.size () == 1);
-					cpp_.indent ();
-					md_member (*op.params_in.front (), std::string ());
-					cpp_ << std::endl
-						<< unindent;
+				if (!op.params_in.empty ()) {
+					cpp_ << "const Parameter Proxy <" << QName (itf) << ">::" PREFIX_OP_PARAM_IN << op.name
+						<< " [" << op.params_in.size () << "] = {\n";
+					if (op.type) {
+						md_members (op.params_in);
+					} else {
+						// _set_ operation
+						assert (op.params_in.size () == 1);
+						cpp_.indent ();
+						md_member (*op.params_in.front (), std::string ());
+						cpp_ << std::endl
+							<< unindent;
+					}
+					cpp_ << "};\n";
 				}
-				cpp_ << "};\n";
-			}
 
-			if (!op.params_out.empty ()) {
-				cpp_ << "const Parameter Proxy <" << QName (itf) << ">::" PREFIX_OP_PARAM_OUT << op.name
-					<< " [" << op.params_out.size () << "] = {\n";
-				md_members (op.params_out);
-				cpp_ << "};\n";
-			}
-
-			if (!op.raises->empty ()) {
-				cpp_ << "const TypeCodeImport* const Proxy <" << QName (itf) << ">::" PREFIX_OP_RAISES << op.name
-					<< " [" << op.raises->size () << "] = {\n";
-				auto it = op.raises->begin ();
-				cpp_ << '&' << TC_Name (**it);
-				for (++it; it != op.raises->end (); ++it) {
-					cpp_ << ",\n"
-						"&" << TC_Name (**it);
+				if (!op.params_out.empty ()) {
+					cpp_ << "const Parameter Proxy <" << QName (itf) << ">::" PREFIX_OP_PARAM_OUT << op.name
+						<< " [" << op.params_out.size () << "] = {\n";
+					md_members (op.params_out);
+					cpp_ << "};\n";
 				}
-				cpp_ << std::endl;
-				cpp_ << "};\n";
-			}
 
-			if (op.context && !op.context->empty ()) {
-				cpp_ << "const Char* const Proxy <" << QName (itf) << ">::" PREFIX_OP_CONTEXT << op.name
-					<< " [" << op.context->size () << "] = {\n";
-				auto it = op.context->begin ();
-				cpp_ << '"' << *it << '"';
-				for (++it; it != op.context->end (); ++it) {
-					cpp_ << ",\n"
-						"\"" << *it << '"';
+				if (!op.raises->empty ()) {
+					cpp_ << "const TypeCodeImport* const Proxy <" << QName (itf) << ">::" PREFIX_OP_RAISES << op.name
+						<< " [" << op.raises->size () << "] = {\n";
+					auto it = op.raises->begin ();
+					cpp_ << '&' << TC_Name (**it);
+					for (++it; it != op.raises->end (); ++it) {
+						cpp_ << ",\n"
+							"&" << TC_Name (**it);
+					}
+					cpp_ << std::endl;
+					cpp_ << "};\n";
 				}
-				cpp_ << std::endl;
-				cpp_ << "};\n";
+
+				if (op.context && !op.context->empty ()) {
+					cpp_ << "const Char* const Proxy <" << QName (itf) << ">::" PREFIX_OP_CONTEXT << op.name
+						<< " [" << op.context->size () << "] = {\n";
+					auto it = op.context->begin ();
+					cpp_ << '"' << *it << '"';
+					for (++it; it != op.context->end (); ++it) {
+						cpp_ << ",\n"
+							"\"" << *it << '"';
+					}
+					cpp_ << std::endl;
+					cpp_ << "};\n";
+				}
 			}
 		}
 
@@ -906,7 +915,16 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 		cpp_ << "{nullptr, 0},\n";
 	else
 		cpp_ << "{Proxy <" << QName (itf) << ">::__operations, countof (Proxy <" << QName (itf) << ">::__operations)},\n";
-	cpp_ << (local_stateless ? "InterfaceMetadata::FLAG_LOCAL_STATELESS" : "0");
+
+	const char* flags;
+	if (local_stateless)
+		flags = "InterfaceMetadata::FLAG_LOCAL_STATELESS";
+	else if (itf.interface_kind () == InterfaceKind::LOCAL)
+		flags = "InterfaceMetadata::FLAG_LOCAL";
+	else
+		flags = "0";
+	cpp_ << flags;
+
 	if (ami) {
 		cpp_ << ",\n\"" << ami->poller->repository_id () << '\"'
 			<< ",\n\"" << ami->handler->repository_id () << '\"';

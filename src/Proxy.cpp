@@ -459,13 +459,13 @@ void Proxy::leaf (const Union& item)
 
 void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* ami)
 {
-	cpp_ << TypeCodeName (itf);
-
 	bool stateless = is_stateless (itf);
 	bool local = (itf.interface_kind () == InterfaceKind::LOCAL);
 	bool local_stateless = stateless && local;
 
 	const char* proxy_base = stateless ? "ProxyBaseStateless" : "ProxyBase";
+
+	cpp_.namespace_open ("CORBA/Internal");
 
 	if (ami)
 		cpp_ << "NIRVANA_IMPLEMENT_AMI (Proxy <" << QName (itf) << ">, " << QName (itf) << ");\n\n";

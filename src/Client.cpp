@@ -966,7 +966,7 @@ void Client::end_interface (const IV_Base& container)
 				const NamedItem& def = static_cast <const NamedItem&> (*item);
 				h_ << "using " << Namespace ("CORBA/Internal") << "Decls <"
 					<< container.name () << ">::" << def.name () << ";\n";
-				if (!pseudo_interface && ItemWithId::cast (&def))
+				if (!pseudo_interface && def.kind () != Item::Kind::NATIVE && ItemWithId::cast (&def))
 					h_ << "using " << Namespace ("CORBA/Internal") << "Decls <"
 					<< container.name () << ">::_tc_" << static_cast <const std::string&> (def.name ()) << ";\n";
 

@@ -1958,7 +1958,7 @@ void Client::implement (const Struct& item)
 	define_ABI (item);
 	define_structured_type (item);
 
-	if (!(is_pseudo (item) && is_native (item))) {
+	if (!(is_pseudo (item) || is_native (item))) {
 		// Marshaling
 		cpp_.namespace_open ("CORBA/Internal");
 		implement_marshaling (item);

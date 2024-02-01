@@ -381,12 +381,14 @@ void Client::forward_interface (const ItemWithId& item)
 
 	iv_traits_begin (item);
 
-	if (value_type || value_type_decl || ikind == InterfaceKind::LOCAL) {
+	if (value_type || value_type_decl
+		|| ikind == InterfaceKind::LOCAL || ikind == InterfaceKind::PSEUDO) {
 		h_ << "template <class S>\n"
 			"using Servant = " << Namespace ("CORBA/Internal") << "Servant <S, " << QName (item) << ">;\n";
 
 		if (value_type || value_type_decl)
-			h_ << "using obv_type = " << Namespace ("CORBA/Internal") << "ServantPOA <" << QName (item) << ">;\n";
+			h_ << "using obv_type = " << Namespace ("CORBA/Internal") << "ServantPOA <" << QName (item)
+			<< ">;\n";
 	}
 
 	bool abstract;
@@ -397,14 +399,18 @@ void Client::forward_interface (const ItemWithId& item)
 	else
 		abstract = ikind == InterfaceKind::ABSTRACT;
 
-	if (value_type || value_type_decl)
+	if ((value_type || value_type_decl) ? abstract :
+		(ikind == InterfaceKind::LOCAL || ikind == InterfaceKind::PSEUDO)) {
 		h_ << "template <class S>\n"
-		"using ServantStatic = " << Namespace ("CORBA/Internal") << "ServantStatic <S, " << QName (item) << ">;\n";
+			"using ServantStatic = " << Namespace ("CORBA/Internal") << "ServantStatic <S, "
+			<< QName (item) << ">;\n";
+	}
 
 	h_ << "using is_abstract = std::" << (abstract ? "true_type" : "false_type") << ";\n";
 
 	if (!(value_type || value_type_decl))
-		h_ << "using is_local = std::" << (ikind == InterfaceKind::LOCAL ? "true_type" : "false_type") << ";\n";
+		h_ << "using is_local = std::" << (ikind == InterfaceKind::LOCAL ? "true_type" : "false_type")
+		<< ";\n";
 
 	traits_end ();
 

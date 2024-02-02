@@ -389,6 +389,9 @@ void Client::forward_interface (const ItemWithId& item)
 		if (value_type || value_type_decl)
 			h_ << "using obv_type = " << Namespace ("CORBA/Internal") << "ServantPOA <" << QName (item)
 			<< ">;\n";
+		else if (ikind == InterfaceKind::LOCAL)
+			h_ << "using base_type = " << Namespace ("CORBA/Internal") << "ServantPOA <" << QName (item)
+			<< ">;\n";
 	}
 
 	bool abstract;

@@ -738,8 +738,12 @@ bool CodeGenBase::is_custom (const Interface& itf) noexcept
 bool CodeGenBase::async_supported (const Interface& itf) noexcept
 {
 	if (itf.interface_kind () == InterfaceKind::UNCONSTRAINED) {
-		//if (is_stateless (itf) || is_custom (itf))
-		//	return false;
+
+		// Do not generate AMI for Policies and other immutable, and also for custom.
+		if (is_stateless (itf) || is_custom (itf))
+			return false;
+
+		// Do not generate AMI for Messaging::ReplyHandler
 		if (itf.qualified_name () == "::Messaging::ReplyHandler")
 			return false;
 

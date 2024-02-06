@@ -172,29 +172,52 @@ void Servant::end (const Interface& itf)
 		if (itf.interface_kind () != InterfaceKind::ABSTRACT) {
 
 			// Standard implementation
+
 			h_.empty_line ();
 			h_ << "template <class S>\n"
-				"class Servant <S, " << QName (itf) << "> : public Implementation";
+				"class Servant <S, " << QName (itf) << "> :\n"
+				<< indent
+				<< "public Implementation";
 			implementation_suffix (itf);
-			h_ << " <S, ";
 			implementation_parameters (itf, all_bases);
-			h_ << "{};\n";
+			h_ << "\n"
+				<< unindent;
+			if (itf.interface_kind () != InterfaceKind::PSEUDO) {
+				h_ << "{\n"
+				"protected:\n"
+				<< indent
+				<< "Servant (Object::_ptr_type comp = nullptr) :\n"
+				<< indent
+				<< "Implementation";
+				implementation_suffix (itf);
+				implementation_parameters (itf, all_bases);
+				h_ << " (comp)\n"
+					<< unindent
+					<< "{}\n"
+					<< unindent << "};\n";
+			} else
+				h_ << "{};\n";
 
 			// Static implementation
+
 			h_.empty_line ();
 			h_ << "template <class S>\n"
-				"class ServantStatic <S, " << QName (itf) << "> : public Implementation";
+				"class ServantStatic <S, " << QName (itf) << "> :\n"
+				<< indent
+				<< "public Implementation";
 			implementation_suffix (itf);
-			h_ << "Static <S, ";
+			h_ << "Static ";
 			implementation_parameters (itf, all_bases);
-			h_ << "{};\n";
+			h_ << unindent << "\n{};\n";
 		}
 
 		if (itf.interface_kind () != InterfaceKind::PSEUDO) {
+
 			// POA implementation
+
 			h_ << empty_line
 				<< "template <>\n"
-				"class NIRVANA_NOVTABLE ServantPOA <" << QName (itf) << "> :\n"
+				"class ServantPOA <" << QName (itf) << "> :\n"
 				<< indent;
 
 			bool has_base = false;
@@ -224,8 +247,8 @@ void Servant::end (const Interface& itf)
 				h_ << "public virtual ServantPOA <" << QName (*b) << ">,\n";
 			}
 			h_ << "public InterfaceImpl <ServantPOA <" << QName (itf) << ">, "
-				<< QName (itf) << ">\n";
-			h_ << unindent
+				<< QName (itf) << ">\n"
+				<< unindent
 				<< "{\n"
 				"public:\n"
 				<< indent
@@ -255,15 +278,21 @@ void Servant::end (const Interface& itf)
 
 			virtual_operations (itf);
 
-			h_
-				<< unindent
-				<< "\nprotected:\n"
-				<< indent
-				<< "ServantPOA ()\n"
-				"{}\n";
-
-			h_ << unindent
-				<< "};\n";
+			if (itf.interface_kind () != InterfaceKind::ABSTRACT) {
+				h_
+					<< unindent
+					<< "\nprotected:\n"
+					<< indent
+					<< "ServantPOA ()\n"
+						"{}\n"
+						"ServantPOA (Object::_ptr_type comp)\n"
+						"{\n"
+					<< indent
+					<< "_create_proxy (comp);\n"
+					<< unindent
+					<< "}\n";
+			}
+			h_ << unindent << "};\n";
 		}
 
 		h_.namespace_close ();
@@ -849,11 +878,11 @@ void Servant::implementation_suffix (const InterfaceKind ik)
 
 void Servant::implementation_parameters (const Interface& primary, const Interfaces& bases)
 {
-	h_ << QName (primary);
+	h_ << " <S, " << QName (primary);
 	for (auto b : bases) {
 		h_ << ", " << QName (*b);
 	}
-	h_ << ">\n";
+	h_ << ">";
 }
 
 void Servant::leaf (const Operation& op)

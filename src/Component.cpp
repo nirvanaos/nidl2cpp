@@ -28,76 +28,55 @@
 
 using namespace AST;
 
-bool Servant::define_component (const AST::Interface& itf)
+bool Servant::collect_ports (const AST::Interface& itf, Ports& ports)
 {
-	bool is_component = false;
-	{
-		Interfaces bases = itf.get_all_bases ();
-		for (const auto b : bases) {
-			if (b->qualified_name () == "::Components::CCMObject") {
-				is_component = true;
-				break;
-			}
-		}
-	}
+	if (!is_component (itf))
+		return false;
 
-	if (is_component) {
-
-		std::vector <std::string> facets;
-
-		struct Receptacle {
-			std::string name;
-			const NamedItem* conn_type;
-			const Type* multi_connections; // nullptr for single receptacle
-		};
-
-		std::vector <Receptacle> receptacles;
-
-		for (const auto item : itf) {
-			if (item->kind () == Item::Kind::OPERATION) {
-				const Operation& op = static_cast <const Operation&> (*item);
-				if (op.empty ()) {
-					if (is_object (op)) {
-						std::string facet = skip_prefix (op.name (), "provide_");
-						if (!facet.empty ())
-							facets.push_back (std::move (facet));
-					}
-				} else if (op.size () == 1) {
-					const Type& conn_itf_type = op.front ()->dereference_type ();
-					if (is_object (conn_itf_type)) {
-						std::string receptacle = skip_prefix (op.name (), "connect_");
-						if (!receptacle.empty ()) {
-							const Operation* disconnect = find_operation (itf, "disconnect_" + receptacle);
-							if (disconnect && static_cast <const Type&> (conn_itf_type) == *disconnect) {
-								if (op.tkind () == Type::Kind::VOID) {
-									// Simple receptacle
-									// disconnect_ must not have params
-									if (disconnect->empty ()) {
-										const Operation* get_connection = find_operation (itf, "get_connection_" + receptacle);
-										if (get_connection && static_cast <const Type&> (conn_itf_type) == *get_connection
-											&& get_connection->empty ()) {
-											receptacles.push_back ({ std::move (receptacle), &conn_itf_type.named_type (), nullptr });
-										}
+	for (const auto item : itf) {
+		if (item->kind () == Item::Kind::OPERATION) {
+			const Operation& op = static_cast <const Operation&> (*item);
+			if (op.empty ()) {
+				if (is_object (op)) {
+					std::string facet = skip_prefix (op.name (), "provide_");
+					if (!facet.empty ())
+						ports.facets.push_back (std::move (facet));
+				}
+			} else if (op.size () == 1) {
+				const Type& conn_itf_type = op.front ()->dereference_type ();
+				if (is_object (conn_itf_type)) {
+					std::string receptacle = skip_prefix (op.name (), "connect_");
+					if (!receptacle.empty ()) {
+						const Operation* disconnect = find_operation (itf, "disconnect_" + receptacle);
+						if (disconnect && static_cast <const Type&> (conn_itf_type) == *disconnect) {
+							if (op.tkind () == Type::Kind::VOID) {
+								// Simple receptacle
+								// disconnect_ must not have params
+								if (disconnect->empty ()) {
+									const Operation* get_connection = find_operation (itf, "get_connection_" + receptacle);
+									if (get_connection && static_cast <const Type&> (conn_itf_type) == *get_connection
+										&& get_connection->empty ()) {
+										ports.receptacles.push_back ({ std::move (receptacle), &conn_itf_type.named_type (), nullptr });
 									}
-								} else if (is_named_type (op, "::Components::Cookie")) {
-									// Multi receptacle
-									// disconnect_ must have 1 param of "::Components::Cookie" type
-									if (disconnect->size () == 1 && is_named_type (*disconnect->front (), "::Components::Cookie")) {
-										const Operation* get_connections = find_operation (itf, "get_connections_" + receptacle);
-										if (get_connections && get_connections->empty ()) {
-											const Type& get_connections_ret = get_connections->dereference_type ();
-											if (get_connections_ret.tkind () == Type::Kind::SEQUENCE) {
-												const Type& connection_type = get_connections_ret.sequence ().dereference_type ();
-												if (connection_type.tkind () == Type::Kind::NAMED_TYPE) {
-													const NamedItem& cs = connection_type.named_type ();
-													if (cs.kind () == Item::Kind::STRUCT) {
-														const Struct& connection_struct = static_cast <const Struct&> (cs);
-														if (connection_struct.size () == 2
-															&& static_cast <const Type&> (conn_itf_type) == *connection_struct [0]
-															&& is_named_type (*connection_struct [1], "::Components::Cookie")
-															) {
-															receptacles.push_back ({ std::move (receptacle), &conn_itf_type.named_type (), &get_connections_ret });
-														}
+								}
+							} else if (is_named_type (op, "::Components::Cookie")) {
+								// Multi receptacle
+								// disconnect_ must have 1 param of "::Components::Cookie" type
+								if (disconnect->size () == 1 && is_named_type (*disconnect->front (), "::Components::Cookie")) {
+									const Operation* get_connections = find_operation (itf, "get_connections_" + receptacle);
+									if (get_connections && get_connections->empty ()) {
+										const Type& get_connections_ret = get_connections->dereference_type ();
+										if (get_connections_ret.tkind () == Type::Kind::SEQUENCE) {
+											const Type& connection_type = get_connections_ret.sequence ().dereference_type ();
+											if (connection_type.tkind () == Type::Kind::NAMED_TYPE) {
+												const NamedItem& cs = connection_type.named_type ();
+												if (cs.kind () == Item::Kind::STRUCT) {
+													const Struct& connection_struct = static_cast <const Struct&> (cs);
+													if (connection_struct.size () == 2
+														&& static_cast <const Type&> (conn_itf_type) == *connection_struct [0]
+														&& is_named_type (*connection_struct [1], "::Components::Cookie")
+														) {
+														ports.receptacles.push_back ({ std::move (receptacle), &conn_itf_type.named_type (), &get_connections_ret });
 													}
 												}
 											}
@@ -110,6 +89,14 @@ bool Servant::define_component (const AST::Interface& itf)
 				}
 			}
 		}
+	}
+	return true;
+}
+
+Servant::ComponentType Servant::define_component (const AST::Interface& itf)
+{
+	Ports ports;
+	if (collect_ports (itf, ports)) {
 
 		// Generate CCMObjectImpl
 
@@ -120,12 +107,12 @@ bool Servant::define_component (const AST::Interface& itf)
 			"public:\n"
 			<< indent;
 
-		if (!facets.empty ()) {
+		if (!ports.facets.empty ()) {
 			h_ << "Type <Object>::VRet provide_facet (const ::Components::FeatureName & name)\n"
 				"{\n"
 				<< indent;
 
-			for (const auto& name : facets) {
+			for (const auto& name : ports.facets) {
 				h_ << "if (name == \"" << name << "\")\n"
 					<< indent
 					<< "return static_cast <S&> (*this).provide_" << name << " ();\n"
@@ -140,14 +127,14 @@ bool Servant::define_component (const AST::Interface& itf)
 				<< unindent << "}\n\n";
 		}
 
-		if (!receptacles.empty ()) {
+		if (!ports.receptacles.empty ()) {
 			h_ << "Type < ::Components::Cookie>::VRet connect (const ::Components::FeatureName& name, "
 				"Object::_ptr_type connection)\n"
 				"{\n"
 				<< indent
 				<< "Type < ::Components::Cookie>::Var ret;\n";
 
-			for (const auto& receptacle : receptacles) {
+			for (const auto& receptacle : ports.receptacles) {
 				h_ << "if (name == \"" << receptacle.name << "\")\n"
 					<< indent;
 
@@ -182,7 +169,7 @@ bool Servant::define_component (const AST::Interface& itf)
 				"{\n"
 				<< indent;
 
-			for (const auto& receptacle : receptacles) {
+			for (const auto& receptacle : ports.receptacles) {
 				h_ << "if (name == \"" << receptacle.name << "\") {\n"
 					<< indent;
 
@@ -230,7 +217,7 @@ bool Servant::define_component (const AST::Interface& itf)
 				<< unindent << "}\n";
 				*/
 
-			for (const auto& receptacle : receptacles) {
+			for (const auto& receptacle : ports.receptacles) {
 				if (receptacle.multi_connections)
 					h_ << "Type < ::Components::Cookie>::VRet";
 				else
@@ -272,7 +259,7 @@ bool Servant::define_component (const AST::Interface& itf)
 				h_ << std::endl;
 			}
 
-			for (const auto& receptacle : receptacles) {
+			for (const auto& receptacle : ports.receptacles) {
 				if (receptacle.multi_connections)
 					h_ << "const std::vector <I_ref <" << QName (*receptacle.conn_type) << "> >& receptacle_";
 				else
@@ -285,7 +272,7 @@ bool Servant::define_component (const AST::Interface& itf)
 
 			h_ << unindent << "\nprivate:\n" << indent;
 
-			for (const auto& receptacle : receptacles) {
+			for (const auto& receptacle : ports.receptacles) {
 				if (receptacle.multi_connections)
 					h_ << "Receptacles <";
 				else
@@ -296,7 +283,8 @@ bool Servant::define_component (const AST::Interface& itf)
 		}
 
 		h_ << unindent << "};\n";
-	}
 
-	return is_component;
+		return ports.receptacles.empty () ? ComponentType::COMPONENT : ComponentType::COMPONENT_WITH_CONNECTIONS;
+	} else
+		return ComponentType::NOT_COMPONENT;
 }

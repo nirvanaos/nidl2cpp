@@ -96,9 +96,29 @@ private:
 
 	void value_constructors (const char* class_name, const StateMembers& all_members);
 
-	bool define_component (const AST::Interface& itf);
+	enum class ComponentType {
+		NOT_COMPONENT,
+		COMPONENT,
+		COMPONENT_WITH_CONNECTIONS
+	};
 
-	const AST::Operation* find_operation (const AST::Interface& itf, const AST::Identifier& name);
+	ComponentType define_component (const AST::Interface& itf);
+
+	struct Receptacle {
+		std::string name;
+		const AST::NamedItem* conn_type;
+		const AST::Type* multi_connections; // nullptr for single receptacle
+	};
+
+	struct Ports
+	{
+		std::vector <std::string> facets;
+		std::vector <Receptacle> receptacles;
+	};
+
+	static bool collect_ports (const AST::Interface& itf, Ports& ports);
+
+	static const AST::Operation* find_operation (const AST::Interface& itf, const AST::Identifier& name);
 
 private:
 	Header h_;

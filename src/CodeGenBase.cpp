@@ -806,3 +806,15 @@ std::string CodeGenBase::skip_prefix (const AST::Identifier& id, const char* pre
 	else
 		return std::string ();
 }
+
+bool CodeGenBase::is_component (const AST::Interface& itf) noexcept
+{
+	Interfaces bases = itf.get_all_bases ();
+	for (const auto b : bases) {
+		if (b->qualified_name () == "::Components::CCMObject") {
+			return true;
+			break;
+		}
+	}
+	return false;
+}

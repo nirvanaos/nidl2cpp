@@ -169,7 +169,7 @@ void Servant::end (const Interface& itf)
 	// Servant implementations
 	if (!options ().no_servant) {
 
-		bool ccm_object = define_component (itf);
+		ComponentType component_type = define_component (itf);
 
 		if (itf.interface_kind () != InterfaceKind::ABSTRACT) {
 
@@ -183,7 +183,7 @@ void Servant::end (const Interface& itf)
 			implementation_suffix (itf);
 			implementation_parameters (itf, all_bases);
 
-			if (ccm_object)
+			if (component_type != ComponentType::NOT_COMPONENT)
 				h_ << ",\n"
 				"public CCMObjectImpl <S, " << QName (itf) << ">";
 
@@ -207,15 +207,17 @@ void Servant::end (const Interface& itf)
 
 			// Static implementation
 
-			h_.empty_line ();
-			h_ << "template <class S>\n"
-				"class ServantStatic <S, " << QName (itf) << "> :\n"
-				<< indent
-				<< "public Implementation";
-			implementation_suffix (itf);
-			h_ << "Static ";
-			implementation_parameters (itf, all_bases);
-			h_ << unindent << "\n{};\n";
+			if (component_type != ComponentType::COMPONENT_WITH_CONNECTIONS) {
+				h_.empty_line ();
+				h_ << "template <class S>\n"
+					"class ServantStatic <S, " << QName (itf) << "> :\n"
+					<< indent
+					<< "public Implementation";
+				implementation_suffix (itf);
+				h_ << "Static ";
+				implementation_parameters (itf, all_bases);
+				h_ << unindent << "\n{};\n";
+			}
 		}
 
 		if (itf.interface_kind () != InterfaceKind::PSEUDO) {

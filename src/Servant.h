@@ -29,6 +29,7 @@
 
 #include "CodeGenBase.h"
 #include "Header.h"
+#include <unordered_set>
 
 // Servant code generator
 class Servant : public CodeGenBase
@@ -66,6 +67,15 @@ public:
 	struct CatchBlock
 	{};
 
+	struct BaseImplPOA
+	{
+		BaseImplPOA (const AST::NamedItem& i) :
+			itf (i)
+		{}
+
+		const AST::NamedItem& itf;
+	};
+
 protected:
 	virtual void end (const AST::Root&) override;
 	virtual void leaf (const AST::Include& item) override;
@@ -92,17 +102,16 @@ private:
 
 	void skeleton_ami (const AST::Interface& itf);
 
-	void virtual_operations (const AST::IV_Base& item);
+	typedef std::unordered_set <const AST::Operation*> OperationSet;
+
+	void virtual_operations (const AST::IV_Base& item, const OperationSet* implement_base = nullptr);
 
 	void value_constructors (const char* class_name, const StateMembers& all_members);
 
-	enum class ComponentType {
-		NOT_COMPONENT,
-		COMPONENT,
-		COMPONENT_WITH_CONNECTIONS
-	};
-
-	ComponentType define_component (const AST::Interface& itf);
+	// Component flags
+	typedef unsigned ComponentFlags;
+	static const ComponentFlags CCM_FACETS = 0x01;
+	static const ComponentFlags CCM_RECEPTACLES = 0x02;
 
 	struct Receptacle {
 		std::string name;
@@ -116,9 +125,13 @@ private:
 		std::vector <Receptacle> receptacles;
 	};
 
-	static bool collect_ports (const AST::Interface& itf, Ports& ports);
+	static bool collect_ports (const AST::Interface& itf, Ports& ports, OperationSet* implement_operations);
 
 	static const AST::Operation* find_operation (const AST::Interface& itf, const AST::Identifier& name);
+
+	ComponentFlags define_component (const AST::Interface& itf, OperationSet& implement_operations);
+
+	static bool component_base (const AST::Interface& itf, OperationSet& implement_operations);
 
 private:
 	Header h_;
@@ -128,5 +141,6 @@ private:
 
 Code& operator << (Code& stm, const Servant::ABI2Servant& val);
 Code& operator << (Code& stm, const Servant::CatchBlock&);
+Code& operator << (Code& stm, const Servant::BaseImplPOA& itf);
 
 #endif

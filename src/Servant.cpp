@@ -103,14 +103,34 @@ void Servant::skeleton_end (const IV_Base& item, const char* suffix)
 		<< "}";
 }
 
-void Servant::virtual_operations (const IV_Base& item)
+void Servant::virtual_operations (const IV_Base& itf, const OperationSet* implement_base)
 {
-	for (auto it = item.begin (); it != item.end (); ++it) {
+	for (auto it = itf.begin (); it != itf.end (); ++it) {
 		const Item& item = **it;
 		switch (item.kind ()) {
 		case Item::Kind::OPERATION: {
 			const Operation& op = static_cast <const Operation&> (item);
-			h_ << "virtual " << ServantOp (op, true) << " = 0;\n";
+			h_ << "virtual " << ServantOp (op, true);
+			if (implement_base && implement_base->find (&op) != implement_base->end ()) {
+				
+				// CCM base operation
+				h_ << "\n"
+					"{\n" << indent;
+				if (op.tkind () != Type::Kind::VOID)
+					h_ << "return ";
+				h_ << BaseImplPOA (itf) << op.name () << " (";
+				auto it = op.begin ();
+				if (it != op.end ()) {
+					h_ << (*it)->name ();
+					++it;
+					for (; it != op.end (); ++it) {
+						h_ << ", " << (*it)->name ();
+					}
+				}
+				h_ << ");\n"
+					<< unindent << "}\n";
+			} else
+				h_ << " = 0;\n";
 		} break;
 		case Item::Kind::ATTRIBUTE: {
 			const Attribute& att = static_cast <const Attribute&> (item);
@@ -169,7 +189,8 @@ void Servant::end (const Interface& itf)
 	// Servant implementations
 	if (!options ().no_servant) {
 
-		ComponentType component_type = define_component (itf);
+		OperationSet implement_operations;
+		ComponentFlags component_type = define_component (itf, implement_operations);
 
 		if (itf.interface_kind () != InterfaceKind::ABSTRACT) {
 
@@ -182,42 +203,53 @@ void Servant::end (const Interface& itf)
 				<< "public Implementation";
 			implementation_suffix (itf);
 			implementation_parameters (itf, all_bases);
-
-			if (component_type != ComponentType::NOT_COMPONENT)
-				h_ << ",\n"
-				"public CCMObjectImpl <S, " << QName (itf) << ">";
-
 			h_ << "\n"
 				<< unindent;
 			if (itf.interface_kind () != InterfaceKind::PSEUDO) {
-				h_ << "{\n"
-				"protected:\n"
-				<< indent
-				<< "Servant (Object::_ptr_type comp = nullptr) :\n"
-				<< indent
-				<< "Implementation";
+				h_ << "{\n" << indent;
+
+				if (component_type) {
+					h_ << unindent
+						<< "public:\n"
+						<< indent;
+
+					if (component_type & CCM_FACETS)
+						h_ << "using InterfaceImpl <S, " << QName (itf) << ">::provide_facet;\n\n";
+
+					if (component_type & CCM_RECEPTACLES) {
+						h_ << "using InterfaceImpl <S, " << QName (itf) << ">::connect;\n"
+							"using InterfaceImpl <S, " << QName (itf) << ">::disconnect;\n\n";
+					}
+
+					h_ << std::endl;
+				}
+
+				h_ << unindent
+					<< "protected:\n"
+					<< indent
+					<< "Servant (Object::_ptr_type comp = nullptr) :\n"
+					<< indent
+					<< "Implementation";
 				implementation_suffix (itf);
 				implementation_parameters (itf, all_bases);
 				h_ << " (comp)\n"
 					<< unindent
-					<< "{}\n"
-					<< unindent << "};\n";
+					<< "{}\n";
+
+				h_ << unindent << "};\n";
 			} else
 				h_ << "{};\n";
 
 			// Static implementation
-
-			if (component_type != ComponentType::COMPONENT_WITH_CONNECTIONS) {
-				h_.empty_line ();
-				h_ << "template <class S>\n"
-					"class ServantStatic <S, " << QName (itf) << "> :\n"
-					<< indent
-					<< "public Implementation";
-				implementation_suffix (itf);
-				h_ << "Static ";
-				implementation_parameters (itf, all_bases);
-				h_ << unindent << "\n{};\n";
-			}
+			h_.empty_line ();
+			h_ << "template <class S>\n"
+				"class ServantStatic <S, " << QName (itf) << "> :\n"
+				<< indent
+				<< "public Implementation";
+			implementation_suffix (itf);
+			h_ << "Static ";
+			implementation_parameters (itf, all_bases);
+			h_ << unindent << "\n{};\n";
 		}
 
 		if (itf.interface_kind () != InterfaceKind::PSEUDO) {
@@ -255,11 +287,10 @@ void Servant::end (const Interface& itf)
 			for (auto b : itf.bases ()) { // Direct bases only
 				h_ << "public virtual ServantPOA <" << QName (*b) << ">,\n";
 			}
-			h_ << "public InterfaceImpl <ServantPOA <" << QName (itf) << ">, "
-				<< QName (itf) << ">\n"
+			h_ << "public InterfaceImpl <ServantPOA <" << QName (itf) << ">, " << QName (itf) << ">\n"
 				<< unindent
 				<< "{\n"
-				"public:\n"
+				<< "public:\n"
 				<< indent
 				<< "typedef " << QName (itf) << " PrimaryInterface;\n\n";
 
@@ -285,7 +316,25 @@ void Servant::end (const Interface& itf)
 
 			h_.empty_line ();
 
-			virtual_operations (itf);
+			virtual_operations (itf, &implement_operations);
+
+			if (component_type & CCM_FACETS) {
+				h_ << "virtual Type <CORBA::Object>::VRet provide_facet (const Type < ::Components::FeatureName>::Var& name) override\n"
+					"{\n" << indent <<
+					"return " << BaseImplPOA (itf) << "provide_facet (name);\n"
+					<< unindent << "}\n";
+			}
+
+			if (component_type & CCM_RECEPTACLES) {
+				h_ << "virtual Type < ::Components::Cookie>::VRet connect (const Type < ::Components::FeatureName>::Var& name, Type <CORBA::Object>::ConstRef connection) override\n"
+					"{\n" << indent <<
+					"return " << BaseImplPOA (itf) << "connect (name, connection);\n"
+					<< unindent << "}\n"
+					"virtual Type <CORBA::Object>::VRet disconnect (const Type < ::Components::FeatureName>::Var& name, Type < ::Components::Cookie>::ConstRef ck) override\n"
+					"{\n" << indent <<
+					"return " << BaseImplPOA (itf) << "disconnect (name, ck);\n"
+					<< unindent << "}\n";
+			}
 
 			if (itf.interface_kind () != InterfaceKind::ABSTRACT) {
 				h_
@@ -1258,7 +1307,7 @@ void Servant::leaf (const Constant& c)
 
 const Operation* Servant::find_operation (const Interface& itf, const Identifier& name)
 {
-	for (const auto item : itf) {
+	for (const auto& item : itf) {
 		if (item->kind () == Item::Kind::OPERATION) {
 			const Operation& op = static_cast <const Operation&> (*item);
 			if (op.name () == name)
@@ -1297,4 +1346,9 @@ Code& operator << (Code& stm, const Servant::CatchBlock&)
 		<< "set_unknown_exception (_env);\n"
 		<< unindent
 		<< "}\n";
+}
+
+Code& operator << (Code& stm, const Servant::BaseImplPOA& itf)
+{
+	return stm << "InterfaceImpl <ServantPOA <" << QName (itf.itf) << ">, " << QName (itf.itf) << ">::";
 }

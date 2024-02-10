@@ -28,12 +28,12 @@
 
 using namespace AST;
 
-bool Servant::collect_ports (const AST::Interface& itf, Ports& ports)
+bool Servant::collect_ports (const AST::Interface& itf, Ports& ports, OperationSet* implement_operations)
 {
 	if (!is_component (itf))
 		return false;
 
-	for (const auto item : itf) {
+	for (const auto& item : itf) {
 		if (item->kind () == Item::Kind::OPERATION) {
 			const Operation& op = static_cast <const Operation&> (*item);
 			if (op.empty ()) {
@@ -57,6 +57,12 @@ bool Servant::collect_ports (const AST::Interface& itf, Ports& ports)
 									if (get_connection && static_cast <const Type&> (conn_itf_type) == *get_connection
 										&& get_connection->empty ()) {
 										ports.receptacles.push_back ({ std::move (receptacle), &conn_itf_type.named_type (), nullptr });
+
+										if (implement_operations) {
+											implement_operations->insert (&op);
+											implement_operations->insert (disconnect);
+											implement_operations->insert (get_connection);
+										}
 									}
 								}
 							} else if (is_named_type (op, "::Components::Cookie")) {
@@ -77,6 +83,12 @@ bool Servant::collect_ports (const AST::Interface& itf, Ports& ports)
 														&& is_named_type (*connection_struct [1], "::Components::Cookie")
 														) {
 														ports.receptacles.push_back ({ std::move (receptacle), &conn_itf_type.named_type (), &get_connections_ret });
+
+														if (implement_operations) {
+															implement_operations->insert (&op);
+															implement_operations->insert (disconnect);
+															implement_operations->insert (get_connections);
+														}
 													}
 												}
 											}
@@ -93,129 +105,88 @@ bool Servant::collect_ports (const AST::Interface& itf, Ports& ports)
 	return true;
 }
 
-Servant::ComponentType Servant::define_component (const AST::Interface& itf)
+bool Servant::component_base (const AST::Interface& itf, OperationSet& implement_operations)
 {
-	Ports ports;
-	if (collect_ports (itf, ports)) {
+	// Operations implemented by the CCM_ObjectBase
+	static const char* const object_base_ops [] = {
+		"get_ccm_home",
+		"configuration_complete",
+		"remove",
+		nullptr
+	};
 
-		// Generate CCMObjectImpl
+	// Operations implemented by the CCM_NavigationBase
+	static const char* const navigation_base_ops [] = {
+		"provide_facet",
+		nullptr
+	};
 
-		h_ << empty_line
-			<< "template <class S>\n"
-			"class CCMObjectImpl <S, " << QName (itf) << "> : public CCMObjectImplBase\n"
-			"{\n"
-			"public:\n"
-			<< indent;
+	// Operations implemented by the CCM_ReceptaclesBase
+	static const char* const receptacles_base_ops [] = {
+		"connect",
+		"disconnect",
+		nullptr
+	};
 
-		if (!ports.facets.empty ()) {
-			h_ << "Type <Object>::VRet provide_facet (const ::Components::FeatureName & name)\n"
-				"{\n"
-				<< indent;
+	static const struct BaseOp {
+		const char* qname;
+		const char* const* ops;
+	} base_ops [] = {
+		{ "::Components::CCMObject", object_base_ops },
+		{ "::Components::Receptacles", receptacles_base_ops },
+		{ "::Components::Navigation", navigation_base_ops }
+	};
 
-			for (const auto& name : ports.facets) {
-				h_ << "if (name == \"" << name << "\")\n"
-					<< indent
-					<< "return static_cast <S&> (*this).provide_" << name << " ();\n"
-					<< unindent
-					<< "else ";
+	const BaseOp* p = nullptr;
+	{
+		auto qn = itf.qualified_name ();
+		for (const auto& b : base_ops) {
+			if (qn == b.qname) {
+				p = &b;
+				break;
 			}
+		}
+	}
 
-			h_ << indent
-				<< "\n"
-				"return CCMObjectImplBase::provide_facet (name);\n"
-				<< unindent
-				<< unindent << "}\n\n";
+	if (p) {
+		for (const char* const* it = p->ops;; ++it ) {
+			const char* name = *it;
+			if (!name)
+				break;
+			const Operation* op = find_operation (itf, name);
+			assert (op);
+			implement_operations.insert (op);
 		}
 
+		return true;
+	}
+
+	return false;
+}
+
+Servant::ComponentFlags Servant::define_component (const AST::Interface& itf, OperationSet& implement_operations)
+{
+	if (component_base (itf, implement_operations))
+		return 0;
+
+	Ports ports;
+	if (collect_ports (itf, ports, &implement_operations)) {
+
+		ComponentFlags flags = 0;
+
+		// CCM_ObjectConnections
+		bool connections = false;
 		if (!ports.receptacles.empty ()) {
-			h_ << "Type < ::Components::Cookie>::VRet connect (const ::Components::FeatureName& name, "
-				"Object::_ptr_type connection)\n"
+
+			connections = true;
+			flags |= CCM_RECEPTACLES;
+
+			h_ << empty_line
+				<< "template <>\n"
+				"class CCM_ObjectConnections <" << QName (itf) << ">\n"
 				"{\n"
-				<< indent
-				<< "Type < ::Components::Cookie>::Var ret;\n";
-
-			for (const auto& receptacle : ports.receptacles) {
-				h_ << "if (name == \"" << receptacle.name << "\")\n"
-					<< indent;
-
-				if (receptacle.multi_connections)
-					h_ << "ret = ";
-
-				h_ << "static_cast <S&> (*this).connect_" << receptacle.name << " ("
-					<< QName (*receptacle.conn_type) << "::_narrow (connection));\n"
-					<< unindent
-					<< "else ";
-			}
-
-			h_ << indent
-				<< "\n"
-				"ret = CCMObjectImplBase::connect (name, connection);\n"
-				<< unindent;
-
-			if (options ().legacy) {
-				h_ << "#ifdef LEGACY_CORBA_CPP\n"
-					"return ret._retn ();\n"
-					"#else\n";
-			}
-
-			h_ << "return ret;\n";
-
-			if (options ().legacy)
-				h_ << "#endif\n";
-
-			h_ << unindent << "}\n"
-
-				"Type <Object>::VRet disconnect (const ::Components::FeatureName& name, ::Components::Cookie::_ptr_type ck)\n"
-				"{\n"
+				"public:\n"
 				<< indent;
-
-			for (const auto& receptacle : ports.receptacles) {
-				h_ << "if (name == \"" << receptacle.name << "\") {\n"
-					<< indent;
-
-				if (receptacle.multi_connections)
-					h_ << "if (!ck)\n"
-					<< indent
-					<< "throw Components::CookieRequired ();\n"
-					<< unindent;
-
-				h_ << "return static_cast <S&> (*this).disconnect_" << receptacle.name;
-
-				if (receptacle.multi_connections)
-					h_ << " (ck);\n";
-				else
-					h_ << " ();\n";
-
-				h_ << unindent
-					<< "} else ";
-			}
-
-			h_ << indent
-				<< "\n"
-				"return CCMObjectImplBase::disconnect (name, ck);\n"
-				<< unindent
-				<< unindent << "}\n\n";
-
-			/* Not used in CCM_LW
-			h_ <<	"::Components::ConnectionDescriptions get_connections (const ::Components::FeatureName& name)\n"
-				"{\n"
-				<< indent
-				<< "::Components::ConnectionDescriptions ret;\n";
-			for (const auto& receptacle : receptacles) {
-				h_ << "if (name == \"" << receptacle.name << "\")\n"
-					<< indent
-					<< receptacle.name << "_.get_connections (ret);\n";
-				h_ << unindent
-					<< "else ";
-			}
-
-			h_ << indent
-				<< "\n"
-				"return CCMObjectImplBase::get_connections (name);\n"
-				<< unindent
-				<< "return ret;\n"
-				<< unindent << "}\n";
-				*/
 
 			for (const auto& receptacle : ports.receptacles) {
 				if (receptacle.multi_connections)
@@ -246,7 +217,7 @@ Servant::ComponentType Servant::define_component (const AST::Interface& itf)
 						"{\n" << indent
 						<< *receptacle.multi_connections << " ret;\n"
 						"receptacle_"
-						<< receptacle.name << "_.get_connections (reinterpret_cast <ConnectionsBase&> (ret));\n"
+						<< receptacle.name << "_.get_connections (reinterpret_cast <Connections&> (ret));\n"
 						"return ret;\n"
 						<< unindent << "}\n";
 				} else {
@@ -274,17 +245,166 @@ Servant::ComponentType Servant::define_component (const AST::Interface& itf)
 
 			for (const auto& receptacle : ports.receptacles) {
 				if (receptacle.multi_connections)
-					h_ << "Receptacles <";
+					h_ << "ReceptacleMultiplex <";
 				else
-					h_ << "Receptacle <";
+					h_ << "ReceptacleSimplex <";
 				h_ << QName (*receptacle.conn_type) << "> receptacle_"
 					<< receptacle.name << "_;\n";
 			}
+
+			h_ << unindent << "};\n\n";
 		}
 
-		h_ << unindent << "};\n";
+		// CCM_FACETS flag is set when:
+		// 1. Interface has facets.
+		// or
+		// 2. More than one of bases have facet.
+		if (!ports.facets.empty ())
+			flags |= CCM_FACETS;
 
-		return ports.receptacles.empty () ? ComponentType::COMPONENT : ComponentType::COMPONENT_WITH_CONNECTIONS;
+		// Collect ports from all bases
+		{
+			Interfaces bases = itf.get_all_bases ();
+			for (const auto b : bases) {
+				size_t sz_fac = ports.facets.size ();
+				size_t sz_rec = ports.receptacles.size ();
+				collect_ports (*b, ports, nullptr);
+				if (sz_fac && ports.facets.size () > sz_fac)
+					flags |= CCM_FACETS;
+				if (sz_rec && ports.receptacles.size () > sz_rec)
+					flags |= CCM_RECEPTACLES;
+			}
+		}
+
+		// Generate CCM_ObjectFeatures
+		if (flags) {
+			h_ << empty_line
+				<< "template <class S>\n"
+				"class CCM_ObjectFeatures <S, " << QName (itf) << ">\n"
+				"{\n"
+				"public:\n"
+				<< indent;
+
+			if (flags & CCM_FACETS) {
+				h_ << "Type <Object>::VRet provide_facet (const ::Components::FeatureName & name)\n"
+					"{\n"
+					<< indent
+					<< "Type <Object>::Var ret;\n";
+
+				for (const auto& name : ports.facets) {
+					h_ << "if (name == \"" << name << "\")\n"
+						<< indent
+						<< "ret = interface2object (static_cast <S&> (*this).provide_" << name << " ());\n"
+						<< unindent
+						<< "else ";
+				}
+
+				h_ << indent
+					<< "\n"
+					"ret = CCM_NavigationBase::provide_facet (name);\n"
+					<< unindent;
+				if (options ().legacy) {
+					h_ << "#ifdef LEGACY_CORBA_CPP\n"
+						"return ret._retn ();\n"
+						"#else\n";
+				}
+
+				h_ << "return ret;\n";
+
+				if (options ().legacy)
+					h_ << "#endif\n";
+
+				h_ << unindent << "}\n\n";
+			}
+
+			if (flags & CCM_RECEPTACLES) {
+				h_ << "Type < ::Components::Cookie>::VRet connect (const ::Components::FeatureName& name, "
+					"Object::_ptr_type connection)\n"
+					"{\n"
+					<< indent
+					<< "Type < ::Components::Cookie>::Var ret;\n";
+
+				for (const auto& receptacle : ports.receptacles) {
+					h_ << "if (name == \"" << receptacle.name << "\")\n"
+						<< indent;
+
+					if (receptacle.multi_connections)
+						h_ << "ret = ";
+
+					h_ << "static_cast <S&> (*this).connect_" << receptacle.name << " ("
+						<< QName (*receptacle.conn_type) << "::_narrow (connection));\n"
+						<< unindent
+						<< "else ";
+				}
+
+				h_ << indent
+					<< "\n"
+					"ret = CCM_ReceptaclesBase::connect (name, connection);\n"
+					<< unindent;
+
+				if (options ().legacy) {
+					h_ << "#ifdef LEGACY_CORBA_CPP\n"
+						"return ret._retn ();\n"
+						"#else\n";
+				}
+
+				h_ << "return ret;\n";
+
+				if (options ().legacy)
+					h_ << "#endif\n";
+
+				h_ << unindent << "}\n"
+
+					"Type <Object>::VRet disconnect (const ::Components::FeatureName& name, ::Components::Cookie::_ptr_type ck)\n"
+					"{\n"
+					<< indent;
+
+				for (const auto& receptacle : ports.receptacles) {
+					h_ << "if (name == \"" << receptacle.name << "\") {\n"
+						<< indent;
+
+					if (receptacle.multi_connections)
+						h_ << "if (!ck)\n"
+						<< indent
+						<< "throw Components::CookieRequired ();\n"
+						<< unindent;
+
+					h_ << "return interface2object (static_cast <S&> (*this).disconnect_" << receptacle.name;
+
+					if (receptacle.multi_connections)
+						h_ << " (ck));\n";
+					else
+						h_ << " ());\n";
+
+					h_ << unindent
+						<< "} else ";
+				}
+
+				h_ << indent
+					<< "\n"
+					"return CCM_ReceptaclesBase::disconnect (name, ck);\n"
+					<< unindent
+					<< unindent << "}\n\n";
+			}
+
+			h_ << unindent << "};\n\n"
+
+				// InterfaceImpl
+
+				"template <class S>\n"
+				"class InterfaceImpl <S, " << QName (itf) << "> :\n"
+				<< indent
+				<< "public InterfaceImplBase <S, " << QName (itf) << '>';
+			if (connections)
+				h_ << ",\n"
+				"public CCM_ObjectConnections <" << QName (itf) << '>';
+			h_ << ",\n"
+				"public CCM_ObjectFeatures <S, " << QName (itf) << ">\n"
+				<< unindent
+				<< "{};\n";
+		}
+
+		return flags;
 	} else
-		return ComponentType::NOT_COMPONENT;
+		return 0;
 }

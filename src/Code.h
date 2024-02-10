@@ -202,4 +202,278 @@ inline Code& empty_line (Code& stm)
 	return stm;
 }
 
+struct QName
+{
+	QName (const AST::NamedItem& ni) :
+		item (ni)
+	{}
+
+	const AST::NamedItem& item;
+};
+
+Code& operator << (Code& stm, const QName& qn);
+
+struct ParentName
+{
+	ParentName (const AST::NamedItem& ni) :
+		item (ni)
+	{}
+
+	const AST::NamedItem& item;
+};
+
+Code& operator << (Code& stm, const ParentName& qn);
+
+struct TypePrefix
+{
+	TypePrefix (const AST::Type& t) :
+		type (t)
+	{}
+
+	const AST::Type& type;
+};
+
+Code& operator << (Code& stm, const TypePrefix& t);
+
+struct ABI_ret
+{
+	ABI_ret (const AST::Type& t, bool _byref = false) :
+		type (t),
+		byref (_byref)
+	{}
+
+	const AST::Type& type;
+	bool byref;
+};
+
+Code& operator << (Code& stm, const ABI_ret& t);
+
+struct ABI_param
+{
+	ABI_param (const AST::Parameter& p) :
+		type (p),
+		att (p.attribute ())
+	{}
+
+	ABI_param (const AST::Type& t, AST::Parameter::Attribute pa = AST::Parameter::Attribute::IN) :
+		type (t),
+		att (pa)
+	{}
+
+	const AST::Type& type;
+	const AST::Parameter::Attribute att;
+};
+
+Code& operator << (Code& stm, const ABI_param& t);
+
+struct Var
+{
+	Var (const AST::Type& t) :
+		type (t)
+	{}
+
+	const AST::Type& type;
+};
+
+Code& operator << (Code& stm, const Var& t);
+
+struct VRet
+{
+	VRet (const AST::Type& t) :
+		type (t)
+	{}
+
+	const AST::Type& type;
+};
+
+Code& operator << (Code& stm, const VRet& t);
+
+struct ConstRef
+{
+	ConstRef (const AST::Type& t) :
+		type (t)
+	{}
+
+	const AST::Type& type;
+};
+
+Code& operator << (Code& stm, const ConstRef& t);
+
+struct TC_Name
+{
+	TC_Name (const AST::NamedItem& ni) :
+		item (ni)
+	{}
+
+	const AST::NamedItem& item;
+};
+
+Code& operator << (Code& stm, const TC_Name& t);
+
+struct ServantParam
+{
+	ServantParam (const AST::Parameter& p, bool v = false) :
+		type (p),
+		att (p.attribute ()),
+		virt (v)
+	{}
+
+	ServantParam (const AST::Attribute& t, bool v = false) :
+		type (t),
+		att (AST::Parameter::Attribute::IN),
+		virt (v)
+	{}
+
+	ServantParam (const AST::Type& t) :
+		type (t),
+		att (AST::Parameter::Attribute::IN),
+		virt (false)
+	{}
+
+	const AST::Type& type;
+	const AST::Parameter::Attribute att;
+	const bool virt;
+};
+
+Code& operator << (Code& stm, const ServantParam& t);
+
+struct ServantOp
+{
+	ServantOp (const AST::Operation& o, bool v = false) :
+		op (o),
+		virt (v)
+	{}
+
+	const AST::Operation& op;
+	const bool virt;
+};
+
+Code& operator << (Code& stm, const ServantOp& t);
+
+struct Namespace
+{
+	Namespace (const char* ns) :
+		prefix (ns)
+	{}
+
+	const char* prefix;
+};
+
+inline
+Code& operator << (Code& stm, const Namespace& ns)
+{
+	stm.namespace_prefix (ns.prefix);
+	return stm;
+}
+
+struct ItemNamespace
+{
+	ItemNamespace (const AST::NamedItem& ni) :
+		item (ni)
+	{}
+
+	const AST::NamedItem& item;
+};
+
+inline
+Code& operator << (Code& stm, const ItemNamespace& ns)
+{
+	stm.namespace_prefix (ns.item);
+	return stm;
+}
+
+struct MemberType
+{
+	MemberType (const AST::Type& t) :
+		type (t)
+	{}
+
+	const AST::Type& type;
+};
+
+Code& operator << (Code& stm, const MemberType& t);
+
+struct MemberVariable
+{
+	MemberVariable (const AST::Member& m) :
+		member (m)
+	{}
+
+	const AST::Member& member;
+};
+
+Code& operator << (Code& stm, const MemberVariable& m);
+
+struct Accessors
+{
+	Accessors (const AST::Member& m) :
+		member (m)
+	{}
+
+	const AST::Member& member;
+};
+
+Code& operator << (Code& stm, const Accessors& a);
+
+struct MemberDefault
+{
+	MemberDefault (const AST::Member& m, const char* pref) :
+		member (m),
+		prefix (pref)
+	{}
+
+	const AST::Member& member;
+	const char* prefix;
+};
+
+Code& operator << (Code& stm, const MemberDefault& val);
+
+struct MemberInit
+{
+	MemberInit (const AST::Member& m, const char* pref) :
+		member (m),
+		prefix (pref)
+	{}
+
+	const AST::Member& member;
+	const char* prefix;
+};
+
+Code& operator << (Code& stm, const MemberInit& val);
+
+struct AMI_ParametersABI
+{
+	AMI_ParametersABI (const AST::Operation& operation) :
+		op (operation)
+	{}
+
+	const AST::Operation& op;
+};
+
+Code& operator << (Code& stm, const AMI_ParametersABI& op);
+
+struct AMI_Parameters
+{
+	AMI_Parameters (const AST::Operation& operation) :
+		op (operation)
+	{}
+
+	const AST::Operation& op;
+};
+
+Code& operator << (Code& stm, const AMI_ParametersABI& op);
+
+struct TypeCodeName
+{
+	TypeCodeName (const AST::NamedItem& ni) :
+		item (ni)
+	{}
+
+	const AST::NamedItem& item;
+};
+
+Code& operator << (Code& stm, const TypeCodeName& it);
+
+Code& operator << (Code& stm, const AST::StateMember& m);
+
 #endif

@@ -151,11 +151,11 @@ bool Servant::define_component (const AST::Interface& itf)
 				h_ << "if (name == \"" << receptacle.name << "\")\n"
 					<< indent;
 
-				h_ << "static_cast <S&> (*this).connect_" << receptacle.name << " ("
-					<< QName (*receptacle.conn_type) << "::_narrow (connection)";
 				if (receptacle.multi_connections)
-					h_ << ", ret";
-				h_ << ");\n"
+					h_ << "ret = ";
+
+				h_ << "static_cast <S&> (*this).connect_" << receptacle.name << " ("
+					<< QName (*receptacle.conn_type) << "::_narrow (connection));\n"
 					<< unindent
 					<< "else ";
 			}
@@ -183,9 +183,16 @@ bool Servant::define_component (const AST::Interface& itf)
 				<< indent;
 
 			for (const auto& receptacle : receptacles) {
-				h_ << "if (name == \"" << receptacle.name << "\")\n"
+				h_ << "if (name == \"" << receptacle.name << "\") {\n"
+					<< indent;
+
+				if (receptacle.multi_connections)
+					h_ << "if (!ck)\n"
 					<< indent
-					<< "return static_cast <S&> (*this).disconnect_" << receptacle.name;
+					<< "throw Components::CookieRequired ();\n"
+					<< unindent;
+
+				h_ << "return static_cast <S&> (*this).disconnect_" << receptacle.name;
 
 				if (receptacle.multi_connections)
 					h_ << " (ck);\n";
@@ -193,7 +200,7 @@ bool Servant::define_component (const AST::Interface& itf)
 					h_ << " ();\n";
 
 				h_ << unindent
-					<< "else ";
+					<< "} else ";
 			}
 
 			h_ << indent
@@ -233,7 +240,7 @@ bool Servant::define_component (const AST::Interface& itf)
 					"{\n" << indent;
 				if (receptacle.multi_connections)
 					h_ << "return ";
-				h_ << receptacle.name << "_.connect (connection);\n"
+				h_ << "receptacle_" << receptacle.name << "_.connect (connection);\n"
 					<< unindent << "}\n"
 
 					<< "Type <" << QName (*receptacle.conn_type) << ">::VRet disconnect_" << receptacle.name << " (";
@@ -241,7 +248,7 @@ bool Servant::define_component (const AST::Interface& itf)
 					h_ << "::Components::Cookie::_ptr_type ck";
 				h_ << ")\n"
 					"{\n" << indent
-					<< "return " << receptacle.name << "_.disconnect (";
+					<< "return receptacle_" << receptacle.name << "_.disconnect (";
 				if (receptacle.multi_connections)
 					h_ << "ck";
 				h_ << ");\n"
@@ -251,6 +258,7 @@ bool Servant::define_component (const AST::Interface& itf)
 					h_ << *receptacle.multi_connections << " get_connections_" << receptacle.name << " ()\n"
 						"{\n" << indent
 						<< *receptacle.multi_connections << " ret;\n"
+						"receptacle_"
 						<< receptacle.name << "_.get_connections (reinterpret_cast <ConnectionsBase&> (ret));\n"
 						"return ret;\n"
 						<< unindent << "}\n";
@@ -258,19 +266,31 @@ bool Servant::define_component (const AST::Interface& itf)
 					h_ << "Type <" << QName (*receptacle.conn_type) << ">::VRet get_connection_" << receptacle.name
 						<< " ()\n"
 						"{\n" << indent
-						<< "return " << receptacle.name << "_.get_connection ();\n"
+						<< "return receptacle_" << receptacle.name << "_.get_connection ();\n"
 						<< unindent << "}\n";
 				}
 				h_ << std::endl;
 			}
 
-			h_ << unindent << "protected:\n" << indent;
+			for (const auto& receptacle : receptacles) {
+				if (receptacle.multi_connections)
+					h_ << "const std::vector <I_ref <" << QName (*receptacle.conn_type) << "> >& receptacle_";
+				else
+					h_ << "I_ptr <" << QName (*receptacle.conn_type) << "> receptacle_";
+				h_ << receptacle.name << " () const noexcept\n"
+					"{\n" << indent
+					<< "return receptacle_" << receptacle.name << "_;\n"
+					<< unindent << "}\n";
+			}
+
+			h_ << unindent << "\nprivate:\n" << indent;
+
 			for (const auto& receptacle : receptacles) {
 				if (receptacle.multi_connections)
 					h_ << "Receptacles <";
 				else
 					h_ << "Receptacle <";
-				h_ << QName (*receptacle.conn_type) << "> "
+				h_ << QName (*receptacle.conn_type) << "> receptacle_"
 					<< receptacle.name << "_;\n";
 			}
 		}

@@ -96,6 +96,10 @@ private:
 
 	void value_constructors (const char* class_name, const StateMembers& all_members);
 
+	bool define_component (const AST::Interface& itf);
+
+	const AST::Operation* find_operation (const AST::Interface& itf, const AST::Identifier& name);
+
 private:
 	Header h_;
 	std::vector <std::string> epv_;

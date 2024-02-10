@@ -99,6 +99,9 @@ public:
 	static bool is_native (const Members& members);
 	static bool is_native (const AST::Raises& raises);
 	static bool is_boolean (const AST::Type& type);
+	static bool is_object (const AST::Type& type);
+	static bool is_native_interface (const AST::NamedItem& type);
+	static bool is_servant (const AST::NamedItem& type);
 
 	static bool is_sequence (const AST::Type& type)
 	{
@@ -108,6 +111,9 @@ public:
 	static bool is_aligned_struct (const AST::Type& type);
 
 	static bool is_bounded (const AST::Type& type);
+
+	static bool is_named_type (const AST::Type& type, const char* qualified_name);
+
 	void init_union (Code& stm, const AST::UnionElement& init_el, const char* prefix = "");
 
 	static bool async_supported (const AST::Interface& itf) noexcept;
@@ -161,14 +167,13 @@ protected:
 
 	static std::string const_id (const AST::Constant& c);
 
+	static std::string skip_prefix (const AST::Identifier& id, const char* prefix);
+
 private:
 	static bool pred (const char* l, const char* r)
 	{
 		return strcmp (l, r) < 0;
 	}
-
-	static bool is_native_interface (const AST::NamedItem& type);
-	static bool is_servant (const AST::NamedItem& type);
 
 	static void get_all_bases (const AST::ValueType& vt,
 		std::unordered_set <const AST::IV_Base*>& bset, Bases& bvec);

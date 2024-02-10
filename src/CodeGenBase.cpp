@@ -359,6 +359,26 @@ bool CodeGenBase::is_complex_type(const Type& type)
 	return false;
 }
 
+bool CodeGenBase::is_object (const AST::Type& type)
+{
+	const Type& t = type.dereference_type ();
+	if (t.tkind () == Type::Kind::NAMED_TYPE) {
+		const NamedItem& item = t.named_type ();
+		InterfaceKind ik (InterfaceKind::ABSTRACT);
+		switch (item.kind ()) {
+		case Item::Kind::INTERFACE:
+			ik = static_cast <const Interface&> (item).interface_kind ();
+			break;
+		case Item::Kind::INTERFACE_DECL:
+			ik = static_cast <const InterfaceDecl&> (item).interface_kind ();
+			break;
+		}
+		return ik.interface_kind () == InterfaceKind::UNCONSTRAINED
+			|| ik.interface_kind () == InterfaceKind::LOCAL;
+	}
+	return false;
+}
+
 bool CodeGenBase::is_native_interface (const Type& type)
 {
 	const Type& t = type.dereference_type ();
@@ -735,6 +755,13 @@ bool CodeGenBase::is_custom (const Interface& itf) noexcept
 	return false;
 }
 
+bool CodeGenBase::is_named_type (const AST::Type& type, const char* qualified_name)
+{
+	const Type& t = type.dereference_type ();
+	return t.tkind () == Type::Kind::NAMED_TYPE
+		&& t.named_type ().qualified_name () == qualified_name;
+}
+
 bool CodeGenBase::async_supported (const Interface& itf) noexcept
 {
 	if (itf.interface_kind () == InterfaceKind::UNCONSTRAINED) {
@@ -769,6 +796,15 @@ std::string CodeGenBase::const_id (const Constant& c)
 		name += *n;
 	}
 	return name;
+}
+
+std::string CodeGenBase::skip_prefix (const AST::Identifier& id, const char* prefix)
+{
+	size_t cc = strlen (prefix);
+	if (id.length () > cc && id.starts_with (prefix))
+		return id.substr (cc);
+	else
+		return std::string ();
 }
 
 Code& operator << (Code& stm, const QName& qn)

@@ -169,6 +169,8 @@ void Servant::end (const Interface& itf)
 	// Servant implementations
 	if (!options ().no_servant) {
 
+		bool ccm_object = define_component (itf);
+
 		if (itf.interface_kind () != InterfaceKind::ABSTRACT) {
 
 			// Standard implementation
@@ -180,6 +182,11 @@ void Servant::end (const Interface& itf)
 				<< "public Implementation";
 			implementation_suffix (itf);
 			implementation_parameters (itf, all_bases);
+
+			if (ccm_object)
+				h_ << ",\n"
+				"public CCMObjectImpl <S, " << QName (itf) << ">";
+
 			h_ << "\n"
 				<< unindent;
 			if (itf.interface_kind () != InterfaceKind::PSEUDO) {
@@ -1245,6 +1252,18 @@ void Servant::leaf (const Constant& c)
 		h_ << "template <> const char StaticId <" << ItemNamespace (c) << "Static_" << static_cast <const std::string&> (c.name ())
 			<< ">::id [] = \"" << const_id (c) << "\";\n";
 	}
+}
+
+const Operation* Servant::find_operation (const Interface& itf, const Identifier& name)
+{
+	for (const auto item : itf) {
+		if (item->kind () == Item::Kind::OPERATION) {
+			const Operation& op = static_cast <const Operation&> (*item);
+			if (op.name () == name)
+				return &op;
+		}
+	}
+	return nullptr;
 }
 
 Code& operator << (Code& stm, const Servant::ABI2Servant& val)

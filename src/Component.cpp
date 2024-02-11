@@ -28,7 +28,7 @@
 
 using namespace AST;
 
-bool Servant::collect_ports (const AST::Interface& itf, Ports& ports, OperationSet* implement_operations)
+bool Servant::collect_ports (const Interface& itf, Ports& ports, OperationSet* implement_operations)
 {
 	if (!is_component (itf))
 		return false;
@@ -105,66 +105,68 @@ bool Servant::collect_ports (const AST::Interface& itf, Ports& ports, OperationS
 	return true;
 }
 
-bool Servant::component_base (const AST::Interface& itf, OperationSet& implement_operations)
+bool Servant::component_base (const Interface& itf, OperationSet& implement_operations)
 {
-	// Operations implemented by the CCM_ObjectBase
-	static const char* const object_base_ops [] = {
-		"get_ccm_home",
-		"configuration_complete",
-		"remove",
-		nullptr
-	};
+	const ItemScope* parent = itf.parent ();
+	if (parent && !parent->parent () && parent->name () == "Components") {
 
-	// Operations implemented by the CCM_NavigationBase
-	static const char* const navigation_base_ops [] = {
-		"provide_facet",
-		nullptr
-	};
+		// Operations implemented by the CCM_ObjectBase
+		static const char* const object_base_ops [] = {
+			"get_ccm_home",
+			"configuration_complete",
+			"remove",
+			nullptr
+		};
 
-	// Operations implemented by the CCM_ReceptaclesBase
-	static const char* const receptacles_base_ops [] = {
-		"connect",
-		"disconnect",
-		nullptr
-	};
+		// Operations implemented by the CCM_NavigationBase
+		static const char* const navigation_base_ops [] = {
+			"provide_facet",
+			nullptr
+		};
 
-	static const struct BaseOp {
-		const char* qname;
-		const char* const* ops;
-	} base_ops [] = {
-		{ "::Components::CCMObject", object_base_ops },
-		{ "::Components::Receptacles", receptacles_base_ops },
-		{ "::Components::Navigation", navigation_base_ops }
-	};
+		// Operations implemented by the CCM_ReceptaclesBase
+		static const char* const receptacles_base_ops [] = {
+			"connect",
+			"disconnect",
+			nullptr
+		};
 
-	const BaseOp* p = nullptr;
-	{
-		auto qn = itf.qualified_name ();
-		for (const auto& b : base_ops) {
-			if (qn == b.qname) {
-				p = &b;
-				break;
+		static const struct BaseOp {
+			const char* qname;
+			const char* const* ops;
+		} base_ops [] = {
+			{ "CCMObject", object_base_ops },
+			{ "Receptacles", receptacles_base_ops },
+			{ "Navigation", navigation_base_ops }
+		};
+
+		const BaseOp* p = nullptr;
+		{
+			for (const auto& b : base_ops) {
+				if (itf.name () == b.qname) {
+					p = &b;
+					break;
+				}
 			}
 		}
-	}
 
-	if (p) {
-		for (const char* const* it = p->ops;; ++it ) {
-			const char* name = *it;
-			if (!name)
-				break;
-			const Operation* op = find_operation (itf, name);
-			assert (op);
-			implement_operations.insert (op);
+		if (p) {
+			for (const char* const* it = p->ops;; ++it) {
+				const char* name = *it;
+				if (!name)
+					break;
+				const Operation* op = find_operation (itf, name);
+				assert (op);
+				implement_operations.insert (op);
+			}
+
+			return true;
 		}
-
-		return true;
 	}
-
 	return false;
 }
 
-Servant::ComponentFlags Servant::define_component (const AST::Interface& itf, OperationSet& implement_operations)
+Servant::ComponentFlags Servant::define_component (const Interface& itf, OperationSet& implement_operations)
 {
 	if (component_base (itf, implement_operations))
 		return 0;

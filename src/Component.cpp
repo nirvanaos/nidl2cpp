@@ -194,7 +194,7 @@ Servant::ComponentFlags Servant::define_component (const Interface& itf, Operati
 				if (receptacle.multi_connections)
 					h_ << "Type < ::Components::Cookie>::VRet";
 				else
-					h_ << "void ";
+					h_ << "void";
 				h_ << " connect_" << receptacle.name << " (I_ptr <" << QName (*receptacle.conn_type)
 					<< "> connection)\n"
 					"{\n" << indent;
@@ -291,12 +291,12 @@ Servant::ComponentFlags Servant::define_component (const Interface& itf, Operati
 				h_ << "Type <Object>::VRet provide_facet (const ::Components::FeatureName & name)\n"
 					"{\n"
 					<< indent
-					<< "Type <Object>::Var ret;\n";
+					<< "Type <Object>::VRet ret;\n";
 
 				for (const auto& name : ports.facets) {
 					h_ << "if (name == \"" << name << "\")\n"
 						<< indent
-						<< "ret = interface2object (static_cast <S&> (*this).provide_" << name << " ());\n"
+						<< "ret = CCM_ObjectBase::_itf_to_object (static_cast <S&> (*this).provide_" << name << " ());\n"
 						<< unindent
 						<< "else ";
 				}
@@ -304,19 +304,9 @@ Servant::ComponentFlags Servant::define_component (const Interface& itf, Operati
 				h_ << indent
 					<< "\n"
 					"ret = CCM_NavigationBase::provide_facet (name);\n"
-					<< unindent;
-				if (options ().legacy) {
-					h_ << "#ifdef LEGACY_CORBA_CPP\n"
-						"return ret._retn ();\n"
-						"#else\n";
-				}
-
-				h_ << "return ret;\n";
-
-				if (options ().legacy)
-					h_ << "#endif\n";
-
-				h_ << unindent << "}\n\n";
+					<< unindent
+					<< "return ret;\n"
+					<< unindent << "}\n\n";
 			}
 
 			if (flags & CCM_RECEPTACLES) {
@@ -324,7 +314,7 @@ Servant::ComponentFlags Servant::define_component (const Interface& itf, Operati
 					"Object::_ptr_type connection)\n"
 					"{\n"
 					<< indent
-					<< "Type < ::Components::Cookie>::Var ret;\n";
+					<< "Type < ::Components::Cookie>::VRet ret = nullptr;\n";
 
 				for (const auto& receptacle : ports.receptacles) {
 					h_ << "if (name == \"" << receptacle.name << "\")\n"
@@ -333,8 +323,8 @@ Servant::ComponentFlags Servant::define_component (const Interface& itf, Operati
 					if (receptacle.multi_connections)
 						h_ << "ret = ";
 
-					h_ << "static_cast <S&> (*this).connect_" << receptacle.name << " ("
-						<< QName (*receptacle.conn_type) << "::_narrow (connection));\n"
+					h_ << "static_cast <S&> (*this).connect_" << receptacle.name
+						<< " (connection->_query_interface <" << QName (*receptacle.conn_type) << "> ());\n"
 						<< unindent
 						<< "else ";
 				}
@@ -342,24 +332,14 @@ Servant::ComponentFlags Servant::define_component (const Interface& itf, Operati
 				h_ << indent
 					<< "\n"
 					"ret = CCM_ReceptaclesBase::connect (name, connection);\n"
-					<< unindent;
-
-				if (options ().legacy) {
-					h_ << "#ifdef LEGACY_CORBA_CPP\n"
-						"return ret._retn ();\n"
-						"#else\n";
-				}
-
-				h_ << "return ret;\n";
-
-				if (options ().legacy)
-					h_ << "#endif\n";
-
-				h_ << unindent << "}\n"
+					<< unindent
+					<< "return ret;\n"
+					<< unindent << "}\n"
 
 					"Type <Object>::VRet disconnect (const ::Components::FeatureName& name, ::Components::Cookie::_ptr_type ck)\n"
 					"{\n"
-					<< indent;
+					<< indent
+					<< "Type <Object>::VRet ret = nullptr;\n";
 
 				for (const auto& receptacle : ports.receptacles) {
 					h_ << "if (name == \"" << receptacle.name << "\") {\n"
@@ -371,7 +351,7 @@ Servant::ComponentFlags Servant::define_component (const Interface& itf, Operati
 						<< "throw Components::CookieRequired ();\n"
 						<< unindent;
 
-					h_ << "return interface2object (static_cast <S&> (*this).disconnect_" << receptacle.name;
+					h_ << "ret = CCM_ObjectBase::_itf_to_object (static_cast <S&> (*this).disconnect_" << receptacle.name;
 
 					if (receptacle.multi_connections)
 						h_ << " (ck));\n";
@@ -384,8 +364,9 @@ Servant::ComponentFlags Servant::define_component (const Interface& itf, Operati
 
 				h_ << indent
 					<< "\n"
-					"return CCM_ReceptaclesBase::disconnect (name, ck);\n"
+					"ret = CCM_ReceptaclesBase::disconnect (name, ck);\n"
 					<< unindent
+					<< "return ret;"
 					<< unindent << "}\n\n";
 			}
 

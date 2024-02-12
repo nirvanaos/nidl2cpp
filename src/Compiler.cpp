@@ -45,6 +45,7 @@ void Compiler::print_usage_info (const char* exe_name)
 		"\t-out <directory>        Directory for output files.\n"
 		"\t-out_h <directory>      Directory for output *.h files.\n"
 		"\t-out_cpp <directory>    Directory for output *.cpp files.\n"
+		"\t-out_proxy <directory>  Directory for output *_p.cpp files.\n"
 		"\t-client                 Generate the client code only.\n"
 		"\t-no_client              Do not generate the client code.\n"
 		"\t-no_client_cpp          Generate only header for client code.\n"
@@ -76,6 +77,9 @@ const char* Compiler::option (const char* arg, const char* opt)
 void Compiler::parse_arguments (CmdLine& args)
 {
 	IDL_FrontEnd::parse_arguments (args);
+
+	if (out_proxy.empty ())
+		out_proxy = out_cpp;
 
 #ifdef _WIN32
 	static const char* INCLUDE_ENV = "INCLUDE";
@@ -160,7 +164,9 @@ bool Compiler::parse_command_line (CmdLine& args)
 			std::cout << '.' << *it;
 		}
 		std::cout << std::endl;
-	}
+	} else if ((arg = option (args.arg (), "out_proxy")))
+		out_proxy = args.parameter (arg);
+
 	if (arg) {
 		args.next ();
 		return true;
@@ -194,7 +200,7 @@ void Compiler::generate_code (const Root& tree)
 		tree.visit (servant);
 	}
 	if (proxy) {
-		Proxy proxy (*this, tree, out_file (tree, out_cpp, proxy_suffix, "cpp"), servant_h);
+		Proxy proxy (*this, tree, out_file (tree, out_proxy, proxy_suffix, "cpp"), servant_h);
 		tree.visit (proxy);
 	}
 }

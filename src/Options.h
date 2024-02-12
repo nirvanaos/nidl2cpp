@@ -42,7 +42,7 @@ public:
 		no_ami (false)
 	{}
 
-	std::filesystem::path out_h, out_cpp;
+	std::filesystem::path out_h, out_cpp, out_proxy;
 	std::string client_suffix;
 	std::string servant_suffix;
 	std::string proxy_suffix;

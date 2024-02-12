@@ -247,7 +247,7 @@ void Servant::end (const Interface& itf)
 				<< indent
 				<< "public Implementation";
 			implementation_suffix (itf);
-			h_ << "Static ";
+			h_ << "Static";
 			implementation_parameters (itf, all_bases);
 			h_ << unindent << "\n{};\n";
 		}
@@ -1300,7 +1300,8 @@ void Servant::leaf (const Constant& c)
 		h_.namespace_open (c);
 		h_ << "class Static_" << static_cast <const std::string&> (c.name ()) << ";\n";
 		h_.namespace_open ("CORBA/Internal");
-		h_ << "template <> const char StaticId <" << ItemNamespace (c) << "Static_" << static_cast <const std::string&> (c.name ())
+		h_ << "template <>\n"
+			"const char StaticId <" << ItemNamespace (c) << "Static_" << static_cast <const std::string&> (c.name ())
 			<< ">::id [] = \"" << const_id (c) << "\";\n";
 	}
 }

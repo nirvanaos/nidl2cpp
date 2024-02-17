@@ -2342,11 +2342,17 @@ void Client::define (const Union& item)
 			}
 		}
 
-		if (!item.default_label ().empty ())
+		if (!item.default_label ().empty ()) {
 			cpp_ << "default:\n"
-			<< indent <<
-			"return " << item.default_label () << ";\n"
-			<< unindent;
+				<< indent <<
+				"return " << item.default_label () << ";\n"
+				<< unindent;
+		} else {
+			cpp_ << "default:\n"
+				<< indent <<
+				"NIRVANA_UNREACHABLE_CODE ();\n"
+				<< unindent;
+		}
 
 		cpp_ << "}\n"
 			<< unindent <<

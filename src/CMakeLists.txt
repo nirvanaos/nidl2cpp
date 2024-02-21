@@ -3,6 +3,7 @@ add_executable(nidl2cpp
 	Code.cpp
 	CodeGenBase.cpp
 	Compiler.cpp
+	Component.cpp
 	Header.cpp
 	main.cpp
 	Proxy.cpp

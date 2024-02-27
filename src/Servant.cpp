@@ -1053,12 +1053,35 @@ const NamedItem* Servant::find_item (const Interface& itf, const Identifier& nam
 void Servant::leaf (const Attribute& att)
 {
 	attribute (att);
+
+	h_ << std::endl;
 }
 
 void Servant::leaf (const StateMember& m)
 {
-	if (m.is_public ())
+	if (m.is_public ()) {
 		attribute (m);
+		if (is_var_len (m)) {
+			{
+				std::string name = SKELETON_MOVE_PREFIX;
+				name += m.name ();
+				h_ << "static void " << name << " (Bridge <" << QName (*m.parent ()) << ">* _b, "
+					<< ABI_param (m, Parameter::Attribute::INOUT) << " val, Interface* _env) noexcept\n"
+					"{\n";
+				epv_.push_back (std::move (name));
+			}
+			h_ << indent
+				<< "try {\n"
+				<< indent
+				<< "S::_implementation (_b)." << m.name () << " (std::move ("
+				<< ABI2Servant (m, "val", Parameter::Attribute::INOUT) << "));\n"
+				<< CatchBlock ()
+				<< unindent
+				<< "}\n";
+		}
+	}
+
+	h_ << std::endl;
 }
 
 void Servant::attribute (const Member& m)
@@ -1111,27 +1134,6 @@ void Servant::attribute (const Member& m)
 			<< unindent
 			<< "}\n";
 	}
-
-	if (!att && is_var_len (m)) {
-		{
-			std::string name = SKELETON_MOVE_PREFIX;
-			name += m.name ();
-			h_ << "static void " << name << " (Bridge <" << QName (itf) << ">* _b, "
-				<< ABI_param (m, Parameter::Attribute::INOUT) << " val, Interface* _env) noexcept\n"
-				"{\n";
-			epv_.push_back (std::move (name));
-		}
-		h_ << indent
-			<< "try {\n"
-			<< indent
-			<< "S::_implementation (_b)." << m.name () << " (std::move ("
-			<< ABI2Servant (m, "val", Parameter::Attribute::INOUT) << "));\n"
-			<< CatchBlock ()
-			<< unindent
-			<< "}\n";
-	}
-
-	h_ << std::endl;
 }
 
 void Servant::skeleton_ami (const AST::Interface& itf)

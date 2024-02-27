@@ -62,6 +62,32 @@ Code& operator << (Code& stm, const Client::Signature& op)
 	return stm << ")";
 }
 
+Code& operator << (Code& stm, const Client::FactoryParam& t)
+{
+	stm << TypePrefix (t.type);
+	if (CodeGenBase::is_var_len (t.type))
+		stm << "Var";
+	else
+		stm << "C_in";
+	return stm;
+}
+
+Code& operator << (Code& stm, const Client::FactorySignature& op)
+{
+	stm << op.op.name () << " (";
+
+	auto it = op.op.begin ();
+	if (it != op.op.end ()) {
+		stm << Client::FactoryParam (**it) << ' ' << (*it)->name ();
+		++it;
+		for (; it != op.op.end (); ++it) {
+			stm << ", " << Client::FactoryParam (**it) << ' ' << (*it)->name ();
+		}
+	}
+
+	return stm << ")";
+}
+
 Code& operator << (Code& stm, const Client::PollerSignature& op)
 {
 	stm << op.op.name () << " (ULong " AMI_TIMEOUT;
@@ -1296,7 +1322,8 @@ void Client::end (const ValueType& vt)
 		for (auto f : factories) {
 			h_ << "Interface* (*" << f->name () << ") (Bridge <" << QName (vt) << FACTORY_SUFFIX ">*";
 			for (auto p : *f) {
-				h_ << ", " << ABI_param (*p);
+				h_ << ", " << ABI_param (*p,
+					is_var_len (*p) ? AST::Parameter::Attribute::INOUT : AST::Parameter::Attribute::IN);
 			}
 			h_ << ", Interface*);\n";
 		}
@@ -1314,14 +1341,15 @@ void Client::end (const ValueType& vt)
 			"public:\n"
 			<< indent;
 		for (auto f : factories) {
-			h_ << "Type <" << QName (vt) << ">::VRet " << Signature (*f) << ";\n";
+			h_ << "Type <" << QName (vt) << ">::VRet " << FactorySignature (*f) << ";\n";
 		}
 		h_ << unindent
 			<< "};\n";
 
 		for (auto f : factories) {
 			h_ << "\ntemplate <class T>\n"
-				<< "Type <" << QName (vt) << ">::VRet " << " Client <T, " << QName (vt) << FACTORY_SUFFIX ">::" << Signature (*f) << "\n"
+				<< "Type <" << QName (vt) << ">::VRet " << " Client <T, " << QName (vt) << FACTORY_SUFFIX ">::"
+				<< FactorySignature (*f) << "\n"
 				"{\n"
 				<< indent;
 			environment (f->raises ());
@@ -1329,7 +1357,12 @@ void Client::end (const ValueType& vt)
 				"Type <" << QName (vt) << ">::C_ret _ret ((_b._epv ().epv." << f->name ()
 				<< ") (&_b";
 			for (auto it = f->begin (); it != f->end (); ++it) {
-				h_ << ", &" << (*it)->name ();
+				const Parameter& param = **it;
+				h_ << ", &";
+				if (is_var_len (param))
+					h_ << TypePrefix (param) << "C_inout (" << param.name () << ")";
+				else
+					h_ << param.name ();
 			}
 			h_ << ", &_env));\n"
 				"_env.check ();\n"

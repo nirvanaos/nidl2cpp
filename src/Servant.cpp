@@ -764,7 +764,10 @@ void Servant::end (const ValueType& vt)
 					h_ << "static Interface* " SKELETON_FUNC_PREFIX << f->name () << "(Bridge <" << QName (vt)
 						<< FACTORY_SUFFIX ">* _b";
 					for (auto p : *f) {
-						h_ << ", " << ABI_param (*p) << ' ' << p->name ();
+						h_ << ", "
+							<< ABI_param (*p,
+								is_var_len (*p) ? AST::Parameter::Attribute::INOUT : AST::Parameter::Attribute::IN)
+							<< ' ' << p->name ();
 					}
 					h_ << ", Interface* _env) noexcept\n"
 						"{\n"
@@ -775,9 +778,9 @@ void Servant::end (const ValueType& vt)
 						<< f->name () << " (";
 					if (!f->empty ()) {
 						auto par = f->begin ();
-						h_ << ABI2Servant (**par);
+						h_ << ABI2ServantFactory (**par);
 						for (++par; par != f->end (); ++par) {
-							h_ << ", " << ABI2Servant (**par);
+							h_ << ", " << ABI2ServantFactory (**par);
 						}
 					}
 					h_ << "));\n"
@@ -827,10 +830,10 @@ void Servant::end (const ValueType& vt)
 					{
 						auto it = f->begin ();
 						if (it != f->end ()) {
-							h_ << ServantParam (**it) << ' ' << (*it)->name ();
+							h_ << ServantParam (**it, false, true) << ' ' << (*it)->name ();
 							++it;
 							for (; it != f->end (); ++it) {
-								h_ << ", " << ServantParam (**it) << ' ' << (*it)->name ();
+								h_ << ", " << ServantParam (**it, false, true) << ' ' << (*it)->name ();
 							}
 						}
 					}
@@ -841,9 +844,9 @@ void Servant::end (const ValueType& vt)
 					{
 						auto it = f->begin ();
 						if (it != f->end ()) {
-							h_ << "std::ref (" << (*it)->name () << ')';
+							h_ << ConstructorParam (**it);
 							for (++it; it != f->end (); ++it) {
-								h_ << ", std::ref (" << (*it)->name () << ')';
+								h_ << ", " << ConstructorParam (**it);
 							}
 						}
 					}
@@ -1337,6 +1340,16 @@ Code& operator << (Code& stm, const Servant::ABI2Servant& val)
 	return stm << " (" << val.name << ')';
 }
 
+Code& operator << (Code& stm, const Servant::ABI2ServantFactory& val)
+{
+	stm << TypePrefix (val.param);
+	if (CodeGenBase::is_var_len (val.param))
+		stm << "inout";
+	else
+		stm << "in";
+	return stm << " (" << val.param.name () << ')';
+}
+
 Code& operator << (Code& stm, const Servant::CatchBlock&)
 {
 	return stm << unindent
@@ -1353,5 +1366,13 @@ Code& operator << (Code& stm, const Servant::CatchBlock&)
 
 Code& operator << (Code& stm, const Servant::BaseImplPOA& itf)
 {
-	return stm << "InterfaceImpl <ServantPOA <" << QName (itf.itf) << ">, " << QName (itf.itf) << ">::";
+	return stm << "InterfaceImpl <ServantPOA <" << QName (itf.itf) << ">, "
+		<< QName (itf.itf) << ">::";
 }
+
+Code& operator << (Code& stm, const Servant::ConstructorParam& val)
+{
+	return stm << (CodeGenBase::is_var_len (val.param) ? "std::move (" : "std::ref (")
+		<< val.param.name () << ')';
+}
+

@@ -64,6 +64,24 @@ public:
 		const AST::Parameter::Attribute att;
 	};
 
+	struct ABI2ServantFactory
+	{
+		ABI2ServantFactory (const AST::Parameter& p) :
+			param (p)
+		{}
+
+		const AST::Parameter& param;
+	};
+
+	struct ConstructorParam
+	{
+		ConstructorParam (const AST::Parameter& p) :
+			param (p)
+		{}
+
+		const AST::Parameter& param;
+	};
+
 	struct CatchBlock
 	{};
 
@@ -140,7 +158,9 @@ private:
 };
 
 Code& operator << (Code& stm, const Servant::ABI2Servant& val);
+Code& operator << (Code& stm, const Servant::ABI2ServantFactory& val);
 Code& operator << (Code& stm, const Servant::CatchBlock&);
 Code& operator << (Code& stm, const Servant::BaseImplPOA& itf);
+Code& operator << (Code& stm, const Servant::ConstructorParam& val);
 
 #endif

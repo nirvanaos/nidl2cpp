@@ -542,7 +542,9 @@ Code& operator << (Code& stm, const TC_Name& t)
 
 Code& operator << (Code& stm, const ServantParam& t)
 {
-	if (t.att == Parameter::Attribute::IN) {
+	if (t.att != Parameter::Attribute::IN || (t.factory && CodeGenBase::is_var_len (t.type)))
+		stm << TypePrefix (t.type) << "Var&";
+	else {
 		if (t.virt && !CodeGenBase::is_ref_type (t.type)) {
 			// For virtual methods (POA implementation), the type must not depend on
 			// machine word size.
@@ -551,12 +553,15 @@ Code& operator << (Code& stm, const ServantParam& t)
 			const Type& dt = t.type.dereference_type ();
 			if (dt.tkind () == Type::Kind::BASIC_TYPE && dt.basic_type () != BasicType::ANY)
 				stm << TypePrefix (t.type) << "Var";
-			else
-				stm << "const " << TypePrefix (t.type) << "Var&";
+			else {
+				if (!t.factory || !CodeGenBase::is_var_len (t.type))
+					stm << "const ";
+				stm << TypePrefix (t.type) << "Var&";
+			}
 		} else
 			stm << TypePrefix (t.type) << "ConstRef";
-	} else
-		stm << TypePrefix (t.type) << "Var&";
+	}
+
 	return stm;
 }
 

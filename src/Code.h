@@ -312,27 +312,31 @@ Code& operator << (Code& stm, const TC_Name& t);
 
 struct ServantParam
 {
-	ServantParam (const AST::Parameter& p, bool v = false) :
+	ServantParam (const AST::Parameter& p, bool v = false, bool f = false) :
 		type (p),
 		att (p.attribute ()),
-		virt (v)
+		virt (v),
+		factory (f)
 	{}
 
 	ServantParam (const AST::Attribute& t, bool v = false) :
 		type (t),
 		att (AST::Parameter::Attribute::IN),
-		virt (v)
+		virt (v),
+		factory (false)
 	{}
 
 	ServantParam (const AST::Type& t) :
 		type (t),
 		att (AST::Parameter::Attribute::IN),
-		virt (false)
+		virt (false),
+		factory (false)
 	{}
 
 	const AST::Type& type;
 	const AST::Parameter::Attribute att;
 	const bool virt;
+	const bool factory;
 };
 
 Code& operator << (Code& stm, const ServantParam& t);

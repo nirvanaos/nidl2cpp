@@ -67,11 +67,29 @@ public:
 
 	struct Signature
 	{
-		Signature (const AST::OperationBase& o) :
+		Signature (const AST::Operation& o) :
 			op (o)
 		{}
 
-		const AST::OperationBase& op;
+		const AST::Operation& op;
+	};
+
+	struct FactoryParam
+	{
+		FactoryParam (const AST::Type& t) :
+			type (t)
+		{}
+
+		const AST::Type& type;
+	};
+
+	struct FactorySignature
+	{
+		FactorySignature (const AST::ValueFactory& o) :
+			op (o)
+		{}
+
+		const AST::ValueFactory& op;
 	};
 
 	struct PollerSignature
@@ -210,6 +228,8 @@ private:
 
 Code& operator << (Code& stm, const Client::Param& t);
 Code& operator << (Code& stm, const Client::Signature& op);
+Code& operator << (Code& stm, const Client::FactoryParam& t);
+Code& operator << (Code& stm, const Client::FactorySignature& op);
 Code& operator << (Code& stm, const Client::ConstType& op);
 Code& operator << (Code& stm, const Client::PollerSignature& op);
 Code& operator << (Code& stm, const Client::SendcSignature& op);

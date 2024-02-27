@@ -2253,7 +2253,7 @@ void Client::define (const Union& item)
 
 			cpp_ << "if (_switch (__d) != " << label << ") {\n" << indent <<
 				"_destruct ();\n" <<
-				Namespace ("CORBA/Internal") << "construct (_u." << el->name () << ", std::move (val));"
+				Namespace ("CORBA/Internal") << "construct (_u." << el->name () << ", std::move (val));\n"
 				"__d = ";
 			if (multi)
 				cpp_ << "label";

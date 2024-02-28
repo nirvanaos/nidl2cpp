@@ -1135,8 +1135,7 @@ void Client::end (const Interface& itf)
 		cpp_ << TypeCodeName (itf);
 		cpp_.namespace_open (itf);
 		cpp_ << empty_line
-			<< "NIRVANA_SELECTANY extern const " << Namespace ("CORBA/Internal") << "StaticTC\n"
-			<< TC_Name (itf) << " = NIRVANA_STATIC_TC (TypeCodeInterface <" << QName (itf) << ">);\n";
+			<< "extern NIRVANA_STATIC_TC (" << TC_Name (itf) << ", TypeCodeInterface <" << QName (itf) << ">);\n";
 	}
 }
 
@@ -1172,8 +1171,7 @@ void Client::end (const ValueType& vt)
 		cpp_ << TypeCodeName (vt);
 		cpp_.namespace_open (vt);
 		cpp_ << empty_line
-			<< "NIRVANA_SELECTANY extern const " << Namespace ("CORBA/Internal") << "StaticTC\n"
-			<< TC_Name (vt) << " = NIRVANA_STATIC_TC (TypeCodeValueAbstract <" << QName (vt) << ">);\n";
+			<< "extern NIRVANA_STATIC_TC (" << TC_Name (vt) << ", TypeCodeValueAbstract <" << QName (vt) << ">);\n";
 		return;
 	}
 

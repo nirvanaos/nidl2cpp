@@ -80,7 +80,7 @@ void Proxy::implement (const Operation& op, bool no_rq)
 		<< static_cast <const std::string&> (op.name()) << "[" << params_out.size () << "];\n";
 
 	if (!op.raises ().empty ())
-		cpp_ << "static const TypeCodeImport* const " PREFIX_OP_RAISES
+		cpp_ << "static const GetTypeCode " PREFIX_OP_RAISES
 		<< static_cast <const std::string&> (op.name()) << "[" << op.raises().size() << "];\n";
 
 	if (!op.context().empty())
@@ -209,11 +209,11 @@ void Proxy::implement (const Attribute& att, bool no_rq)
 	}
 
 	if (!att.getraises().empty())
-		cpp_ << "static const TypeCodeImport* const " PREFIX_OP_RAISES "_get_"
+		cpp_ << "static const GetTypeCode " PREFIX_OP_RAISES "_get_"
 		<< static_cast <const std::string&> (att.name ()) << "[" << att.getraises().size() << "];\n";
 
 	if (!att.setraises().empty())
-		cpp_ << "static const TypeCodeImport* const " PREFIX_OP_RAISES "_set_"
+		cpp_ << "static const GetTypeCode " PREFIX_OP_RAISES "_set_"
 		<< static_cast <const std::string&> (att.name()) << "[" << att.setraises().size() << "];\n";
 }
 
@@ -404,8 +404,10 @@ void Proxy::leaf (const Exception& item)
 		type_code_members (item, item);
 	}
 
-	cpp_.namespace_close ();
-	exp (item) << "TypeCodeException <" << QName (item) << ", " << (item.empty () ? "false" : "true") << ">)\n";
+	if (!item.empty ()) {
+		cpp_.namespace_close ();
+		exp (item) << "TypeCodeException <" << QName (item) << ">)\n";
+	}
 }
 
 void Proxy::leaf (const Struct& item)
@@ -858,13 +860,13 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 				}
 
 				if (!op.raises->empty ()) {
-					cpp_ << "const TypeCodeImport* const Proxy <" << QName (itf) << ">::" PREFIX_OP_RAISES << op.name
+					cpp_ << "const GetTypeCode Proxy <" << QName (itf) << ">::" PREFIX_OP_RAISES << op.name
 						<< " [" << op.raises->size () << "] = {\n";
 					auto it = op.raises->begin ();
-					cpp_ << '&' << TC_Name (**it);
+					cpp_ << UserException (**it);
 					for (++it; it != op.raises->end (); ++it) {
 						cpp_ << ",\n"
-							"&" << TC_Name (**it);
+							<< UserException (**it);
 					}
 					cpp_ << std::endl;
 					cpp_ << "};\n";
@@ -1032,3 +1034,7 @@ void Proxy::generate_poller (const Interface& itf, const ValueType& poller)
 	cpp_.namespace_close ();
 }
 
+Code& operator << (Code& stm, const Proxy::UserException& ue)
+{
+	return stm << QName (ue.item) << "::_type_code";
+}

@@ -172,6 +172,9 @@ void Client::type_code_decl (const NamedItem& item)
 	case Item::Kind::VALUE_TYPE:
 		no_import = (static_cast <const ValueType&> (item).modifier () == ValueType::Modifier::ABSTRACT);
 		break;
+	case Item::Kind::EXCEPTION:
+		no_import = static_cast <const Exception&> (item).empty ();
+		break;
 	}
 
 	if (!is_nested (item)) {
@@ -181,7 +184,7 @@ void Client::type_code_decl (const NamedItem& item)
 		h_ << "static const ";
 
 	if (no_import)
-		h_ << Namespace ("CORBA/Internal") << "StaticTC ";
+		h_ << Namespace ("CORBA/Internal") << "StaticIdNameTC ";
 	else
 		h_ << Namespace ("Nirvana") << "ImportInterfaceT <" << Namespace ("CORBA") << "TypeCode> ";
 
@@ -1131,11 +1134,11 @@ void Client::end (const Interface& itf)
 	end_interface (itf);
 
 	if (itf.interface_kind () != Interface::InterfaceKind::PSEUDO) {
-		// Do not import type code
-		cpp_ << TypeCodeName (itf);
 		cpp_.namespace_open (itf);
 		cpp_ << empty_line
-			<< "extern NIRVANA_STATIC_TC (" << TC_Name (itf) << ", TypeCodeInterface <" << QName (itf) << ">);\n";
+			<< "extern NIRVANA_STATIC_TC (" << TC_Name (itf) << ", TypeCodeInterface <" << QName (itf) << ">, "
+			<< Namespace ("CORBA/Internal") << "RepIdOf <" << itf.name () << ">::id, \""
+			<< static_cast <const std::string&> (itf.name ()) << "\");\n";
 	}
 }
 
@@ -1168,10 +1171,11 @@ void Client::end (const ValueType& vt)
 
 	if (vt.modifier () == ValueType::Modifier::ABSTRACT) {
 		// Do not import type code
-		cpp_ << TypeCodeName (vt);
 		cpp_.namespace_open (vt);
 		cpp_ << empty_line
-			<< "extern NIRVANA_STATIC_TC (" << TC_Name (vt) << ", TypeCodeValueAbstract <" << QName (vt) << ">);\n";
+			<< "extern NIRVANA_STATIC_TC (" << TC_Name (vt) << ", TypeCodeValueAbstract <" << QName (vt) << ">, "
+			<< Namespace ("CORBA/Internal") << "RepIdOf <" << vt.name () << ">::id, \""
+			<< static_cast <const std::string&> (vt.name ()) << "\");\n";
 		return;
 	}
 
@@ -1950,7 +1954,16 @@ void Client::implement (const Exception& item)
 	} else
 		rep_id_of (item);
 
-	type_code_def (item);
+	if (!item.empty ())
+		type_code_def (item);
+	else {
+		cpp_ << empty_line;
+		if (!is_nested (item))
+			cpp_ << "extern ";
+		cpp_ << "NIRVANA_STATIC_TC (" << TC_Name (item) << ", TypeCodeExceptionEmpty, "
+			<< Namespace ("CORBA/Internal") << "RepIdOf <" << item.name () << ">::id, \""
+			<< static_cast <const std::string&> (item.name ()) << "\");\n";
+	}
 }
 
 void Client::leaf (const StructDecl& item)

@@ -49,6 +49,15 @@ public:
 		cpp_.include_header (servant);
 	}
 
+	struct UserException
+	{
+		UserException (const AST::ItemWithId& it) :
+			item (it)
+		{}
+
+		const AST::ItemWithId& item;
+	};
+
 private:
 	virtual void end (const AST::Root&) override;
 
@@ -98,5 +107,7 @@ private:
 	Code cpp_;
 	bool custom_;
 };
+
+Code& operator << (Code& stm, const Proxy::UserException& ue);
 
 #endif

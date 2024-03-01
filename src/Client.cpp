@@ -29,116 +29,6 @@
 using std::filesystem::path;
 using namespace AST;
 
-Code& operator << (Code& stm, const Client::Param& t)
-{
-	stm << TypePrefix (t.type);
-	switch (t.att) {
-		case Parameter::Attribute::IN:
-			stm << "C_in";
-			break;
-		case Parameter::Attribute::OUT:
-			stm << "C_out";
-			break;
-		case Parameter::Attribute::INOUT:
-			stm << "C_inout";
-			break;
-	}
-	return stm;
-}
-
-Code& operator << (Code& stm, const Client::Signature& op)
-{
-	stm << op.op.name () << " (";
-
-	auto it = op.op.begin ();
-	if (it != op.op.end ()) {
-		stm << Client::Param (**it) << ' ' << (*it)->name ();
-		++it;
-		for (; it != op.op.end (); ++it) {
-			stm << ", " << Client::Param (**it) << ' ' << (*it)->name ();
-		}
-	}
-
-	return stm << ")";
-}
-
-Code& operator << (Code& stm, const Client::FactoryParam& t)
-{
-	stm << TypePrefix (t.type);
-	if (CodeGenBase::is_var_len (t.type))
-		stm << "Var";
-	else
-		stm << "C_in";
-	return stm;
-}
-
-Code& operator << (Code& stm, const Client::FactorySignature& op)
-{
-	stm << op.op.name () << " (";
-
-	auto it = op.op.begin ();
-	if (it != op.op.end ()) {
-		stm << Client::FactoryParam (**it) << ' ' << (*it)->name ();
-		++it;
-		for (; it != op.op.end (); ++it) {
-			stm << ", " << Client::FactoryParam (**it) << ' ' << (*it)->name ();
-		}
-	}
-
-	return stm << ")";
-}
-
-Code& operator << (Code& stm, const Client::PollerSignature& op)
-{
-	stm << op.op.name () << " (ULong " AMI_TIMEOUT;
-
-	if (op.op.tkind () != Type::Kind::VOID)
-		stm << ", " << TypePrefix (op.op) << "C_out " AMI_RETURN_VAL;
-
-	// inout/out parameters
-	for (auto param : op.op) {
-		if (param->attribute () != Parameter::Attribute::IN)
-			stm << ", " << TypePrefix (*param) << "C_out " << param->name ();
-	}
-
-	return stm << ')';
-}
-
-Code& operator << (Code& stm, const Client::SendcSignature& op)
-{
-	stm << AMI_SENDC << static_cast <const std::string&> (op.op.name ())
-		<< " (" << TypePrefix (Type (&op.handler)) << "C_in " AMI_HANDLER;
-
-	// in/inout parameters
-	for (auto param : op.op) {
-		if (param->attribute () != Parameter::Attribute::OUT)
-			stm << ", " << TypePrefix (*param) << "C_in " << param->name ();
-	}
-
-	return stm << ')';
-}
-
-Code& operator << (Code& stm, const Client::SendpSignature& op)
-{
-	stm << AMI_SENDP << static_cast <const std::string&> (op.op.name ())
-		<< " (";
-
-	// in/inout parameters
-	auto it = op.op.begin ();
-	while (it != op.op.end () && (*it)->attribute () == Parameter::Attribute::OUT)
-		++it;
-
-	if (it != op.op.end ()) {
-		stm << TypePrefix (**it) << "C_in " << (*it)->name ();
-		for (++it; it != op.op.end (); ++it) {
-			if ((*it)->attribute () != Parameter::Attribute::OUT)
-				stm << ", " << TypePrefix (**it) << "C_in " << (*it)->name ();
-		}
-	}
-
-	return stm << ')';
-}
-
 void Client::end (const Root&)
 {
 	h_.close ();
@@ -444,7 +334,7 @@ void Client::forward_interface (const ItemWithId& item)
 		h_ << "using is_local = std::" << (ikind == InterfaceKind::LOCAL ? "true_type" : "false_type")
 		<< ";\n";
 
-	traits_end ();
+	iv_traits_end ();
 
 	h_ << empty_line
 		<< "#endif\n"; // Close forward guard
@@ -2014,6 +1904,8 @@ void Client::implement (const Struct& item)
 	define_ABI (item);
 	define_structured_type (item);
 
+	structured_type_traits (item);
+
 	if (!(is_pseudo (item) || is_native (item))) {
 		// Marshaling
 		cpp_.namespace_open ("CORBA/Internal");
@@ -2028,6 +1920,8 @@ void Client::implement (const Union& item)
 	define_swap (item);
 	define_ABI (item);
 	define_structured_type (item);
+
+	structured_type_traits (item);
 
 	if (!(is_pseudo (item) && is_native (item))) {
 		// Marshaling
@@ -2747,17 +2641,140 @@ void Client::generate_ami (const Interface& itf)
 	h_ << "NIRVANA_AMI_END ()\n";
 }
 
-void Client::iv_traits_begin (const ItemWithId& item)
+void Client::traits_begin (const ItemWithId& item)
 {
 	h_.namespace_open ("IDL");
-	h_ << "template <> struct traits <" << QName (item) << ">\n"
-		"{\n" << indent <<
-		"using ref_type = " << Namespace ("CORBA/Internal") << "I_ref <" << QName (item) << ">;\n"
-		"using ptr_type = " << Namespace ("CORBA/Internal") << "I_ptr <" << QName (item) << ">;\n";
+	h_ << "template <> struct traits <" << QName (item) << ">";
 }
 
-void Client::traits_end ()
+inline
+void Client::iv_traits_begin (const ItemWithId& item)
+{
+	traits_begin (item);
+	h_ << " : CORBA::Internal::TraitsInterface <" << QName (item) << ">\n"
+		"{\n" << indent;
+}
+
+inline
+void Client::iv_traits_end ()
 {
 	h_ << unindent << "};\n";
 	h_.namespace_close ();
+}
+
+void Client::structured_type_traits (const ItemWithId& item)
+{
+	traits_begin (item);
+	h_ << " : CORBA::Internal::Traits <" << QName (item) << ">\n"
+		"{};\n";
+}
+
+Code& operator << (Code& stm, const Client::Param& t)
+{
+	stm << TypePrefix (t.type);
+	switch (t.att) {
+	case Parameter::Attribute::IN:
+		stm << "C_in";
+		break;
+	case Parameter::Attribute::OUT:
+		stm << "C_out";
+		break;
+	case Parameter::Attribute::INOUT:
+		stm << "C_inout";
+		break;
+	}
+	return stm;
+}
+
+Code& operator << (Code& stm, const Client::Signature& op)
+{
+	stm << op.op.name () << " (";
+
+	auto it = op.op.begin ();
+	if (it != op.op.end ()) {
+		stm << Client::Param (**it) << ' ' << (*it)->name ();
+		++it;
+		for (; it != op.op.end (); ++it) {
+			stm << ", " << Client::Param (**it) << ' ' << (*it)->name ();
+		}
+	}
+
+	return stm << ")";
+}
+
+Code& operator << (Code& stm, const Client::FactoryParam& t)
+{
+	stm << TypePrefix (t.type);
+	if (CodeGenBase::is_var_len (t.type))
+		stm << "Var";
+	else
+		stm << "C_in";
+	return stm;
+}
+
+Code& operator << (Code& stm, const Client::FactorySignature& op)
+{
+	stm << op.op.name () << " (";
+
+	auto it = op.op.begin ();
+	if (it != op.op.end ()) {
+		stm << Client::FactoryParam (**it) << ' ' << (*it)->name ();
+		++it;
+		for (; it != op.op.end (); ++it) {
+			stm << ", " << Client::FactoryParam (**it) << ' ' << (*it)->name ();
+		}
+	}
+
+	return stm << ")";
+}
+
+Code& operator << (Code& stm, const Client::PollerSignature& op)
+{
+	stm << op.op.name () << " (ULong " AMI_TIMEOUT;
+
+	if (op.op.tkind () != Type::Kind::VOID)
+		stm << ", " << TypePrefix (op.op) << "C_out " AMI_RETURN_VAL;
+
+	// inout/out parameters
+	for (auto param : op.op) {
+		if (param->attribute () != Parameter::Attribute::IN)
+			stm << ", " << TypePrefix (*param) << "C_out " << param->name ();
+	}
+
+	return stm << ')';
+}
+
+Code& operator << (Code& stm, const Client::SendcSignature& op)
+{
+	stm << AMI_SENDC << static_cast <const std::string&> (op.op.name ())
+		<< " (" << TypePrefix (Type (&op.handler)) << "C_in " AMI_HANDLER;
+
+	// in/inout parameters
+	for (auto param : op.op) {
+		if (param->attribute () != Parameter::Attribute::OUT)
+			stm << ", " << TypePrefix (*param) << "C_in " << param->name ();
+	}
+
+	return stm << ')';
+}
+
+Code& operator << (Code& stm, const Client::SendpSignature& op)
+{
+	stm << AMI_SENDP << static_cast <const std::string&> (op.op.name ())
+		<< " (";
+
+	// in/inout parameters
+	auto it = op.op.begin ();
+	while (it != op.op.end () && (*it)->attribute () == Parameter::Attribute::OUT)
+		++it;
+
+	if (it != op.op.end ()) {
+		stm << TypePrefix (**it) << "C_in " << (*it)->name ();
+		for (++it; it != op.op.end (); ++it) {
+			if ((*it)->attribute () != Parameter::Attribute::OUT)
+				stm << ", " << TypePrefix (**it) << "C_in " << (*it)->name ();
+		}
+	}
+
+	return stm << ')';
 }

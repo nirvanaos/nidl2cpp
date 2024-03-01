@@ -218,8 +218,10 @@ private:
 
 	void override_sendp (const AST::Interface& itf, const AST::ValueType& poller);
 
+	void traits_begin (const AST::ItemWithId& item);
 	void iv_traits_begin (const AST::ItemWithId& item);
-	void traits_end ();
+	void iv_traits_end ();
+	void structured_type_traits (const AST::ItemWithId& item);
 
 private:
 	Header h_; // .h file

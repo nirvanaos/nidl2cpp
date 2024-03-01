@@ -1341,20 +1341,20 @@ void Client::end (const ValueType& vt)
 			"public:\n"
 			<< indent;
 		for (auto f : factories) {
-			h_ << "Type <" << QName (vt) << ">::VRet " << FactorySignature (*f) << ";\n";
+			h_ << Namespace ("IDL") << "Type <" << QName (vt) << ">::VRet " << FactorySignature (*f) << ";\n";
 		}
 		h_ << unindent
 			<< "};\n";
 
 		for (auto f : factories) {
 			h_ << "\ntemplate <class T>\n"
-				<< "Type <" << QName (vt) << ">::VRet " << " Client <T, " << QName (vt) << FACTORY_SUFFIX ">::"
+				<< Namespace ("IDL") << "Type <" << QName (vt) << ">::VRet " << " Client <T, " << QName (vt) << FACTORY_SUFFIX ">::"
 				<< FactorySignature (*f) << "\n"
 				"{\n"
 				<< indent;
 			environment (f->raises ());
 			h_ << "Bridge < " << QName (vt) << FACTORY_SUFFIX ">& _b (T::_get_bridge (_env));\n"
-				"Type <" << QName (vt) << ">::C_ret _ret ((_b._epv ().epv." << f->name ()
+				<< Namespace ("IDL") << "Type <" << QName (vt) << ">::C_ret _ret ((_b._epv ().epv." << f->name ()
 				<< ") (&_b";
 			for (auto it = f->begin (); it != f->end (); ++it) {
 				const Parameter& param = **it;

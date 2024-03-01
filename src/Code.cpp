@@ -462,7 +462,8 @@ Code& operator << (Code& stm, const ParentName& qn)
 
 Code& operator << (Code& stm, const TypePrefix& t)
 {
-	return stm << Namespace ("CORBA/Internal") << "Type" << " <" << t.type << ">::";
+	// Use namespace IDL to avoid possible collisions with user-defined symbol `Type`.
+	return stm << Namespace ("IDL") << "Type" << " <" << t.type << ">::";
 }
 
 Code& operator << (Code& stm, const ABI_ret& t)

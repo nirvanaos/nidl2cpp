@@ -62,7 +62,7 @@ void Servant::begin (const ValueType& vt)
 			<< indent <<
 			"try {\n"
 			<< indent <<
-			"return Type <" << QName (*concrete_itf) << ">::ret (S::_implementation (_b)._this ());\n"
+			"return " << Namespace ("IDL") << "Type <" << QName (*concrete_itf) << ">::ret (S::_implementation (_b)._this ());\n"
 			<< CatchBlock ()
 			<< "return nullptr;\n"
 			<< unindent
@@ -305,7 +305,7 @@ void Servant::end (const Interface& itf)
 				h_ << ">::find (*this, id);\n"
 					<< unindent
 					<< "}\n\n"
-					<< "Type <" << QName (itf) << ">::VRet _this ()\n"
+					<< Namespace ("IDL") << "Type <" << QName (itf) << ">::VRet _this ()\n"
 					"{\n"
 					<< indent
 					<< "return this->_get_proxy ().template downcast <" << QName (itf)
@@ -319,18 +319,21 @@ void Servant::end (const Interface& itf)
 			virtual_operations (itf, &implement_operations);
 
 			if (component_type & CCM_FACETS) {
-				h_ << "virtual Type <CORBA::Object>::VRet provide_facet (const Type < ::Components::FeatureName>::Var& name) override\n"
+				h_ << "virtual " << Namespace ("IDL") << "Type <CORBA::Object>::VRet provide_facet "
+					"(const Type < ::Components::FeatureName>::Var& name) override\n"
 					"{\n" << indent <<
 					"return " << BaseImplPOA (itf) << "provide_facet (name);\n"
 					<< unindent << "}\n";
 			}
 
 			if (component_type & CCM_RECEPTACLES) {
-				h_ << "virtual Type < ::Components::Cookie>::VRet connect (const Type < ::Components::FeatureName>::Var& name, Type <CORBA::Object>::ConstRef connection) override\n"
+				h_ << "virtual " << Namespace ("IDL") << "Type < ::Components::Cookie>::VRet connect "
+					"(const Type < ::Components::FeatureName>::Var& name, Type <CORBA::Object>::ConstRef connection) override\n"
 					"{\n" << indent <<
 					"return " << BaseImplPOA (itf) << "connect (name, connection);\n"
 					<< unindent << "}\n"
-					"virtual Type <CORBA::Object>::VRet disconnect (const Type < ::Components::FeatureName>::Var& name, Type < ::Components::Cookie>::ConstRef ck) override\n"
+					"virtual " << Namespace ("IDL") << "Type <CORBA::Object>::VRet disconnect "
+					"(const Type < ::Components::FeatureName>::Var& name, Type < ::Components::Cookie>::ConstRef ck) override\n"
 					"{\n" << indent <<
 					"return " << BaseImplPOA (itf) << "disconnect (name, ck);\n"
 					<< unindent << "}\n";
@@ -746,7 +749,7 @@ void Servant::end (const ValueType& vt)
 				}
 
 				if (concrete_base)
-					h_ << "Type <" << QName (*concrete_base) << ">::type_code";
+					h_ << Namespace ("IDL") << "Type <" << QName (*concrete_base) << ">::type_code";
 				else
 					h_ << "nullptr";
 
@@ -774,7 +777,7 @@ void Servant::end (const ValueType& vt)
 						<< indent
 						<< "try {\n"
 						<< indent
-						<< "return Type <" << QName (vt) << ">::ret (S::_implementation (_b)."
+						<< "return " << Namespace ("IDL") << "Type <" << QName (vt) << ">::ret (S::_implementation (_b)."
 						<< f->name () << " (";
 					if (!f->empty ()) {
 						auto par = f->begin ();
@@ -787,7 +790,7 @@ void Servant::end (const ValueType& vt)
 						<< CatchBlock ()
 
 						// Return default value on exception
-						<< "return Type <" << QName (vt) << ">::ret ();\n";
+						<< "return " << Namespace ("IDL") << "Type <" << QName (vt) << ">::ret ();\n";
 
 					h_ << unindent << "}\n\n";
 				}
@@ -826,7 +829,7 @@ void Servant::end (const ValueType& vt)
 					<< "using ImplType = typename ValueCreatorBase <Impl>::ImplType;\n";
 
 				for (auto f : factories) {
-					h_ << "static Type <" << QName (vt) << ">::VRet " << f->name () << " (";
+					h_ << "static " << Namespace ("IDL") << "Type <" << QName (vt) << ">::VRet " << f->name () << " (";
 					{
 						auto it = f->begin ();
 						if (it != f->end ()) {
@@ -1014,7 +1017,7 @@ void Servant::leaf (const Operation& op)
 		h_ << "return " << TypePrefix (op) << "ret (";
 
 	if (holder_raises && !holder_raises->empty ()) {
-		h_ << "::Messaging::ExceptionHolder::_ptr_type _eh = Type < ::Messaging::ExceptionHolder>::in ("
+		h_ << "::Messaging::ExceptionHolder::_ptr_type _eh = " << Namespace ("IDL") << "Type < ::Messaging::ExceptionHolder>::in ("
 			<< op.front ()->name () << ");\n"
 			"set_user_exceptions <" << *holder_raises << "> (_eh);\n"
 			"S::_implementation (_b)." << op.name () << " (_eh);\n";

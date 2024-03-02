@@ -331,8 +331,8 @@ void Client::forward_interface (const ItemWithId& item)
 	h_ << "using is_abstract = std::" << (abstract ? "true_type" : "false_type") << ";\n";
 
 	if (!(value_type || value_type_decl))
-		h_ << "using is_local = std::" << (ikind == InterfaceKind::LOCAL ? "true_type" : "false_type")
-		<< ";\n";
+		h_ <<
+			"using is_local = std::" << (ikind == InterfaceKind::LOCAL ? "true" : "false") << "_type;\n";
 
 	iv_traits_end ();
 
@@ -2515,6 +2515,14 @@ void Client::leaf (const ValueBox& vb)
 		"{\n" << indent;
 	type_code_func (vb);
 	h_ << unindent << "};\n";
+
+	iv_traits_begin (vb);
+
+	h_ <<
+		"using boxed_traits = traits <" << static_cast <const Type&> (vb) << ">;\n"
+		"using is_abstract = std::false_type;\n";
+
+	iv_traits_end ();
 }
 
 void Client::define_swap (const ItemWithId& item)

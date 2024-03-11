@@ -1438,7 +1438,8 @@ void Client::leaf (const Constant& item)
 		
 		// const object reference
 
-		h_ << "NIRVANA_STATIC_IMPORT " << ConstType (item) << ' ' << item.name () << ";\n";
+		h_ << empty_line
+			<< "NIRVANA_STATIC_IMPORT " << ConstType (item) << ' ' << item.name () << ";\n";
 
 		const NamedItem& type = item.dereference_type ().named_type ();
 
@@ -1451,9 +1452,11 @@ void Client::leaf (const Constant& item)
 			ik = &static_cast <const InterfaceDecl&> (type);
 			break;
 		}
+
 		bool is_object = ik && (ik->interface_kind () == InterfaceKind::Kind::UNCONSTRAINED || ik->interface_kind () == InterfaceKind::Kind::LOCAL);
 		cpp_.namespace_open (item);
-		cpp_ << "NIRVANA_OLF_SECTION_OPT extern NIRVANA_STATIC_IMPORT "
+		cpp_ << empty_line
+			<< "NIRVANA_OLF_SECTION_OPT extern NIRVANA_STATIC_IMPORT "
 			<< Namespace ("Nirvana") << "ImportInterfaceT <" << QName (item.named_type ()) << ">\n"
 			<< item.name () << " = { " << Namespace ("Nirvana") << "OLF_IMPORT_" << (is_object ? "OBJECT" : "INTERFACE")
 			<< ", \"" << const_id (item) << "\", "

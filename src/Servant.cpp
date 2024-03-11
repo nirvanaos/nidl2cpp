@@ -1308,7 +1308,8 @@ void Servant::leaf (const Constant& c)
 		h_.namespace_open (c);
 		h_ << "class Static_" << static_cast <const std::string&> (c.name ()) << ";\n";
 		h_.namespace_open ("CORBA/Internal");
-		h_ << "template <>\n"
+		h_ << empty_line
+			<< "template <>\n"
 			"const char StaticId <" << ItemNamespace (c) << "Static_" << static_cast <const std::string&> (c.name ())
 			<< ">::id [] = \"" << const_id (c) << "\";\n";
 	}

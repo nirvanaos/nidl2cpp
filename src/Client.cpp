@@ -1610,7 +1610,8 @@ void Client::define_structured_type (const ItemWithId& item)
 	assert (!members.empty ());
 
 	bool var_len = is_var_len (members);
-	bool CDR = !u && is_CDR (members);
+	SizeAndAlignment size_and_alignment;
+	bool CDR = !u && !var_len && is_CDR (members, size_and_alignment);
 
 	// Type
 	h_ << "template <>\n"
@@ -1668,15 +1669,16 @@ void Client::define_structured_type (const ItemWithId& item)
 
 	// Declare marshaling
 	if (!(is_pseudo (item) && is_native (members))) {
-		if (!CDR) {
-			h_ << "\n"
-				"static void marshal_in (const Var&, IORequest::_ptr_type);\n";
 
-			if (var_len)
-				h_ << "static void marshal_out (Var&, IORequest::_ptr_type);\n";
+		h_ << "\n"
+			"static void marshal_in (const Var&, IORequest_ptr);\n";
 
-			h_ << "static void unmarshal (IORequest::_ptr_type, Var&);\n";
-		} else {
+		if (var_len)
+			h_ << "static void marshal_out (Var&, IORequest_ptr);\n";
+
+		h_ << "static void unmarshal (IORequest_ptr, Var&);\n";
+		
+		if (CDR) {
 			std::vector <const Member*> byteswap_members;
 			for (const auto& m : members) {
 				const Type* t = &m->dereference_type ();
@@ -1711,18 +1713,8 @@ void Client::define_structured_type (const ItemWithId& item)
 				}
 			}
 			h_ << unindent << "}\n\n"
-
-				"static const size_t CDR_align = " << TypePrefix (*members.front ()) << "CDR_align;\n";
-
-			if (options ().legacy && item.kind () == Item::Kind::STRUCT)
-				h_ << "\n#ifndef LEGACY_CORBA_CPP\n";
-			CDR_size (static_cast <const StructBase&> (item), "_");
-
-			if (options ().legacy && item.kind () == Item::Kind::STRUCT) {
-				h_ << "#else\n";
-				CDR_size (static_cast <const StructBase&> (item), "");
-				h_ << "#endif\n";
-			}
+				"static const size_t CDR_align = " << size_and_alignment.alignment << ";\n"
+				"static const size_t CDR_size = " << size_and_alignment.size << ";\n";
 		}
 	}
 
@@ -1778,19 +1770,6 @@ void Client::define_structured_type (const ItemWithId& item)
 		type_code_func (item);
 
 	h_ << unindent << "};\n";
-}
-
-void Client::CDR_size (const StructBase& item, const char* prefix)
-{
-	assert (!item.empty ());
-
-	const char* suffix = "";
-	if (item.kind () == Item::Kind::EXCEPTION)
-		suffix = EXCEPTION_SUFFIX;
-
-	h_ << "static const size_t CDR_size = offsetof ("
-		<< QName (item) << suffix << ", " << prefix << item.back ()->name () << ") + "
-		<< TypePrefix (*item.back ()) << "CDR_size;\n";
 }
 
 bool Client::has_check (const Type& type)
@@ -1933,7 +1912,7 @@ void Client::implement (const Union& item)
 			marshal_union (item, true);
 		cpp_ << empty_line <<
 			"void Type <" << QName (item)
-			<< ">::unmarshal (IORequest::_ptr_type rq, Var& v)\n"
+			<< ">::unmarshal (IORequest_ptr rq, Var& v)\n"
 			"{\n" << indent <<
 			"v._destruct ();\n" <<
 			TypePrefix (item.discriminator_type ()) << "unmarshal (rq, v.__d);\n"
@@ -2545,32 +2524,29 @@ void Client::implement_marshaling (const StructBase& item)
 	if (item.kind () == Item::Kind::EXCEPTION)
 		suffix = EXCEPTION_SUFFIX;
 
-	if (!is_CDR (item)) {
+	std::string my_prefix = "v._";
 
-		std::string my_prefix = "v._";
-
-		cpp_.namespace_open ("CORBA/Internal");
+	cpp_.namespace_open ("CORBA/Internal");
+	cpp_ << "\n"
+		"void Type <" << QName (item) << suffix
+		<< ">::marshal_in (const Var& v, IORequest_ptr rq)\n"
+		"{\n";
+	marshal_members (cpp_, item, "marshal_in", my_prefix.c_str ());
+	cpp_ << "}\n";
+	if (is_var_len (item)) {
 		cpp_ << "\n"
 			"void Type <" << QName (item) << suffix
-			<< ">::marshal_in (const Var& v, IORequest::_ptr_type rq)\n"
+			<< ">::marshal_out (Var& v, IORequest_ptr rq)\n"
 			"{\n";
-		marshal_members (cpp_, item, "marshal_in", my_prefix.c_str ());
-		cpp_ << "}\n";
-		if (is_var_len (item)) {
-			cpp_ << "\n"
-				"void Type <" << QName (item) << suffix
-				<< ">::marshal_out (Var& v, IORequest::_ptr_type rq)\n"
-				"{\n";
-			marshal_members (cpp_, item, "marshal_out", my_prefix.c_str ());
-			cpp_ << "}\n";
-		}
-		cpp_ << "\n"
-			"void Type <" << QName (item) << suffix
-			<< ">::unmarshal (IORequest::_ptr_type rq, Var& v)\n"
-			"{\n";
-		unmarshal_members (cpp_, item, my_prefix.c_str ());
+		marshal_members (cpp_, item, "marshal_out", my_prefix.c_str ());
 		cpp_ << "}\n";
 	}
+	cpp_ << "\n"
+		"void Type <" << QName (item) << suffix
+		<< ">::unmarshal (IORequest_ptr rq, Var& v)\n"
+		"{\n";
+	unmarshal_members (cpp_, item, my_prefix.c_str ());
+	cpp_ << "}\n";
 }
 
 void Client::marshal_union (const Union& u, bool out)
@@ -2583,7 +2559,7 @@ void Client::marshal_union (const Union& u, bool out)
 		"void Type <" << QName (u) << ">::" << func << " (";
 	if (!out)
 		cpp_ << "const ";
-	cpp_ << "Var& v, IORequest::_ptr_type rq)\n"
+	cpp_ << "Var& v, IORequest_ptr rq)\n"
 		"{\n" << indent <<
 		TypePrefix (u.discriminator_type ()) << func << " (v.__d, rq);\n"
 		"switch (v.__d) {\n";

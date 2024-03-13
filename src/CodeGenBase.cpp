@@ -175,50 +175,69 @@ bool CodeGenBase::is_var_len (const Type& type)
 	return false;
 }
 
-bool CodeGenBase::is_CDR (const Type& type)
+bool CodeGenBase::is_CDR (const Type& type, SizeAndAlignment& sa)
 {
 	const Type& t = type.dereference_type ();
 	switch (t.tkind ()) {
 		case Type::Kind::BASIC_TYPE:
 			switch (t.basic_type ()) {
-				case BasicType::ANY:
-				case BasicType::OBJECT:
-				case BasicType::VALUE_BASE:
-				case BasicType::WCHAR:
-					return false;
-				default:
-					return true;
+				case BasicType::BOOLEAN:
+				case BasicType::OCTET:
+				case BasicType::CHAR:
+					return sa.append (1);
+
+				case BasicType::USHORT:
+				case BasicType::SHORT:
+					return sa.append (2);
+
+				case BasicType::ULONG:
+				case BasicType::LONG:
+				case BasicType::FLOAT:
+					return sa.append (4);
+
+				case BasicType::ULONGLONG:
+				case BasicType::LONGLONG:
+				case BasicType::DOUBLE:
+					return sa.append (4);
+
+				case BasicType::LONGDOUBLE:
+					return sa.append (8);
 			}
+			break;
 
-		case Type::Kind::STRING:
-		case Type::Kind::WSTRING:
-		case Type::Kind::SEQUENCE:
-			return false;
+		case Type::Kind::FIXED:
+			sa.append (1, (t.fixed_digits () + 2) / 2);
+			return true;
 
-		case Type::Kind::ARRAY:
-			return is_CDR (t.array ());
+		case Type::Kind::ARRAY: {
+			const Array& ar = t.array ();
+			auto cnt = 1;
+			for (auto d : ar.dimensions ()) {
+				cnt *= d;
+			}
+			for (; cnt; --cnt) {
+				if (!is_CDR (t.array (), sa))
+					break;
+			}
+			if (!cnt)
+				return true;
+		} break;
 
 		case Type::Kind::NAMED_TYPE: {
 			const NamedItem& item = t.named_type ();
 			switch (item.kind ()) {
-				case Item::Kind::INTERFACE:
-				case Item::Kind::INTERFACE_DECL:
-				case Item::Kind::VALUE_TYPE:
-				case Item::Kind::VALUE_TYPE_DECL:
-				case Item::Kind::VALUE_BOX:
-				case Item::Kind::NATIVE:
-				case Item::Kind::UNION:
-					return false;
-
 				case Item::Kind::STRUCT:
-					return is_CDR (static_cast <const Struct&> (item));
+					if (is_CDR (static_cast <const Struct&> (item), sa))
+						return true;
+					break;
 
-				default:
-					return true;
+				case Item::Kind::ENUM:
+					return sa.append (4);
 			}
 		}
 	}
-	return true;
+	sa.invalidate ();
+	return false;
 }
 
 bool CodeGenBase::is_var_len (const Members& members)
@@ -230,10 +249,10 @@ bool CodeGenBase::is_var_len (const Members& members)
 	return false;
 }
 
-bool CodeGenBase::is_CDR (const Members& members)
+bool CodeGenBase::is_CDR (const Members& members, SizeAndAlignment& al)
 {
 	for (const auto& member : members) {
-		if (!is_CDR (*member))
+		if (!is_CDR (*member, al))
 			return false;
 	}
 	return true;
@@ -468,13 +487,6 @@ bool CodeGenBase::is_boolean (const Type& type)
 	return t.tkind () == Type::Kind::BASIC_TYPE && t.basic_type () == BasicType::BOOLEAN;
 }
 
-bool CodeGenBase::is_aligned_struct (const Type& type)
-{
-	// TODO: Check for CDR size == native size
-	const Type& t = type.dereference_type ();
-	return t.tkind () == Type::Kind::NAMED_TYPE && t.named_type ().kind () == Item::Kind::STRUCT;
-}
-
 CodeGenBase::StateMembers CodeGenBase::get_members (const ValueType& cont)
 {
 	StateMembers ret;
@@ -604,27 +616,29 @@ void CodeGenBase::marshal_members (Code& stm, const Members& members, const char
 	stm.indent ();
 
 	for (Members::const_iterator m = members.begin (); m != members.end ();) {
-		// Marshal variable-length members
-		while (!is_CDR (**m) && !is_aligned_struct (**m)) {
-			marshal_member (stm, **m, func, prefix);
-			if (members.end () == ++m)
-				break;
-		}
-		if (m != members.end ()) {
-			// Marshal fixed-length members
-			auto begin = m;
-			const Member* last;
-			do {
-				last = *m;
-				++m;
-			} while (m != members.end () && is_CDR (**m) && !is_aligned_struct (*last));
 
-			if (m > begin + 1) {
-				stm << "marshal_members (&" << prefix << (*begin)->name () << ", ";
-				stm << "&" << prefix << (*(m - 1))->name ();
-				stm << ", rq);\n";
-			} else
-				marshal_member (stm, **begin, func, prefix);
+		// Marshal CDR members
+		SizeAndAlignment al;
+		if (is_CDR (**m, al)) {
+			do {
+				auto begin = m;
+				while (members.end () != ++m) {
+					if (!is_CDR (**m, al))
+						break;
+				}
+				if (m > begin + 1) {
+					stm << "marshal_members (&" << prefix << (*begin)->name () << ", ";
+					stm << "&" << prefix << (*(m - 1))->name ();
+					stm << ", rq);\n";
+				} else
+					marshal_member (stm, **begin, func, prefix);
+			} while (m != members.end () && al.is_valid ());
+		}
+
+		// Marshal non-CDR member
+		if (m != members.end ()) {
+			marshal_member (stm, **m, func, prefix);
+			++m;
 		}
 	}
 
@@ -645,45 +659,49 @@ void CodeGenBase::unmarshal_members (Code& stm, const Members& members, const ch
 {
 	stm.indent ();
 	for (Members::const_iterator m = members.begin (); m != members.end ();) {
-		// Unmarshal variable-length members
-		while (!is_CDR (**m) && !is_aligned_struct (**m)) {
-			unmarshal_member (stm , **m, prefix);
-			if (members.end () == ++m)
-				break;
-		}
-		if (m != members.end ()) {
-			// Unmarshal fixed-length members
-			auto begin = m;
-			const Member* last;
+
+		// Marshal CDR members
+		SizeAndAlignment al;
+		if (is_CDR (**m, al)) {
 			do {
-				last = *m;
-				++m;
-			} while (m != members.end () && is_CDR (**m) && !is_aligned_struct (*last));
-			auto end = m;
+				auto begin = m;
+				while (members.end () != ++m) {
+					if (!is_CDR (**m, al))
+						break;
+				}
+				auto end = m;
 
-			if (end > begin + 1) {
-				stm << "if (unmarshal_members (rq, &" << prefix << (*begin)->name ()
-					<< ", &" << prefix << (*(end - 1))->name ()
-					<< ")) {\n"
-					<< indent;
+				if (end > begin + 1) {
+					stm << "if (unmarshal_members (rq, &" << prefix << (*begin)->name ()
+						<< ", &" << prefix << (*(end - 1))->name ()
+						<< ")) {\n"
+						<< indent;
 
-				// Swap bytes
-				m = begin;
-				do {
-					stm << TypePrefix (**m) << "byteswap (" << prefix << (*m)->name () << ");\n";
-				} while (end != ++m);
-				stm << unindent
-					<< "}\n";
+					// Swap bytes
+					m = begin;
+					do {
+						stm << TypePrefix (**m) << "byteswap (" << prefix << (*m)->name () << ");\n";
+					} while (end != ++m);
+					stm << unindent
+						<< "}\n";
 
-				// If some members have check, check them
-				m = begin;
-				do {
-					stm << TypePrefix (**m) << "check ((const " << TypePrefix (**m) << "ABI&)" << prefix << (*m)->name () << ");\n";
-				} while (end != ++m);
-			} else
-				unmarshal_member (stm, **begin, prefix);
+					// If some members have check, check them
+					m = begin;
+					do {
+						stm << TypePrefix (**m) << "check ((const " << TypePrefix (**m) << "ABI&)" << prefix << (*m)->name () << ");\n";
+					} while (end != ++m);
+				} else
+					unmarshal_member (stm, **begin, prefix);
+			} while (m != members.end () && al.is_valid ());
+		}
+
+		// Unmarshal non-CDR member
+		if (m != members.end ()) {
+			unmarshal_member (stm, **m, prefix);
+			++m;
 		}
 	}
+
 	stm.unindent ();
 }
 
@@ -818,3 +836,24 @@ bool CodeGenBase::is_component (const AST::Interface& itf) noexcept
 	}
 	return false;
 }
+
+bool CodeGenBase::SizeAndAlignment::append (unsigned member_align, unsigned member_size) noexcept
+{
+	if (!size) {
+		alignment = member_align;
+		size = member_size;
+		return true;
+	}
+
+	if (alignment < member_align) {
+		// Gap may be occur here ocassionally, depending on the real alignment.
+		// We must break here.
+		alignment = member_align;
+		size = member_size;
+		return false;
+	}
+
+	size = (size + member_align - 1) / member_align * member_align + member_size;
+	return true;
+}
+

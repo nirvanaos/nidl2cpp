@@ -212,7 +212,6 @@ private:
 	void define_itf_suppl (const AST::Identifier& name);
 	void implement_marshaling (const AST::StructBase& item);
 	void marshal_union (const AST::Union& u, bool out);
-	void CDR_size (const AST::StructBase& item, const char* prefix);
 
 	void generate_ami (const AST::Interface& itf);
 

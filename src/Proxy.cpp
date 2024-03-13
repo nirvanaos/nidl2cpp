@@ -94,7 +94,7 @@ void Proxy::implement (const Operation& op, bool no_rq)
 
 	cpp_ << empty_line
 		<< "static void " PREFIX_OP_PROC << static_cast <const std::string&> (op.name ())
-		<< " (" << QName (itf) << "* _servant, IORequest::_ptr_type _call)";
+		<< " (" << QName (itf) << "* _servant, IORequest_ptr _call)";
 
 	if (is_custom (op)) {
 		custom_ = true;
@@ -162,7 +162,7 @@ void Proxy::implement (const Attribute& att, bool no_rq)
 	if (!no_rq) {
 		cpp_ << empty_line
 			<< "static void " PREFIX_OP_PROC "_get_" << static_cast <const std::string&> (att.name ())
-			<< " (" << QName (itf) << "* _servant, IORequest::_ptr_type _call)";
+			<< " (" << QName (itf) << "* _servant, IORequest_ptr _call)";
 
 		if (is_native (att)) {
 			custom_ = true;
@@ -194,7 +194,7 @@ void Proxy::implement (const Attribute& att, bool no_rq)
 
 		if (!no_rq) {
 			cpp_ << "\nstatic void " PREFIX_OP_PROC "_set_" << static_cast <const std::string&> (att.name ())
-				<< " (" << QName (itf) << "* _servant, IORequest::_ptr_type _call)\n"
+				<< " (" << QName (itf) << "* _servant, IORequest_ptr _call)\n"
 				"{\n"
 				<< indent
 

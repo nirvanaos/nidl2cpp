@@ -87,8 +87,39 @@ public:
 
 	static bool is_var_len (const AST::Type& type);
 	static bool is_var_len (const Members& members);
-	static bool is_CDR (const AST::Type& type);
-	static bool is_CDR (const Members& members);
+
+	struct SizeAndAlignment
+	{
+		unsigned alignment; // Alignment of first element after a gap
+		unsigned size;      // Size of data after the gap.
+
+		SizeAndAlignment () :
+			alignment (0),
+			size (0)
+		{}
+
+		bool append (unsigned member_size) noexcept
+		{
+			return append (std::max (member_size, 8U), member_size);
+		}
+
+		bool append (unsigned member_align, unsigned member_size) noexcept;
+
+		void invalidate () noexcept
+		{
+			size = 0;
+		}
+
+		bool is_valid () const noexcept
+		{
+			return size != 0;
+		}
+	};
+
+
+	static bool is_CDR (const AST::Type& type, SizeAndAlignment& sa);
+	static bool is_CDR (const Members& members, SizeAndAlignment& sa);
+
 	static bool is_pseudo (const AST::NamedItem& item);
 	static bool is_ref_type (const AST::Type& type);
 	static bool is_complex_type(const AST::Type& type);
@@ -107,8 +138,6 @@ public:
 	{
 		return type.dereference_type ().tkind () == AST::Type::Kind::SEQUENCE;
 	}
-
-	static bool is_aligned_struct (const AST::Type& type);
 
 	static bool is_bounded (const AST::Type& type);
 

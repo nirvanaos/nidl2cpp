@@ -841,9 +841,11 @@ bool CodeGenBase::SizeAndAlign::append (unsigned member_align, unsigned member_s
 {
 	assert (1 <= member_align && member_align <= 8);
 	assert (member_size);
+	assert (is_valid ());
 
 	if (!size) {
-		alignment = member_align;
+		if (alignment < member_align)
+			alignment = member_align;
 		size = member_size;
 		return true;
 	}

@@ -1611,7 +1611,19 @@ void Client::define_structured_type (const ItemWithId& item)
 
 	bool var_len = is_var_len (members);
 	SizeAndAlign size_and_alignment;
-	bool CDR = !u && !var_len && is_CDR (members, size_and_alignment);
+	bool CDR = false;
+	bool CDR_seq = false;
+	if (!u && !var_len) {
+		SizeAndAlign sa (1);
+		if ((CDR = is_CDR (members, sa))) {
+			CDR_seq = true;
+			size_and_alignment = sa;
+		} else {
+			SizeAndAlign sa (4);
+			if ((CDR_seq = is_CDR (members, sa)))
+				size_and_alignment = sa;
+		}
+	}
 
 	// Type
 	h_ << "template <>\n"
@@ -1636,9 +1648,9 @@ void Client::define_structured_type (const ItemWithId& item)
 			"MarshalHelper <" << QName (item) << ", " << QName (item) << ">";
 
 		h_ << unindent << "\n{\n" << indent <<
-
 			"static const bool has_check = " << (check ? "true" : "false") << ";\n" <<
-			"static const bool is_CDR = " << (CDR ? "true" : "false") << ";\n";
+			"static const bool is_CDR = " << (CDR ? "true" : "false") << ";\n"
+			"static const bool is_CDR_seq = " << (CDR_seq ? "true" : "false") << ";\n";
 
 		if (u) {
 			h_ << "\n"
@@ -1678,7 +1690,7 @@ void Client::define_structured_type (const ItemWithId& item)
 
 		h_ << "static void unmarshal (IORequest_ptr, Var&);\n";
 		
-		if (CDR) {
+		if (CDR_seq) {
 			std::vector <const Member*> byteswap_members;
 			for (const auto& m : members) {
 				const Type* t = &m->dereference_type ();

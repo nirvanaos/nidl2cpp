@@ -93,8 +93,8 @@ public:
 		unsigned alignment; // Alignment of first element after a gap
 		unsigned size;      // Size of data after the gap.
 
-		SizeAndAlign () :
-			alignment (0),
+		SizeAndAlign (unsigned initial_align = 1) :
+			alignment (initial_align),
 			size (0)
 		{}
 
@@ -102,12 +102,12 @@ public:
 
 		void invalidate () noexcept
 		{
-			size = 0;
+			size = std::numeric_limits <unsigned>::max ();
 		}
 
 		bool is_valid () const noexcept
 		{
-			return size != 0;
+			return size != std::numeric_limits <unsigned>::max ();
 		}
 	};
 

@@ -175,7 +175,7 @@ bool CodeGenBase::is_var_len (const Type& type)
 	return false;
 }
 
-bool CodeGenBase::is_CDR (const Type& type, SizeAndAlignment& sa)
+bool CodeGenBase::is_CDR (const Type& type, SizeAndAlign& sa)
 {
 	const Type& t = type.dereference_type ();
 	switch (t.tkind ()) {
@@ -184,24 +184,24 @@ bool CodeGenBase::is_CDR (const Type& type, SizeAndAlignment& sa)
 				case BasicType::BOOLEAN:
 				case BasicType::OCTET:
 				case BasicType::CHAR:
-					return sa.append (1);
+					return sa.append (1, 1);
 
 				case BasicType::USHORT:
 				case BasicType::SHORT:
-					return sa.append (2);
+					return sa.append (2, 2);
 
 				case BasicType::ULONG:
 				case BasicType::LONG:
 				case BasicType::FLOAT:
-					return sa.append (4);
+					return sa.append (4, 4);
 
 				case BasicType::ULONGLONG:
 				case BasicType::LONGLONG:
 				case BasicType::DOUBLE:
-					return sa.append (4);
+					return sa.append (8, 8);
 
 				case BasicType::LONGDOUBLE:
-					return sa.append (8);
+					return sa.append (8, 16);
 			}
 			break;
 
@@ -232,7 +232,7 @@ bool CodeGenBase::is_CDR (const Type& type, SizeAndAlignment& sa)
 					break;
 
 				case Item::Kind::ENUM:
-					return sa.append (4);
+					return sa.append (4, 4);
 			}
 		}
 	}
@@ -249,7 +249,7 @@ bool CodeGenBase::is_var_len (const Members& members)
 	return false;
 }
 
-bool CodeGenBase::is_CDR (const Members& members, SizeAndAlignment& al)
+bool CodeGenBase::is_CDR (const Members& members, SizeAndAlign& al)
 {
 	for (const auto& member : members) {
 		if (!is_CDR (*member, al))
@@ -618,7 +618,7 @@ void CodeGenBase::marshal_members (Code& stm, const Members& members, const char
 	for (Members::const_iterator m = members.begin (); m != members.end ();) {
 
 		// Marshal CDR members
-		SizeAndAlignment al;
+		SizeAndAlign al;
 		if (is_CDR (**m, al)) {
 			do {
 				auto begin = m;
@@ -661,7 +661,7 @@ void CodeGenBase::unmarshal_members (Code& stm, const Members& members, const ch
 	for (Members::const_iterator m = members.begin (); m != members.end ();) {
 
 		// Marshal CDR members
-		SizeAndAlignment al;
+		SizeAndAlign al;
 		if (is_CDR (**m, al)) {
 			do {
 				auto begin = m;
@@ -837,8 +837,11 @@ bool CodeGenBase::is_component (const AST::Interface& itf) noexcept
 	return false;
 }
 
-bool CodeGenBase::SizeAndAlignment::append (unsigned member_align, unsigned member_size) noexcept
+bool CodeGenBase::SizeAndAlign::append (unsigned member_align, unsigned member_size) noexcept
 {
+	assert (1 <= member_align && member_align <= 8);
+	assert (member_size);
+
 	if (!size) {
 		alignment = member_align;
 		size = member_size;

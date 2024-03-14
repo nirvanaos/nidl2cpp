@@ -1610,7 +1610,7 @@ void Client::define_structured_type (const ItemWithId& item)
 	assert (!members.empty ());
 
 	bool var_len = is_var_len (members);
-	SizeAndAlignment size_and_alignment;
+	SizeAndAlign size_and_alignment;
 	bool CDR = !u && !var_len && is_CDR (members, size_and_alignment);
 
 	// Type

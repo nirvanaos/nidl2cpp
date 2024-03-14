@@ -88,20 +88,15 @@ public:
 	static bool is_var_len (const AST::Type& type);
 	static bool is_var_len (const Members& members);
 
-	struct SizeAndAlignment
+	struct SizeAndAlign
 	{
 		unsigned alignment; // Alignment of first element after a gap
 		unsigned size;      // Size of data after the gap.
 
-		SizeAndAlignment () :
+		SizeAndAlign () :
 			alignment (0),
 			size (0)
 		{}
-
-		bool append (unsigned member_size) noexcept
-		{
-			return append (std::max (member_size, 8U), member_size);
-		}
 
 		bool append (unsigned member_align, unsigned member_size) noexcept;
 
@@ -117,8 +112,8 @@ public:
 	};
 
 
-	static bool is_CDR (const AST::Type& type, SizeAndAlignment& sa);
-	static bool is_CDR (const Members& members, SizeAndAlignment& sa);
+	static bool is_CDR (const AST::Type& type, SizeAndAlign& sa);
+	static bool is_CDR (const Members& members, SizeAndAlign& sa);
 
 	static bool is_pseudo (const AST::NamedItem& item);
 	static bool is_ref_type (const AST::Type& type);

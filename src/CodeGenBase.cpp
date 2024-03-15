@@ -216,7 +216,7 @@ bool CodeGenBase::is_CDR (const Type& type, SizeAndAlign& sa)
 				cnt *= d;
 			}
 			for (; cnt; --cnt) {
-				if (!is_CDR (t.array (), sa))
+				if (!is_CDR (ar, sa))
 					break;
 			}
 			if (!cnt)

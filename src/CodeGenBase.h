@@ -111,7 +111,6 @@ public:
 		}
 	};
 
-
 	static bool is_CDR (const AST::Type& type, SizeAndAlign& sa);
 	static bool is_CDR (const Members& members, SizeAndAlign& sa);
 

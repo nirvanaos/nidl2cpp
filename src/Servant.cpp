@@ -1085,9 +1085,9 @@ void Servant::leaf (const StateMember& m)
 				<< unindent
 				<< "}\n";
 		}
-	}
 
-	h_ << std::endl;
+		h_ << std::endl;
+	}
 }
 
 void Servant::attribute (const Member& m)

@@ -35,12 +35,11 @@ std::string Header::get_guard_macro (const path& file)
 	std::string ext = file.extension ().string ().substr (1);
 	to_upper (name);
 	to_upper (ext);
-	std::string ret = "IDL_";
-	ret += name;
-	ret += '_';
-	ret += ext;
-	ret += '_';
-	return ret;
+	std::ostringstream ss;
+	ss <<  "IDL_" << std::setfill ('0') << std::setw (sizeof (size_t) * 2)
+		<< std::hex << std::hash <path> () (file.parent_path ())
+		<< '_' << name << '_' << ext << '_';
+	return ss.str ();
 }
 
 void Header::to_upper (std::string& s)

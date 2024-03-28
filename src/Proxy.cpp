@@ -44,6 +44,7 @@ void Proxy::end (const Root&)
 	cpp_.close ();
 }
 
+inline
 void Proxy::get_parameters (const Operation& op, Members& params_in, Members& params_out)
 {
 	for (auto it = op.begin (); it != op.end (); ++it) {
@@ -62,28 +63,25 @@ void Proxy::get_parameters (const Operation& op, Members& params_in, Members& pa
 	}
 }
 
-void Proxy::implement (const Operation& op, bool no_rq)
+void Proxy::implement (const Operation& op, const OpMetadata& md, bool no_rq)
 {
 	cpp_.empty_line ();
 
 	const ItemScope& itf = *op.parent ();
 
-	Members params_in, params_out;
-	get_parameters (op, params_in, params_out);
-
-	if (!params_in.empty ())
+	if (!md.params_in.empty ())
 		cpp_ << "static const Parameter " PREFIX_OP_PARAM_IN
-		<< static_cast <const std::string&> (op.name ()) << " [" << params_in.size () << "];\n";
+		<< static_cast <const std::string&> (op.name ()) << " [" << md.params_in.size () << "];\n";
 
-	if (!params_out.empty ())
+	if (!md.params_out.empty ())
 		cpp_ << "static const Parameter " PREFIX_OP_PARAM_OUT
-		<< static_cast <const std::string&> (op.name()) << "[" << params_out.size () << "];\n";
+		<< static_cast <const std::string&> (op.name()) << "[" << md.params_out.size () << "];\n";
 
 	if (!op.raises ().empty ())
 		cpp_ << "static const GetTypeCode " PREFIX_OP_RAISES
 		<< static_cast <const std::string&> (op.name()) << "[" << op.raises().size() << "];\n";
 
-	if (!op.context().empty())
+	if (!op.context ().empty())
 		cpp_ << "static const Char* const " PREFIX_OP_CONTEXT
 		<< static_cast <const std::string&> (op.name()) << "[" << op.context().size() << "];\n";
 
@@ -105,7 +103,7 @@ void Proxy::implement (const Operation& op, bool no_rq)
 	cpp_ << "\n{\n" << indent;
 
 	// out and inout params
-	for (auto p : params_out) {
+	for (auto p : md.params_out) {
 		cpp_ << Var (*p) << ' ' << p->name () << ";\n";
 	}
 	if (op.tkind () != Type::Kind::VOID)
@@ -114,7 +112,7 @@ void Proxy::implement (const Operation& op, bool no_rq)
 	cpp_ << "{\n"
 		<< indent;
 
-	// in params
+	// in params (without inout, only pure in)
 	for (auto it = op.begin (); it != op.end (); ++it) {
 		const Parameter* p = *it;
 		if (p->attribute () == Parameter::Attribute::IN)
@@ -122,7 +120,7 @@ void Proxy::implement (const Operation& op, bool no_rq)
 	}
 
 	// Unmarshal in and inout
-	for (auto p : params_in) {
+	for (auto p : md.params_in) {
 		cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";
 	}
 	cpp_ << "_call->unmarshal_end ();\n";
@@ -147,7 +145,7 @@ void Proxy::implement (const Operation& op, bool no_rq)
 	// Marshal output
 	if (op.tkind () != Type::Kind::VOID)
 		cpp_ << TypePrefix (op) << "marshal_out (_ret, _call);\n";
-	for (auto p : params_out) {
+	for (auto p : md.params_out) {
 		cpp_ << TypePrefix (*p) << "marshal_out (" << p->name () << ", _call);\n";
 	}
 
@@ -251,15 +249,7 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op, bool no_rq
 	else
 		cpp_ << "{ nullptr, { ";
 
-	bool in_complex = false, out_complex = false;
-
 	if (not_local && !op.params_in.empty ()) {
-		for (const Member* par : op.params_in) {
-			if (is_complex_type (*par)) {
-				in_complex = true;
-				break;
-			}
-		}
 		std::string params = PREFIX_OP_PARAM_IN;
 		params += op.name;
 		cpp_ << params << ", countof (" << params << ')';
@@ -267,17 +257,7 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op, bool no_rq
 		cpp_ << "0, 0";
 	cpp_ << " }, { ";
 
-	if (not_local && op.type && is_complex_type (*op.type))
-		out_complex = true;
-
 	if (not_local && !op.params_out.empty ()) {
-		if (!out_complex)
-			for (const Member* par : op.params_out) {
-				if (is_complex_type (*par)) {
-					out_complex = true;
-					break;
-				}
-			}
 		std::string params = PREFIX_OP_PARAM_OUT;
 		params += op.name;
 		cpp_ << params << ", countof (" << params << ')';
@@ -307,12 +287,12 @@ void Proxy::md_operation (const Interface& itf, const OpMetadata& op, bool no_rq
 		cpp_ << "0";
 
 	const char* flags = "0";
-	if (in_complex)
-		if (out_complex)
+	if (op.complex_in ())
+		if (op.complex_out ())
 			flags = "Operation::FLAG_IN_CPLX | Operation::FLAG_OUT_CPLX";
 		else
 			flags = "Operation::FLAG_IN_CPLX";
-	else if (out_complex)
+	else if (op.complex_out ())
 		flags = "Operation::FLAG_OUT_CPLX";
 
 	if (no_rq)
@@ -516,8 +496,6 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 		case Item::Kind::OPERATION: {
 			const Operation& op = static_cast <const Operation&> (item);
 
-			implement (op, local_stateless);
-
 			unsigned op_idx = (unsigned)metadata.size ();
 			metadata.emplace_back ();
 			OpMetadata& op_md = metadata.back ();
@@ -529,6 +507,8 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 			op_md.raises = &op.raises ();
 			op_md.context = &op.context ();
 			get_parameters (op, op_md.params_in, op_md.params_out);
+
+			implement (op, op_md, local_stateless);
 
 			cpp_ << ServantOp (op) << " const";
 			if (is_custom (op)) {
@@ -583,16 +563,29 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 						// Unmarshal output
 
 						if (op.tkind () != Type::Kind::VOID) {
+							// Unmarshal return value to the _ret variable
 							cpp_ << Var (op) << " _ret;\n"
 								<< TypePrefix (op) << "unmarshal (_call, _ret);\n";
 						}
+
+						// Unmarshal out parameters to the temporary variables
 						for (auto p : op_md.params_out) {
-							cpp_ << TypePrefix (*p) << "unmarshal (_call, " << p->name () << ");\n";
+							cpp_ << Var (*p) << " _out_" << static_cast <const std::string&> (p->name ())
+								<< ";\n"
+								<< TypePrefix (*p) << "unmarshal (_call, _out_"
+								<< static_cast <const std::string&> (p->name ()) << ");\n";
 						}
+
 						cpp_ << "_call->unmarshal_end ();\n";
 
+						// Move out parameters to caller
+						for (auto p : op_md.params_out) {
+							cpp_ << p->name () << " = std::move (_out_" << static_cast <const std::string&> (p->name ())
+								<< ");\n";
+						}
+
 						if (op.tkind () != Type::Kind::VOID)
-							cpp_ << "return _ret;\n";
+							cpp_ << "return _ret;\n"; // return _ret variable
 					}
 
 					if (stateless)
@@ -704,7 +697,8 @@ void Proxy::generate_proxy (const Interface& itf, const Compiler::AMI_Objects* a
 
 						<< Var (att) << " _ret;\n"
 						<< TypePrefix (att) << "unmarshal (_call, _ret);\n"
-						"return _ret;\n";
+							"_call->unmarshal_end ();\n"
+							"return _ret;\n";
 
 					if (stateless)
 						cpp_ << unindent << "}\n";
@@ -994,12 +988,33 @@ void Proxy::generate_poller (const Interface& itf, const ValueType& poller)
 				"{\n" << indent
 				<< "IORequest::_ref_type _reply = _get_reply <" << op.raises () << "> (" AMI_TIMEOUT ", " << op_idx << ");\n";
 
-			for (auto param : op) {
-				if (param->attribute () != Parameter::Attribute::IN)
-					cpp_ << TypePrefix (*param) << "unmarshal (_reply, " << param->name () << ");\n";
+			if (op.tkind () != Type::Kind::VOID) {
+				// Unmarshal return value to the _ret variable
+				cpp_ << Var (op) << " _ret;\n"
+					<< TypePrefix (op) << "unmarshal (_reply, _ret);\n";
 			}
+			
+			for (auto p : op) {
+				// Unmarshal out parameters to the temporary variables
+				if (p->attribute () != Parameter::Attribute::IN) {
+					cpp_ << Var (*p) << " _out_" << static_cast <const std::string&> (p->name ())
+						<< ";\n"
+						<< TypePrefix (*p) << "unmarshal (_reply, _out_" << static_cast <const std::string&> (p->name ()) << ");\n";
+				}
+			}
+
+			cpp_ << "_reply->unmarshal_end ();\n";
+
+			// return _ret variable
 			if (op.tkind () != Type::Kind::VOID)
-				cpp_ << TypePrefix (op) << "unmarshal (_reply, " AMI_RETURN_VAL ");\n";
+				cpp_ << AMI_RETURN_VAL " = std::move (_ret);\n";
+
+			for (auto p : op) {
+				// Move out parameters to caller
+				if (p->attribute () != Parameter::Attribute::IN)
+					cpp_ << p->name () << " = std::move (_out_" << static_cast <const std::string&> (p->name ())
+					<< ");\n";
+			}
 
 			cpp_ << unindent << "}\n";
 			++op_idx;
@@ -1011,9 +1026,9 @@ void Proxy::generate_poller (const Interface& itf, const ValueType& poller)
 				<< TypePrefix (att) << "Var& " AMI_RETURN_VAL ")\n"
 				"{\n" << indent
 				<< "IORequest::_ref_type _reply = _get_reply <" << att.getraises () << "> (" AMI_TIMEOUT ", " << op_idx << ");\n"
-				<< TypePrefix (att) << "unmarshal (_reply, " AMI_RETURN_VAL ");\n";
-
-			cpp_ << unindent << "}\n";
+				<< TypePrefix (att) << "unmarshal (_reply, " AMI_RETURN_VAL ");\n"
+					"_reply->unmarshal_end ();\n"
+				<< unindent << "}\n";
 			++op_idx;
 
 			if (!att.readonly ()) {
@@ -1032,6 +1047,29 @@ void Proxy::generate_poller (const Interface& itf, const ValueType& poller)
 	cpp_ << unindent << "};\n";
 
 	cpp_.namespace_close ();
+}
+
+inline
+bool Proxy::OpMetadata::complex_in () const noexcept
+{
+	for (const Member* par : params_in) {
+		if (is_complex_type (*par))
+			return true;
+	}
+	return false;
+}
+
+inline
+bool Proxy::OpMetadata::complex_out () const noexcept
+{
+	if (type && is_complex_type (*type))
+		return true;
+
+	for (const Member* par : params_out) {
+		if (is_complex_type (*par))
+			return true;
+	}
+	return false;
 }
 
 Code& operator << (Code& stm, const Proxy::UserException& ue)

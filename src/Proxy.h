@@ -75,13 +75,6 @@ private:
 
 	static std::string export_name (const AST::NamedItem& item);
 
-	void implement (const AST::Operation& op, bool no_rq);
-	void implement (const AST::Attribute& att, bool no_rq);
-
-	void md_members (const Members& members);
-	void md_member (const AST::Member& m);
-	void md_member (const AST::Type& t, const std::string& name);
-
 	struct OpMetadata
 	{
 		std::string name;
@@ -90,7 +83,17 @@ private:
 		Members params_out;
 		const AST::Raises* raises;
 		const AST::Operation::Context* context;
+
+		bool complex_in () const noexcept;
+		bool complex_out () const noexcept;
 	};
+
+	void implement (const AST::Operation& op, const OpMetadata& md, bool no_rq);
+	void implement (const AST::Attribute& att, bool no_rq);
+
+	void md_members (const Members& members);
+	void md_member (const AST::Member& m);
+	void md_member (const AST::Type& t, const std::string& name);
 
 	typedef std::list <OpMetadata> Metadata;
 

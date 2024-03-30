@@ -515,7 +515,10 @@ void Client::end_interface (const IV_Base& container)
 
 				if (!att || !is_native (att->getraises ())) {
 					h_ << ABI_ret (m, att_byref)
-						<< " (*_get_" << m.name () << ") (Bridge <" << QName (container)
+						<< " (*_get_" << m.name () << ") (";
+					if (!att)
+						h_ << "const ";
+					h_ << "Bridge <" << QName (container)
 						<< ">*, Interface*);\n";
 				}
 
@@ -577,7 +580,10 @@ void Client::end_interface (const IV_Base& container)
 					h_ << VRet (m);
 				else
 					h_ << ConstRef (m);
-				h_ << ' ' << m.name () << " ();\n";
+				h_ << ' ' << m.name () << " ()";
+				if (item->kind () == Item::Kind::STATE_MEMBER)
+					h_ << " const";
+				h_ << ";\n";
 
 				if (ami) {
 					h_ << "void " AMI_SENDC "get_" << static_cast <const std::string&> (m.name ())
@@ -708,7 +714,7 @@ void Client::end_interface (const IV_Base& container)
 				if (m.kind () == Item::Kind::ATTRIBUTE)
 					att = &static_cast <const Attribute&> (m);
 
-				// att == nullptr for members
+				// att == nullptr for state members
 
 				if (!att || !is_native (att->getraises ())) {
 					h_ << "\ntemplate <class T>\n";
@@ -717,10 +723,15 @@ void Client::end_interface (const IV_Base& container)
 					else
 						h_ << ConstRef (m);
 
-					h_ << " Client <T, " << QName (container) << ">::" << m.name () << " ()\n"
+					h_ << " Client <T, " << QName (container) << ">::" << m.name () << " ()";
+					if (!att)
+						h_ << " const";
+					h_ << "\n"
 						"{\n" << indent;
 
 					environment (att ? att->getraises () : Raises ());
+					if (!att)
+						h_ << "const ";
 					h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n"
 						<< TypePrefix (m) << 'C';
 

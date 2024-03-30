@@ -1103,7 +1103,10 @@ void Servant::attribute (const Member& m)
 		{
 			std::string name = SKELETON_GETTER_PREFIX;
 			name += m.name ();
-			h_ << ' ' << name << " (Bridge <" << QName (itf) << ">* _b, Interface* _env) noexcept\n"
+			h_ << ' ' << name << " (";
+			if (!att)
+				h_ << "const ";
+			h_ << "Bridge <" << QName (itf) << ">* _b, Interface* _env) noexcept\n"
 				"{\n";
 			epv_.push_back (std::move (name));
 		}

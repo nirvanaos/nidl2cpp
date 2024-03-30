@@ -605,15 +605,12 @@ Code& operator << (Code& stm, const Accessors& a)
 		"return _" << static_cast <const std::string&> (a.member.name ()) << ";\n"
 		<< unindent << "}\n";
 
-	if (a.member.kind () != Item::Kind::STATE_MEMBER
-		|| !static_cast <const StateMember&> (a.member).is_public ()) {
-		// reference getter
-		stm << MemberType (a.member)
-			<< "& " << a.member.name () << " ()\n"
-			"{\n" << indent <<
-			"return _" << static_cast <const std::string&> (a.member.name ()) << ";\n"
-			<< unindent << "}\n";
-	}
+	// reference getter
+	stm << MemberType (a.member)
+		<< "& " << a.member.name () << " ()\n"
+		"{\n" << indent <<
+		"return _" << static_cast <const std::string&> (a.member.name ()) << ";\n"
+		<< unindent << "}\n";
 
 	// setter
 	if (CodeGenBase::is_ref_type (a.member)) {

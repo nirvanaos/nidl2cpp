@@ -116,7 +116,7 @@ public:
 
 	static bool is_pseudo (const AST::NamedItem& item);
 	static bool is_ref_type (const AST::Type& type);
-	static bool is_complex_type(const AST::Type& type);
+	static bool is_complex_type (const AST::Type& type);
 	static const AST::Enum* is_enum (const AST::Type& type);
 	static bool is_native_interface (const AST::Type& type);
 	static bool is_servant (const AST::Type& type);

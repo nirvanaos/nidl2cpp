@@ -1069,6 +1069,19 @@ bool Proxy::OpMetadata::complex_out () const noexcept
 		if (is_complex_type (*par))
 			return true;
 	}
+
+	if (raises) {
+		for (auto p : *raises) {
+			if (p->kind () == Item::Kind::EXCEPTION) {
+				const Exception& ex = static_cast <const Exception&> (*p);
+				for (const Member* pm : ex) {
+					if (is_complex_type (*pm))
+						return true;
+				}
+			}
+		}
+	}
+
 	return false;
 }
 

@@ -25,6 +25,7 @@
 */
 #include "pch.h"
 #include "Header.h"
+#include <sstream>
 
 using std::filesystem::path;
 
@@ -35,9 +36,11 @@ std::string Header::get_guard_macro (const path& file)
 	std::string ext = file.extension ().string ().substr (1);
 	to_upper (name);
 	to_upper (ext);
+	size_t dir_hash = std::hash <std::string> {} (
+		std::filesystem::canonical (file).parent_path ().string ());
 	std::ostringstream ss;
-	ss <<  "IDL_" << std::setfill ('0') << std::setw (sizeof (size_t) * 2)
-		<< std::hex << std::hash <path> () (file.parent_path ())
+	ss <<  "IDL_"
+		<< std::setfill ('0') << std::setw (sizeof (size_t) * 2) << std::hex << dir_hash
 		<< '_' << name << '_' << ext << '_';
 	return ss.str ();
 }

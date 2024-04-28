@@ -227,7 +227,9 @@ void Servant::end (const Interface& itf)
 				h_ << unindent
 					<< "protected:\n"
 					<< indent
-					<< "Servant (Object::_ptr_type comp = nullptr) :\n"
+					<< "Servant ()\n"
+						"{}\n"
+						"Servant (Object::_ptr_type comp) :\n"
 					<< indent
 					<< "Implementation";
 				implementation_suffix (itf);

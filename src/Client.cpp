@@ -2482,7 +2482,7 @@ void Client::leaf (const ValueBox& vb)
 		"private:\n"
 		<< indent <<
 		"template <class T1, class ... Args>\n"
-		"friend CORBA::servant_reference <T1> CORBA::make_reference (Args ...);\n";
+		"friend CORBA::servant_reference <T1> CORBA::make_reference (Args&& ...);\n";
 
 	if (options ().legacy)
 		h_ << "#endif\n";

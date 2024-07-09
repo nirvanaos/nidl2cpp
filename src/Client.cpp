@@ -2620,9 +2620,9 @@ void Client::generate_ami (const Interface& itf)
 			if (is_native (op.raises ()))
 				break;
 
-			h_ << "void (*" AMI_SENDC << op.name () << ") (Bridge <"
+			h_ << "void (*" AMI_SENDC << static_cast <const std::string&> (op.name ()) << ") (Bridge <"
 				<< QName (itf) << ">*, Interface*" << AMI_ParametersABI (op) << ";\n"
-				"Interface* (*" AMI_SENDP << op.name () << ") (Bridge <"
+				"Interface* (*" AMI_SENDP << static_cast <const std::string&> (op.name ()) << ") (Bridge <"
 				<< QName (itf) << ">*" << AMI_ParametersABI (op) << ";\n";
 
 		} break;
@@ -2631,17 +2631,19 @@ void Client::generate_ami (const Interface& itf)
 			const Attribute& att = static_cast <const Attribute&> (*item);
 
 			if (!is_native (att.getraises ())) {
-				h_ << "void (*" AMI_SENDC "get_" << att.name () << ") (Bridge <" << QName (itf)
-					<< ">*, Interface*, Interface*);\n"
-					"Interface* (*" AMI_SENDP "get_" << att.name () << ") (Bridge <" << QName (itf)
-					<< ">*, Interface*);\n";
+				h_ << "void (*" AMI_SENDC "get_" << static_cast <const std::string&> (att.name ())
+					<< ") (Bridge <" << QName (itf) << ">*, Interface*, Interface*);\n"
+					"Interface* (*" AMI_SENDP "get_" << static_cast <const std::string&> (att.name ())
+					<< ") (Bridge <" << QName (itf) << ">*, Interface*);\n";
 			}
 
 			if (!att.readonly () && !is_native (att.setraises ())) {
-				h_ << "void (*" AMI_SENDC "set_" << att.name () << ") (Bridge <" << QName (itf)
-					<< ">*, Interface*, " << ABI_param (att, Parameter::Attribute::IN) << ", Interface*);\n"
-					"Interface* (*" AMI_SENDP "set_" << att.name () << ") (Bridge <" << QName (itf)
-					<< ">*, " << ABI_param (att, Parameter::Attribute::IN) << ", Interface*);\n";
+				h_ << "void (*" AMI_SENDC "set_" << static_cast <const std::string&> (att.name ())
+					<< ") (Bridge <" << QName (itf) << ">*, Interface*, "
+					<< ABI_param (att, Parameter::Attribute::IN) << ", Interface*);\n"
+					"Interface* (*" AMI_SENDP "set_" << static_cast <const std::string&> (att.name ())
+					<< ") (Bridge <" << QName (itf) << ">*, " << ABI_param (att, Parameter::Attribute::IN)
+					<< ", Interface*);\n";
 			}
 
 		} break;

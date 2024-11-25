@@ -27,7 +27,7 @@
 #define NIDL2CPP_CODE_H_
 #pragma once
 
-#include <BE/IndentedOut.h>
+#include <idlfe/BE/IndentedOut.h>
 #include <string_view>
 
 // C++ code file output.

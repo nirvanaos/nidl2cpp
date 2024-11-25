@@ -1,7 +1,8 @@
-set(CMAKE_TOOLCHAIN_FILE $ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake)
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.28)
 cmake_policy(SET CMP0010 NEW)
 cmake_policy(SET CMP0053 NEW)
+cmake_policy(SET CMP0174 NEW)
+
 set(CMAKE_CONFIGURATION_TYPES Debug Release)
 
 project(nidl2cpp CXX)

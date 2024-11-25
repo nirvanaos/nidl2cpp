@@ -1,17 +1,21 @@
 {
   "default-registry": {
     "kind": "git",
-    "baseline": "73e9c8e73fbebbfecea912efbda2ec6475134dd1",
+    "baseline": "5e5d0e1cd7785623065e77eff011afdeec1a3574",
     "repository": "https://github.com/microsoft/vcpkg"
   },
   "registries": [
     {
       "kind": "git",
-      "baseline": "779d6b373e2959f6378b70b9034180f0cb5d6eb6",
+      "baseline": "749a414d8f3d08bb1517160b9617d8072b74b0f5",
       "repository": "https://github.com/nirvanaos/vcpkg-registry.git",
       "packages": [
-        "idlfe"
+        "idlfe",
+        "decnumber"
       ]
     }
+  ],
+  "overlay-ports": [
+    "./ports"
   ]
 }

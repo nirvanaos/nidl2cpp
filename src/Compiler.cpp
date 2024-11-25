@@ -28,7 +28,7 @@
 #include "Client.h"
 #include "Servant.h"
 #include "Proxy.h"
-#include <AST/Builder.h>
+#include <idlfe/AST/Builder.h>
 #include <iostream>
 
 using std::filesystem::path;

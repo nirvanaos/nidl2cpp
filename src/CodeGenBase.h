@@ -30,7 +30,7 @@
 #include "Compiler.h"
 #include "Code.h"
 #include "Compiler.h"
-#include <BE/MessageOut.h>
+#include <idlfe/BE/MessageOut.h>
 #include <unordered_set>
 
 #define FACTORY_SUFFIX "_factory"

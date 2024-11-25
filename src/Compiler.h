@@ -27,8 +27,8 @@
 #define NIDL2CPP_COMPILER_H_
 #pragma once
 
-#include <IDL_FrontEnd.h>
-#include <AST/Interface.h>
+#include <idlfe/IDL_FrontEnd.h>
+#include <idlfe/AST/Interface.h>
 #include "Options.h"
 #include <unordered_map>
 

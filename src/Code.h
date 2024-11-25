@@ -188,6 +188,20 @@ Code& operator << (Code& stm, const std::string& s)
 	return stm;
 }
 
+inline
+Code& operator << (Code& stm, const std::string_view& s)
+{
+	static_cast <BE::IndentedOut&> (stm) << s;
+	return stm;
+}
+
+inline
+Code& operator << (Code& stm, const std::filesystem::path& s)
+{
+	static_cast <BE::IndentedOut&> (stm) << s;
+	return stm;
+}
+
 Code& operator << (Code& stm, const AST::Identifier& id);
 Code& operator << (Code& stm, const AST::Type& t);
 Code& operator << (Code& stm, const AST::Variant& var);

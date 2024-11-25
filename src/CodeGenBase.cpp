@@ -25,6 +25,8 @@
 */
 #include "CodeGenBase.h"
 
+#include <algorithm>
+
 using namespace AST;
 
 const char* const CodeGenBase::protected_names_ [] = {

@@ -27,11 +27,14 @@
 #define NIDL2CPP_COMPILER_H_
 #pragma once
 
+#include <unordered_map>
+
+#include "Options.h"
+
 #include <idlfe/IDL_FrontEnd.h>
 #include <idlfe/AST/Interface.h>
 #include <idlfe/AST/Exception.h>
-#include "Options.h"
-#include <unordered_map>
+#include <idlfe/AST/ValueType.h>
 
 class Compiler :
 	public IDL_FrontEnd,

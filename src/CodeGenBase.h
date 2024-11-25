@@ -27,6 +27,7 @@
 #define NIDL2CPP_CODEGENBASE_H_
 #pragma once
 
+#include <string.h>
 #include <unordered_set>
 
 #include "Compiler.h"

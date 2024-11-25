@@ -27,6 +27,9 @@
 #define NIDL2CPP_OPTIONS_H_
 #pragma once
 
+#include <filesystem>
+#include <string>
+
 struct Options
 {
 public:

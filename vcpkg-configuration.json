@@ -7,15 +7,12 @@
   "registries": [
     {
       "kind": "git",
-      "baseline": "749a414d8f3d08bb1517160b9617d8072b74b0f5",
+      "baseline": "6d13f18deee865c45dc916d8f5bb4e4ccc309566",
       "repository": "https://github.com/nirvanaos/vcpkg-registry.git",
       "packages": [
         "idlfe",
         "decnumber"
       ]
     }
-  ],
-  "overlay-ports": [
-    "./ports"
   ]
 }

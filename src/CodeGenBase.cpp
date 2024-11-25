@@ -24,6 +24,7 @@
 *  popov.nirvana@gmail.com
 */
 #include "pch.h"
+#include <algorithm>
 #include "CodeGenBase.h"
 
 using namespace AST;

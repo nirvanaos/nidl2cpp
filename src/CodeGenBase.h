@@ -27,11 +27,13 @@
 #define NIDL2CPP_CODEGENBASE_H_
 #pragma once
 
+#include <string.h>
+#include <unordered_set>
+
 #include "Compiler.h"
 #include "Code.h"
 #include "Compiler.h"
 #include <idlfe/BE/MessageOut.h>
-#include <unordered_set>
 
 #define FACTORY_SUFFIX "_factory"
 #define EXCEPTION_SUFFIX "::_Data"

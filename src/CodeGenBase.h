@@ -37,6 +37,10 @@
 #include <idlfe/AST/CodeGen.h>
 #include <idlfe/BE/MessageOut.h>
 
+#if defined (__clang__)
+#pragma GCC diagnostic ignored "-Wswitch"
+#endif
+
 #define FACTORY_SUFFIX "_factory"
 #define EXCEPTION_SUFFIX "::_Data"
 

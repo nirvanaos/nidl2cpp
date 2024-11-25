@@ -12,5 +12,5 @@ add_executable(nidl2cpp
 find_package(idlfe CONFIG REQUIRED)
 target_link_libraries(nidl2cpp PRIVATE idlfe)
 
-target_precompile_headers(nidl2cpp PRIVATE pch.h)
+#target_precompile_headers(nidl2cpp PRIVATE pch.h)
 target_compile_features(nidl2cpp PRIVATE cxx_std_20)

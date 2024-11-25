@@ -29,6 +29,7 @@
 
 #include <idlfe/IDL_FrontEnd.h>
 #include <idlfe/AST/Interface.h>
+#include <idlfe/AST/Exception.h>
 #include "Options.h"
 #include <unordered_map>
 

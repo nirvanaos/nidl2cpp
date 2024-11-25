@@ -27,8 +27,17 @@
 #define NIDL2CPP_CODE_H_
 #pragma once
 
-#include <idlfe/BE/IndentedOut.h>
 #include <string_view>
+
+#include <idlfe/AST/Root.h>
+#include <idlfe/AST/Module.h>
+#include <idlfe/AST/Variant.h>
+#include <idlfe/AST/Parameter.h>
+#include <idlfe/AST/Attribute.h>
+#include <idlfe/AST/Operation.h>
+#include <idlfe/AST/StateMember.h>
+
+#include <idlfe/BE/IndentedOut.h>
 
 // C++ code file output.
 class Code : public BE::IndentedOut

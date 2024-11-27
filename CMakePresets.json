@@ -62,7 +62,7 @@
       "binaryDir": "build/clang",
       "cacheVariables": {
         "CMAKE_CXX_COMPILER": "clang++",
-        "CMAKE_CXX_FLAGS": "-stdlib=libc++"
+        "CMAKE_CXX_FLAGS": "-stdlib=libstdc++"
       }
     }
   ],

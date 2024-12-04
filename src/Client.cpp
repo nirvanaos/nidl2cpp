@@ -1438,12 +1438,12 @@ void Client::leaf (const Constant& item)
 			else
 				cpp_.namespace_open ("CORBA/Internal");
 			cpp_ << "const " << ConstType (item) << ' ' << QName (item);
-		}
 
-		if (outline)
-			cpp_ << " = " << static_cast <const Variant&> (item);
-		
-		cpp_ << ";\n";
+			if (outline)
+				cpp_ << " = " << static_cast <const Variant&> (item);
+
+			cpp_ << ";\n";
+		}
 
 	} else {
 		

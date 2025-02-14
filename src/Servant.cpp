@@ -1127,7 +1127,7 @@ void Servant::attribute (const Member& m)
 			<< "}\n";
 	}
 
-	if (!att || !(att->readonly () || is_native (att->setraises ()))) {
+	if (att ? (!(att->readonly () || is_native (att->setraises ()))) : !is_ref_type (m)) {
 		{
 			std::string name = SKELETON_SETTER_PREFIX;
 			name += m.name ();

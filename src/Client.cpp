@@ -521,7 +521,7 @@ void Client::end_interface (const IV_Base& container)
 						<< ">*, Interface*);\n";
 				}
 
-				if (!att || !(att->readonly () || is_native (att->setraises ()))) {
+				if (att ? (!(att->readonly () || is_native (att->setraises ()))) : !is_ref_type (m)) {
 					h_ << "void (*_set_" << m.name () << ") (Bridge <" << QName (container)
 						<< ">*, " << ABI_param (m) << ", Interface*);\n";
 				}
@@ -591,7 +591,11 @@ void Client::end_interface (const IV_Base& container)
 						<< " ();\n";
 				}
 
-				if (!(m.kind () == Item::Kind::ATTRIBUTE && static_cast <const Attribute&> (m).readonly ())) {
+				if (
+					!(m.kind () == Item::Kind::ATTRIBUTE && static_cast <const Attribute&> (m).readonly ())
+				&&
+					!(m.kind () == Item::Kind::STATE_MEMBER && is_ref_type (m))
+				) {
 					h_ << "void " << m.name () << " (" << Param (m) << ");\n";
 
 					if (ami) {
@@ -603,8 +607,12 @@ void Client::end_interface (const IV_Base& container)
 					}
 				}
 
-				if (m.kind () == Item::Kind::STATE_MEMBER && is_var_len (m))
-					h_ << "void " << m.name () << " (" << Var (m) << "&&);\n";
+				if (m.kind () == Item::Kind::STATE_MEMBER && is_var_len (m)) {
+					h_ << "void " << m.name () << " (" << Var (m);
+					if (!is_ref_type (m))
+						h_ << "&&";
+					h_ << ");\n";
+				}
 
 			} break;
 		}
@@ -774,7 +782,7 @@ void Client::end_interface (const IV_Base& container)
 					}
 				}
 
-				if (!(att && (att->readonly () || is_native (att->setraises ())))) {
+				if (!(att ? (att->readonly () || is_native (att->setraises ())) : is_ref_type (m))) {
 					h_ << "\ntemplate <class T>\n"
 						"void Client <T, " << QName (container) << ">::" << m.name ()
 						<< " (" << Param (m) << " val)\n"
@@ -788,10 +796,14 @@ void Client::end_interface (const IV_Base& container)
 				}
 
 				if (!att && is_var_len (m)) {
-					h_ << "\ntemplate <class T>\n"
+					h_ << "\n"
+						"template <class T>\n"
 						"void Client <T, " << QName (container) << ">::" << m.name ()
-						<< " (" << Var (m) << "&& val)\n"
-						"{\n" << indent;
+						<< " (" << Var (m);
+						if (!is_ref_type (m))
+							h_ << "&&";
+						h_ << " val)\n"
+							"{\n" << indent;
 
 					environment (Raises ());
 					h_ << "Bridge < " << QName (container) << ">& _b (T::_get_bridge (_env));\n"

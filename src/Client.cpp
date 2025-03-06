@@ -301,11 +301,17 @@ void Client::forward_interface (const ItemWithId& item)
 
 	if (value_type || value_type_decl
 		|| ikind == InterfaceKind::LOCAL || ikind == InterfaceKind::PSEUDO) {
+
 		h_ << "template <class S>\n"
-			"using Servant = " << Namespace ("CORBA/Internal") << "Servant <S, " << QName (item) << ">;\n";
+			"using Value = " << Namespace ("CORBA/Internal");
+		if (value_type || value_type_decl)
+			h_ << "Value <S, ";
+		else
+			h_ << "Servant <S, ";
+		h_ << QName (item) << ">;\n";
 
 		if (value_type || value_type_decl)
-			h_ << "using obv_type = " << Namespace ("CORBA/Internal") << "ServantPOA <" << QName (item)
+			h_ << "using obv_type = " << Namespace ("CORBA/Internal") << "ValuePOA <" << QName (item)
 			<< ">;\n";
 		else if (ikind == InterfaceKind::LOCAL)
 			h_ << "using base_type = " << Namespace ("CORBA/Internal") << "ServantPOA <" << QName (item)

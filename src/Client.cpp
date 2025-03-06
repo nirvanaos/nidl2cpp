@@ -328,9 +328,17 @@ void Client::forward_interface (const ItemWithId& item)
 
 	if ((value_type || value_type_decl) ? abstract :
 		(ikind == InterfaceKind::LOCAL || ikind == InterfaceKind::PSEUDO)) {
-		h_ << "template <class S>\n"
-			"using ServantStatic = " << Namespace ("CORBA/Internal") << "ServantStatic <S, "
-			<< QName (item) << ">;\n";
+		h_ << "template <class S>\n";
+		if (value_type || value_type_decl)
+			h_ << "using ValueStatic = ";
+		else
+			h_ << "using ServantStatic = ";
+		h_ << Namespace ("CORBA/Internal");
+		if (value_type || value_type_decl)
+			h_ << "ValueStatic <S, ";
+		else
+			h_ << "ServantStatic <S, ";
+		h_ << QName (item) << ">;\n";
 	}
 
 	h_ << "using is_abstract = std::" << (abstract ? "true_type" : "false_type") << ";\n";

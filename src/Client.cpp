@@ -2667,7 +2667,9 @@ void Client::generate_ami (const Interface& itf)
 void Client::traits_begin (const ItemWithId& item)
 {
 	h_.namespace_open ("IDL");
-	h_ << "template <> struct traits <" << QName (item) << ">";
+	h_ <<
+		"template <>\n"
+		"struct traits <" << QName (item) << ">";
 }
 
 inline

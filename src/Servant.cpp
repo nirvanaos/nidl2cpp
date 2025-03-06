@@ -359,9 +359,8 @@ void Servant::end (const Interface& itf)
 
 		h_.namespace_close ();
 
-		if (itf.interface_kind () != InterfaceKind::PSEUDO
-		&& itf.interface_kind () != InterfaceKind::ABSTRACT) {
-			if (options ().legacy) {
+		if (itf.interface_kind () != InterfaceKind::ABSTRACT) {
+			if (options ().legacy && itf.interface_kind () != InterfaceKind::PSEUDO) {
 
 				h_ << "\n#ifdef LEGACY_CORBA_CPP\n";
 				const NamedItem* ns = itf.parent ();
@@ -400,8 +399,13 @@ void Servant::end (const Interface& itf)
 			}
 
 			h_.namespace_open ("CORBA");
-			h_ << "template <> struct servant_traits <" << QName (itf) << "> :\n"
-				<< indent << "Internal::ServantTraits <" << QName (itf) << ">\n"
+			h_ <<
+				"template <>\n"
+				"struct servant_traits <" << QName (itf) << "> :\n"
+				<< indent << "Internal::TraitsServant";
+			if (itf.interface_kind () == InterfaceKind::PSEUDO)
+				h_ << "Pseudo";
+			h_ << " <" << QName (itf) << ">\n"
 				<< unindent << "{};\n";
 		}
 	}

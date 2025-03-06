@@ -461,7 +461,7 @@ void Servant::end (const ValueType& vt)
 
 		h_ << empty_line
 			<< "template <class S>\n"
-			"class Servant <S, " << QName (vt) << "> :\n"
+			"class Value <S, " << QName (vt) << "> :\n"
 			<< indent;
 
 		enum class BaseType {
@@ -578,7 +578,7 @@ void Servant::end (const ValueType& vt)
 		}
 		all_members.insert (all_members.end (), members.begin (), members.end ());
 
-		value_constructors ("Servant", all_members);
+		value_constructors ("Value", all_members);
 
 		h_ << unindent
 			<< "};\n";
@@ -588,7 +588,7 @@ void Servant::end (const ValueType& vt)
 		if (vt.modifier () == ValueType::Modifier::ABSTRACT) {
 			h_ << empty_line
 				<< "template <class S>\n"
-				"class ServantStatic <S, " << QName (vt) << "> : public ValueStatic";
+				"class ValueStatic <S, " << QName (vt) << "> : public ImplementationValueStatic";
 			
 			if (BaseType::CONCRETE == base_type)
 				h_ << "Supports";
@@ -610,18 +610,18 @@ void Servant::end (const ValueType& vt)
 
 		h_ << empty_line
 			<< "template <>\n"
-			"class ServantPOA <" << QName (vt) << "> :\n"
+			"class ValuePOA <" << QName (vt) << "> :\n"
 			<< indent;
 		if (vt.bases ().empty ())
-			h_ << "public virtual ServantPOA <ValueBase>,\n";
+			h_ << "public virtual ValuePOA <ValueBase>,\n";
 		else
 			for (auto b : vt.bases ()) {
-				h_ << "public virtual ServantPOA <" << QName (*b) << ">,\n";
+				h_ << "public virtual ValuePOA <" << QName (*b) << ">,\n";
 			}
 		for (auto b : vt.supports ()) {
-			h_ << "public virtual ServantPOA <" << QName (*b) << ">,\n";
+			h_ << "public virtual ValuePOA <" << QName (*b) << ">,\n";
 		}
-		h_ << "public ValueImpl <ServantPOA <" << QName (vt) << ">, " << QName (vt) << ">\n"
+		h_ << "public ValueImpl <ValuePOA <" << QName (vt) << ">, " << QName (vt) << ">\n"
 			<< unindent <<
 			"{\n"
 			"public:\n" << indent
@@ -662,7 +662,7 @@ void Servant::end (const ValueType& vt)
 			}
 		}
 
-		value_constructors ("ServantPOA", all_members);
+		value_constructors ("ValuePOA", all_members);
 
 		h_ << unindent << 
 			"\nprivate:\n"
@@ -718,7 +718,7 @@ void Servant::end (const ValueType& vt)
 		// OBV_ type
 
 		h_.namespace_open (vt);
-		h_ << "typedef " << Namespace ("CORBA/Internal") << "ServantPOA <" << vt.name () << "> OBV_"
+		h_ << "typedef " << Namespace ("CORBA/Internal") << "ValuePOA <" << vt.name () << "> OBV_"
 			<< static_cast <const std::string&> (vt.name ()) << ";\n";
 
 		if (vt.modifier () != ValueType::Modifier::ABSTRACT) {

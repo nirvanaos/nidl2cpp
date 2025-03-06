@@ -400,20 +400,9 @@ void Servant::end (const Interface& itf)
 			}
 
 			h_.namespace_open ("CORBA");
-			h_ << "template <> struct servant_traits <" << QName (itf)
-				<< "> : public Internal::TraitsInterface <I>\n"
-				"{\n" << indent <<
-				"typedef Internal::ServantPOA <I> base_type;\n"
-				"typedef servant_reference <Internal::ServantPOA <I> > ref_type;\n"
-				"\n"
-				"template <class S>\n"
-				"using tie_type = Internal::ServantTied <S, I>;\n"
-				"\n"
-				"template <class S>\n"
-				"using Servant = Internal::Servant <S, I>;\n"
-				"template <class S>\n"
-				"using ServantStatic = Internal::ServantStatic <S, I>;\n"
-				<< unindent << "};\n";
+			h_ << "template <> struct servant_traits <" << QName (itf) << "> :\n"
+				<< indent << "Internal::ServantTraits <" << QName (itf) << ">\n"
+				<< unindent << "{};\n";
 		}
 	}
 }

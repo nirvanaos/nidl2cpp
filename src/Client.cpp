@@ -303,7 +303,7 @@ void Client::forward_interface (const ItemWithId& item)
 		|| ikind == InterfaceKind::LOCAL || ikind == InterfaceKind::PSEUDO) {
 
 		h_ << "template <class S>\n"
-			"using Value = " << Namespace ("CORBA/Internal");
+			"using Servant = " << Namespace ("CORBA/Internal");
 		if (value_type || value_type_decl)
 			h_ << "Value <S, ";
 		else
@@ -328,12 +328,8 @@ void Client::forward_interface (const ItemWithId& item)
 
 	if ((value_type || value_type_decl) ? abstract :
 		(ikind == InterfaceKind::LOCAL || ikind == InterfaceKind::PSEUDO)) {
-		h_ << "template <class S>\n";
-		if (value_type || value_type_decl)
-			h_ << "using ValueStatic = ";
-		else
-			h_ << "using ServantStatic = ";
-		h_ << Namespace ("CORBA/Internal");
+		h_ << "template <class S>\n"
+			"using ServantStatic = " << Namespace ("CORBA/Internal");
 		if (value_type || value_type_decl)
 			h_ << "ValueStatic <S, ";
 		else

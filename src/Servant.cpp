@@ -359,43 +359,61 @@ void Servant::end (const Interface& itf)
 
 		h_.namespace_close ();
 
-		if (options ().legacy && itf.interface_kind () != InterfaceKind::PSEUDO
-			&& itf.interface_kind () != InterfaceKind::ABSTRACT) {
+		if (itf.interface_kind () != InterfaceKind::PSEUDO
+		&& itf.interface_kind () != InterfaceKind::ABSTRACT) {
+			if (options ().legacy) {
 
-			h_ << "\n#ifdef LEGACY_CORBA_CPP\n";
-			const NamedItem* ns = itf.parent ();
-			if (ns) {
-				ScopedName sn = ns->scoped_name ();
-				{
-					std::string s = "POA_";
-					s += sn.front ();
-					h_ << "namespace " << s << " {\n";
+				h_ << "\n#ifdef LEGACY_CORBA_CPP\n";
+				const NamedItem* ns = itf.parent ();
+				if (ns) {
+					ScopedName sn = ns->scoped_name ();
+					{
+						std::string s = "POA_";
+						s += sn.front ();
+						h_ << "namespace " << s << " {\n";
+					}
+					for (auto it = sn.cbegin () + 1; it != sn.cend (); ++it) {
+						h_ << "namespace " << *it << " {\n";
+					}
+
+					h_ << "\n"
+						"typedef " << Namespace ("CORBA/Internal")
+						<< "ServantPOA <" << QName (itf) << "> " << itf.name () << ";\n";
+
+					if (itf.interface_kind () != InterfaceKind::ABSTRACT)
+						h_ << "template <class T> using " << itf.name () << "_tie = "
+						<< Namespace ("CORBA/Internal") << "ServantTied <T, " << QName (itf) << ">;\n\n";
+
+					for (size_t cnt = sn.size (); cnt; --cnt) {
+						h_ << "}\n";
+					}
+				} else {
+
+					h_ << "typedef " << Namespace ("CORBA/Internal")
+						<< "ServantPOA <" << QName (itf) << "> POA_" << static_cast <const std::string&> (itf.name ()) << ";\n";
+
+					if (itf.interface_kind () != InterfaceKind::ABSTRACT)
+						h_ << "template <class T> using POA_" << static_cast <const std::string&> (itf.name ()) << "_tie = "
+						<< Namespace ("CORBA/Internal") << "ServantTied <T, " << QName (itf) << ">;\n\n";
 				}
-				for (auto it = sn.cbegin () + 1; it != sn.cend (); ++it) {
-					h_ << "namespace " << *it << " {\n";
-				}
-
-				h_ << "\n"
-					"typedef " << Namespace ("CORBA/Internal")
-					<< "ServantPOA <" << QName (itf) << "> " << itf.name () << ";\n";
-
-				if (itf.interface_kind () != InterfaceKind::ABSTRACT)
-					h_ << "template <class T> using " << itf.name () << "_tie = "
-					<< Namespace ("CORBA/Internal") << "ServantTied <T, " << QName (itf) << ">;\n\n";
-
-				for (size_t cnt = sn.size (); cnt; --cnt) {
-					h_ << "}\n";
-				}
-			} else {
-
-				h_ << "typedef " << Namespace ("CORBA/Internal")
-					<< "ServantPOA <" << QName (itf) << "> POA_" << static_cast <const std::string&> (itf.name ()) << ";\n";
-
-				if (itf.interface_kind () != InterfaceKind::ABSTRACT)
-					h_ << "template <class T> using POA_" << static_cast <const std::string&> (itf.name ()) << "_tie = "
-					<< Namespace ("CORBA/Internal") << "ServantTied <T, " << QName (itf) << ">;\n\n";
+				h_ << "#endif\n";
 			}
-			h_ << "#endif\n";
+
+			h_.namespace_open ("CORBA");
+			h_ << "template <> struct servant_traits <" << QName (itf)
+				<< "> : public Internal::TraitsInterface <I>\n"
+				"{\n" << indent <<
+				"typedef Internal::ServantPOA <I> base_type;\n"
+				"typedef servant_reference <Internal::ServantPOA <I> > ref_type;\n"
+				"\n"
+				"template <class S>\n"
+				"using tie_type = Internal::ServantTied <S, I>;\n"
+				"\n"
+				"template <class S>\n"
+				"using Servant = Internal::Servant <S, I>;\n"
+				"template <class S>\n"
+				"using ServantStatic = Internal::ServantStatic <S, I>;\n"
+				<< unindent << "};\n";
 		}
 	}
 }

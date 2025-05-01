@@ -1315,8 +1315,8 @@ void Client::native_itf_template (const Operation& op)
 
 		if (par_iid) {
 			// Generate template
-			h_ << "template <class I>\n"
-				"typename Type <I>::VRet " << op.name () << " (";
+			h_ << "template <class Itf>\n"
+				"typename Type <Itf>::VRet " << op.name () << " (";
 
 			auto it = op.begin ();
 			if (par_iid == *it)
@@ -1336,18 +1336,18 @@ void Client::native_itf_template (const Operation& op)
 				<< "return " << op.name () << " (";
 			it = op.begin ();
 			if (par_iid == *it)
-				h_ << "RepIdOf <I>::id";
+				h_ << "RepIdOf <Itf>::id";
 			else
 				h_ << (*it)->name ();
 			++it;
 			for (; it != op.end (); ++it) {
 				h_ << ", ";
 				if (par_iid == *it)
-					h_ << "RepIdOf <I>::id";
+					h_ << "RepIdOf <Itf>::id";
 				else
 					h_ << (*it)->name ();
 			}
-			h_ << ").template downcast <I> ();\n"
+			h_ << ").template downcast <Itf> ();\n"
 				<< unindent
 				<< "}\n";
 		}

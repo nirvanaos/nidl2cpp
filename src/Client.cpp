@@ -479,7 +479,7 @@ void Client::end_interface (const IV_Base& container)
 		h_ << "NIRVANA_BRIDGE_EPV\n";
 
 		if (concrete_itf && concrete_itf->interface_kind () != InterfaceKind::PSEUDO)
-			h_ << "Interface* (*_this) (Bridge <" << QName (vt) << ">*, Interface*);\n";
+			h_ << "Interface* (*_this) (Bridge <" << QName (vt) << ">*, Interface*) noexcept;\n";
 	}
 
 	for (auto item : container) {
@@ -498,7 +498,15 @@ void Client::end_interface (const IV_Base& container)
 					h_ << ", " << ABI_param (*param);
 				}
 
-				h_ << ", Interface*);\n";
+				h_ << ", Interface*)";
+
+				// Special case for Nirvana::Main and Nirvana::ModuleInit
+				if (!pseudo_interface || op.name () != "raise_exception"
+					|| !container.parent () || container.parent ()->name () != "Nirvana"
+					|| (container.name () != "Main" && container.name () != "ModuleInit")
+				)
+					h_ << " noexcept";
+				h_ << ";\n";
 
 			} break;
 
@@ -518,17 +526,17 @@ void Client::end_interface (const IV_Base& container)
 					if (!att)
 						h_ << "const ";
 					h_ << "Bridge <" << QName (container)
-						<< ">*, Interface*);\n";
+						<< ">*, Interface*) noexcept;\n";
 				}
 
 				if (att ? (!(att->readonly () || is_native (att->setraises ()))) : !is_ref_type (m)) {
 					h_ << "void (*_set_" << m.name () << ") (Bridge <" << QName (container)
-						<< ">*, " << ABI_param (m) << ", Interface*);\n";
+						<< ">*, " << ABI_param (m) << ", Interface*) noexcept;\n";
 				}
 
 				if (!att && is_var_len (m)) {
 					h_ << "void (*_move_" << m.name () << ") (Bridge <" << QName (container)
-						<< ">*, " << ABI_param (m, Parameter::Attribute::INOUT) << ", Interface*);\n";
+						<< ">*, " << ABI_param (m, Parameter::Attribute::INOUT) << ", Interface*) noexcept;\n";
 				}
 			} break;
 		}

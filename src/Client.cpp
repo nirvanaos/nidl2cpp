@@ -170,9 +170,7 @@ void Client::leaf (const TypeDef& item)
 		cpp_ << "NIRVANA_SELECTANY\n"
 			"const " << Namespace ("CORBA/Internal") << "Alias " << TC_Name (item)
 			<< " { \"" << item.repository_id () << "\", \"" << name << "\",\n"
-			"NIRVANA_STATIC_BRIDGE ("
-			<< Namespace ("CORBA") << "TypeCode, "
-			<< Namespace ("CORBA/Internal") << "TypeDef <&" << TC_Name (item) << ">) }; \n";
+			<< Namespace ("CORBA/Internal") << "TypeDef <&" << TC_Name (item) << ">::_bridge () }; \n";
 	}
 }
 

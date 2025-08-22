@@ -230,14 +230,12 @@ void Proxy::end (const Interface& itf)
 		generate_poller (itf, *ami->poller);
 
 	cpp_.namespace_close ();
-	cpp_ << "NIRVANA_EXPORT (" << export_name (itf) << ", CORBA::Internal::RepIdOf <" << QName (itf)
-		<< ">::id, CORBA::Internal::ProxyFactory, CORBA::Internal::ProxyFactoryImpl"
-		<< " <" << QName (itf);
+	cpp_ << "NIRVANA_EXPORT_PROXY (" << export_name (itf) << ", " << QName (itf);
 
 	if (ami)
 		cpp_ << ", " << QName (*ami->poller);
 
-	cpp_ << ">)\n";
+	cpp_ << ")\n";
 }
 
 void Proxy::md_operation (const Interface& itf, const OpMetadata& op, bool no_rq)
@@ -349,8 +347,8 @@ void Proxy::type_code_members (const ItemWithId& item, const Members& members)
 Code& Proxy::exp (const NamedItem& item)
 {
 	return cpp_ <<
-		"NIRVANA_EXPORT (" << export_name (item) << ", "
-		"CORBA::Internal::RepIdOf <" << QName (item) << ">::id, CORBA::TypeCode, CORBA::Internal::";
+		"NIRVANA_EXPORT_STATIC (" << export_name (item) << ", "
+		"CORBA::Internal::RepIdOf <" << QName (item) << ">::id, CORBA::Internal::";
 }
 
 void Proxy::leaf (const Enum& item)
@@ -407,9 +405,7 @@ void Proxy::leaf (const ValueBox& vb)
 	cpp_ << TypeCodeName (vb);
 
 	cpp_.namespace_close ();
-	cpp_ << "NIRVANA_EXPORT (" << export_name (vb) << ", CORBA::Internal::RepIdOf <" << QName (vb) << ">::id, CORBA"
-		<< "::Internal::PseudoBase, CORBA::Internal::ValueBoxFactory <"
-		<< QName (vb) << ">)\n";
+	cpp_ << "NIRVANA_EXPORT_VB_FACTORY (" << export_name (vb) << ", " << QName (vb) << ")\n";
 }
 
 void Proxy::leaf (const Union& item)

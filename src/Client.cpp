@@ -1755,6 +1755,11 @@ void Client::define_structured_type (const ItemWithId& item)
 			h_ << unindent << "}\n\n"
 				"static const size_t CDR_align = " << size_and_alignment.alignment << ";\n"
 				"static const size_t CDR_size = " << size_and_alignment.size << ";\n";
+
+			cpp_.namespace_open ("CORBA/Internal");
+			cpp_ << "const size_t Type <" << QName (item) << suffix << ">::CDR_align;\n";
+			cpp_ << "const size_t Type <" << QName (item) << suffix << ">::CDR_size;\n";
+
 		}
 	}
 

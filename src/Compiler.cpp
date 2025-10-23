@@ -60,7 +60,9 @@ void Compiler::print_usage_info (const char* exe_name)
 		"\t-no_servant             Do not generate servant implementations.\n"
 		"\t-inc_cpp <file>         Add additional include file to each .cpp file\n"
 		"\t-no_ami                 Do not generate AMI\n"
-		"\t--version               Print compiler version\n";
+		"\t--version               Print compiler version\n"
+		"For -out... options, if the directory path is not absolute, it resolves relative to the"
+		" source IDL file location.\n";
 }
 
 const char* Compiler::option (const char* arg, const char* opt)
@@ -177,10 +179,16 @@ path Compiler::out_file (const Root& tree, const path& dir, const std::string& s
 {
 	path name (tree.file ().stem ().string () + suffix);
 	name.replace_extension (ext);
-	if (!dir.empty ())
-		return dir / name;
+
+	path out_dir = tree.file ().parent_path ();
+	if (dir.empty ())
+		out_dir = tree.file ().parent_path ();
+	else if (dir.is_absolute ())
+		out_dir = dir;
 	else
-		return tree.file ().parent_path () / name;
+		out_dir = tree.file ().parent_path () / dir;
+		
+	return  out_dir / name;
 }
 
 void Compiler::generate_code (const Root& tree)

@@ -5,7 +5,7 @@ cmake_policy(SET CMP0053 NEW)
 
 set(CMAKE_CONFIGURATION_TYPES Debug Release)
 
-project(nidl2cpp VERSION 0.1.3 LANGUAGES CXX)
+project(nidl2cpp VERSION 1.0.0 LANGUAGES CXX)
 
 add_subdirectory(src)
 install(TARGETS ${PROJECT_NAME} EXPORT ${PROJECT_NAME}_targets)

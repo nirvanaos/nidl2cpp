@@ -42,8 +42,9 @@ jobs:
 #      with:
 #        vcpkgGitCommitId: '${{ matrix.vcpkgCommitId }}'
     
-    - name: Setup Ninja
-      uses: seanmiddleditch/gha-setup-ninja@master
+# This action is no longer necessary, as ninja is now included on all default GitHub runner instances.
+#    - name: Setup Ninja
+#      uses: seanmiddleditch/gha-setup-ninja@master
 
     - name: Set reusable strings
       # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.

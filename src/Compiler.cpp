@@ -34,7 +34,7 @@ using std::filesystem::path;
 using namespace AST;
 
 const char Compiler::name_ [] = "Nirvana IDL to C++ compiler";
-const unsigned short Compiler::version_ [3] = { 0, 0, 1 };
+const unsigned short Compiler::version_ [3] = { 1, 0, 1 };
 
 void Compiler::print_usage_info (const char* exe_name)
 {
